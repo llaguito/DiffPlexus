@@ -1,7 +1,16 @@
 <html>
+
 <head>
     <title>Diff</title>
+    <meta charset="utf-8">
+    <title>Comparador</title>
+    <link rel="stylesheet" href="./css/style.css" />
+    <script type="text/javascript" src="./mapa_resources/diff.js"></script>
+    <script type="text/javascript" src="./mapa_resources/archivo.js"></script>
+    <script type="text/javascript" src="./mapa_resources/general.js"></script>
+    <script type="text/javascript" src="./mapa_resources/jquery-3.3.1.min.js"></script>
 </head>
+
 <body>
 
     <iframe id="page1" frameborder="0" src="" style="width:700px; height:1000px; border:0p;"></iframe>
@@ -9,7 +18,16 @@
 
     <script src="mapa_resources/jquery-3.3.1.min.js"></script>
     <script>
+
+        window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
+        window.requestFileSystem(type, size, successCallback, opt_errorCallback);
+
+        function onInitFs(fs) {
+            console.log('Opened file system: ' + fs.name);
+        }
+
         function getAllFiles() {
+
             
         }
         function lee(fichero, observador) {
@@ -53,5 +71,25 @@
                 // alert( modificado );
             }); }, 1000);
     </script>
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">Ficheros</span>
+            <nav class="mdl-navigation">
+                <ul id="listaArchivos" class="demo-list-icon mdl-list"></ul>
+            </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <table id="tablaVisualizar">
+                <thead>
+                    <tr>
+                        <th>Original</th>
+                        <th>Nuevo</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </main>
+    </div>
 </body>
+
 </html>
