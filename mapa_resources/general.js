@@ -25,7 +25,7 @@ function Inicio() {
     ListarArchivos();
 
     setTimeout(function() {
-        lee("es/caixagalicia/anpm/prestamos/catalogo/servicios/fachada/BusquedaProductoSrv.java", function(original, modificado) {
+        lee("../archivos_java/prueba.java.", function(original, modificado) {
             alert("Fichero cargado.");
             alert(original);
             alert(modificado);
