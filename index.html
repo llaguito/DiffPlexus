@@ -1,169 +1,57 @@
-<!DOCTYPE html>
-<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <html>
 <head>
-	<meta charset="utf-8">
-	<title>comparación</title>
-	<link rel="stylesheet" href="style.css"/>
+    <title>Uno</title>
 </head>
 <body>
-<!--<input id="fileInput" type="file" size="50" onchange="processFiles(this.files)">-->
-<div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
-	<div class="mdl-layout__drawer">
-	  <span class="mdl-layout-title">Ficheros</span>
-	  <nav class="mdl-navigation">
-		<ul class="demo-list-icon mdl-list">
-			<li class="mdl-list__item">
-			  <span class="mdl-list__item-primary-content">
-			  <i class="material-icons mdl-list__item-icon">list_alt</i>
-			  <a>Bryan Cranston</a>
-		  </span>
-			</li>
-			<li class="mdl-list__item">
-			  <span class="mdl-list__item-primary-content">
-			  <i class="material-icons mdl-list__item-icon">list_alt</i>
-			  <a>Aaron Paul</a>
-			</span>
-			</li>
-			<li class="mdl-list__item">
-			  <span class="mdl-list__item-primary-content">
-			  <i class="material-icons mdl-list__item-icon">list_alt</i>
-			 <a>Bob Odenkirk</a> 
-			</span>
-			</li>
-		  </ul>
-	  </nav>
-	</div>
-	<main class="mdl-layout__content">
-		<table id="tablaVisualizar">
-			<tr class="trHead">
-				<th>Original</th>
-				<th>Nuevo</th>
-			</tr>
-			<tr>
-				<td contenteditable="true"></td>
-				<td contenteditable="true"></td>
-			</tr>
-		</table>
-	</main>
-  </div>
 
-<!-- pueden usarse
-<script src="diff.js">
-</script>
-<script defer>
-var a = document.getElementById('a');
-var b = document.getElementById('b');
-var result = document.getElementById('result');
+    <iframe id="page1" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
+    <iframe id="page2" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
 
-function readTextFile(file)
-{
-    var rawFile = new XMLHttpRequest();
-    rawFile.open("GET", file, false);
-    rawFile.onreadystatechange = function ()
-    {
-        if(rawFile.readyState === 4)
-        {
-            if(rawFile.status === 200 || rawFile.status == 0)
-            {
-                var allText = rawFile.responseText;
-                alert(allText);
-            }
+    <script src="mapa_resources/jquery-3.3.1.min.js"></script>
+    <script>
+        function getAllFiles() {
+            
         }
-    }
-    rawFile.send(null);
-}
+        function lee(fichero, observador) {
+            var original = null;
+            var original_loaded = false;
+            var destino = null;
+            var destino_loaded = false;
 
-function changed() {
-	if(window.diffType == 'applyPatch') {
-		b.textContent = JsDiff.applyPatch(a.textContent, result.textContent);
-	} else if(window.diffType == 'createPatch') {
-		result.textContent = JsDiff.createPatch('filename',a.textContent, b.textContent,'left','right');
-	} else {
-		var diff = JsDiff[window.diffType](a.textContent, b.textContent);
-		var fragment = document.createDocumentFragment();
-		for (var i=0; i < diff.length; i++) {
-
-			if (diff[i].added && diff[i + 1] && diff[i + 1].removed) {
-				var swap = diff[i];
-				diff[i] = diff[i + 1];
-				diff[i + 1] = swap;
-			}
-
-			var node;
-			if (diff[i].removed) {
-				node = document.createElement('del');
-				node.appendChild(document.createTextNode(diff[i].value));
-			} else if (diff[i].added) {
-				node = document.createElement('ins');
-				node.appendChild(document.createTextNode(diff[i].value));
-			} else {
-				node = document.createTextNode(diff[i].value);
-			}
-			fragment.appendChild(node);
-		}
-
-		result.textContent = '';
-		result.appendChild(fragment);
-	}
-}
-
-window.onload = function() {
-	onDiffTypeChange(document.querySelector('#settings [name="diff_type"]:checked'));
-	changed();
-};
-
-a.onpaste = a.onchange =
-b.onpaste = b.onchange =
-result.onpaste = result.onchange =
- changed;
-
-if ('oninput' in a) {
-	a.oninput = b.oninput = result.oninput = changed;
-} else {
-	a.onkeyup = b.onkeyup = result.onkeyup = changed;
-}
-
-function onDiffTypeChange(radio) {
-	window.diffType = radio.value;
-	document.title = "Diff " + radio.parentNode.innerText;
-	if(window.diffType == "applyPatch") {
-		b.removeAttribute('contenteditable');
-		result.setAttribute('contenteditable','true');
-	} else {
-		result.removeAttribute('contenteditable');
-		b.setAttribute('contenteditable','true');
-	}
-}
-
-var radio = document.getElementsByName('diff_type');
-for (var i = 0; i < radio.length; i++) {
-	radio[i].onchange = function(e) {
-		onDiffTypeChange(e.target);
-		changed();
-	}
-}
-</script>
-<script>
-
-
-function processFiles(files) {
-var file = files[0];
-
-var reader = new FileReader();
-
-reader.onload = function (e) {
-// Cuando éste evento se dispara, los datos están ya disponibles.
-// Se trata de copiarlos a una área <div> en la página.
-var output = document.getElementById("fileOutput");
-output.textContent = e.target.result;
-};
-reader.readAsText(file);
-}
-
-
-</script>
--->
+            leeFichero("./src/main/java/"+fichero+".original", 'page1', function(content){
+                original = content;
+                original_loaded = true;
+                if( destino_loaded ) {
+                    observador( original, destino );
+                }
+            });
+            leeFichero("./src/main/java/"+fichero+".new", 'page2', function(content){
+                destino = content;
+                destino_loaded = true;
+                if( original_loaded ) {
+                    observador( original, destino );
+                }
+            });
+        }
+        
+        function leeFichero(fichero, inname, callback) {
+            var iframe = document.getElementById(inname);
+            iframe.src = fichero;
+            setTimeout(function() {
+                try {
+                    callback( iframe.contentWindow.document.body.innerText); 
+                } catch(fail) {
+                    console.log( fail );
+                    alert("Su navegador no permite acceder al contenido local. Pruebe a usar iexplorer");
+                }
+            }, 250);
+        }
+        setTimeout(function() {
+            lee("es/caixagalicia/anpm/prestamos/catalogo/servicios/fachada/BusquedaProductoSrv.java", function(original, modificado){
+                alert("Fichero cargado.");
+                alert( original );
+                alert( modificado );
+            }); }, 1000);
+    </script>
 </body>
 </html>

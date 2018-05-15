@@ -1,0 +1,446 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionConsultaDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestorCuadroAmortizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.GenerarCuadroAmortizacionVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IRegistro;
+
+
+
+public class ContextoGenerarCuadroAmortizacion
+{
+
+	//*****************   CONSTANTES NECESARIAS PARA EL CONTEXTO DE SALIDA QUE ESTAMOS RELLENANDO ********************** 
+	private static final String CTX_RETORNO_ID = "ANPMN424";
+	private static final String CTX_RETORNO_PRODUCTO= "ANPMN424010";
+	private static final String CTX_RETORNO_SUBPRODUCTO= "ANPMN424020";
+	private static final String CTX_RETORNO_VERSION_SUBP= "ANPMN424030";
+	private static final String CTX_RETORNO_COLECTIVO= "ANPMN424040";
+	private static final String CTX_RETORNO_OFICINA= "ANPMN424050";
+	private static final String CTX_RETORNO_NUM_SOLIC= "ANPMN424060";
+	private static final String CTX_RETORNO_VERSION_SOLIC= "ANPMN424070";
+	private static final String CTX_RETORNO_NUC_EXP= "ANPMN424080";
+	private static final String CTX_RETORNO_DIGITO_SOLIC= "ANPMN424090";
+	private static final String CTX_RETORNO_INDICADOR_TAE= "ANPMN424100";
+	private static final String CTX_RETORNO_CODIGO_ERROR = "ANPMN424110";
+	private static final String CTX_RETORNO_MENSAJE_ERROR= "ANPMN424120";	
+	private static final String CTX_RETORNO_NUM_CUOTAS= "ANPMN424130";
+	private static final String CTX_RETORNO_PERIODO_AMORTIZACION= "ANPMN424140";
+	private static final String CTX_RETORNO_PRIMERA_CUOTA= "ANPMN424150";
+	private static final String CTX_RETORNO_SUCESIVAS= "ANPMN424160";
+	private static final String CTX_RETORNO_ULTIMA_CUOTA= "ANPMN424170";
+	private static final String CTX_RETORNO_CAPITAL_PRESTAMO= "ANPMN424180";
+	private static final String CTX_RETORNO_MATRIZ_PAGOS= "ANPMN424190";
+	private static final String CTX_RETORNO_PORCENTAJE_TAE= "ANPMN424200";
+	private static final String CTX_RETORNO_PORCENTAJE_TAE_BONIFICADA= "ANPMN424210";
+	private static final String CTX_RETORNO_FECHA_INICIO_PLAZO= "ANPMN424220";
+	private static final String CTX_RETORNO_INTERES_INICIAL= "ANPMN424230";
+	private static final String CTX_RETORNO_FECHA_PRIMERA_REVISION= "ANPMN424240";
+	private static final String CTX_RETORNO_PORCENTAJE_REFERENCIA_ACTUAL= "ANPMN424250";
+	private static final String CTX_RETORNO_INTERES_MINIMO_REFERENCIA= "ANPMN424260";
+	private static final String CTX_RETORNO_FECHA_MINIMO_REFERENCIA= "ANPMN424270";
+	private static final String CTX_RETORNO_INTERES_MAXIMO_REFERENCIA= "ANPMN424280";
+	private static final String CTX_RETORNO_FECHA_MAXIMO_REFERENCIA= "ANPMN424290";
+	private static final String CTX_RETORNO_INTERES_MEDIO_REFERENCIA= "ANPMN424300";
+	private static final String CTX_RETORNO_CUIOTA_SUELO= "ANPMN424310";
+	private static final String CTX_RETORNO_CUOTA_TECHO= "ANPMN424320";
+	private static final String CTX_RETORNO_CUOTA_MINIMA= "ANPMN424330";
+	private static final String CTX_RETORNO_CUOTA_MAXIMA= "ANPMN424340";
+	private static final String CTX_RETORNO_CUOTA_MEDIA= "ANPMN424350";
+	private static final String CTX_RETORNO_VARIACION_REFERENCIA= "ANPMN424360";
+	private static final String CTX_RETORNO_TOTAL_INTERES_ORDINARIO= "ANPMN424370";
+	private static final String CTX_RETORNO_TOTAL_INTERES_DEMORA= "ANPMN424380";	
+	private static final String CTX_RETORNO_IND_MAS_ELEMENTOS_MATRIZ= "ANPMN424410";
+	private static final String CTX_RETORNO_FECHA_REPOS_SI_RELLAMADA= "ANPMN424420";
+	private static final String CTX_RETORNO_FECHA_PUBLICACION_TIPO_REF = "ANPMN424450";
+	private static final String CTX_RETORNO_IMPORTE_COMISION_APERTURA = "ANPMN424460";
+	private static final String CTX_RETORNO_IMPORTE_TOTAL_A_FINANCIAR = "ANPMN424470";
+	private static final String CTX_RETORNO_INDICADOR_CONDONAR_COMISION_APERTURA = "ANPMN424480";
+	private static final String CTX_RETORNO_CUOTA_SCORING = "ANPMN424490";
+	private static final String CTX_RETORNO_INTERES_TRAMO3 = "ANPMN424530";
+	private static final String CTX_RETORNO_TIPO_REFERENCIA_TRAMO3 = "ANPMN424540";
+	
+	
+	//****************** CONSTANTES NECESARIAS PARA EL CONTEXTO DE SALIDA DEL CUAL ESTAMOS COGIENDO LOS DATOS, CONTEXTO QUE DEVUELVE EL PL1 *********************** 
+	private static final String CTX_PRODUCTO= "ANPMN425010";
+	private static final String CTX_SUBPRODUCTO= "ANPMN425020";
+	private static final String CTX_VERSION_SUBP= "ANPMN425030";
+	private static final String CTX_COLECTIVO= "ANPMN425040";
+	private static final String CTX_OFICINA= "ANPMN425050";
+	private static final String CTX_NUM_SOLIC= "ANPMN425060";
+	private static final String CTX_VERSION_SOLIC= "ANPMN425070";
+	private static final String CTX_NUC_EXP= "ANPMN425080";
+	private static final String CTX_DIGITO_SOLIC= "ANPMN425090";	
+	private static final String CTX_INDICADOR_TAE= "ANPMN425170";	
+	private static final String CTX_CODIGO_ERROR = "ANPMN425730";
+	private static final String CTX_MENSAJE_ERROR= "ANPMN425735";
+//	private static final String CTX_NUMERO_CUOTAS = "ANPMN425740";
+	private static final String CTX_PERIODO_AMORTIZACION= "ANPMN425745";
+	private static final String CTX_PRIMERA_CUOTA= "ANPMN425750";
+	private static final String CTX_SUCESIVAS = "ANPMN425755";
+	private static final String CTX_ULTIMA_CUOTA= "ANPMN425760";
+	private static final String CTX_CAPITAL_PRESTAMO= "ANPMN425765";
+	private static final String CTX_MATRIZ_PAGOS = "ANPMN425770";
+	private static final String CTX_PORC_TAE_NORMAL = "ANPMN425800";
+	private static final String CTX_PORC_TAE_BONIFICADA = "ANPMN425805";
+	private static final String CTX_FECHA_INICIO_PLAZO = "ANPMN425810";
+	private static final String CTX_INTERES_INICIAL = "ANPMN425815";
+	private static final String CTX_FECHA_PRIMERA_REVISION = "ANPMN425820";
+	private static final String CTX_PORC_REFERENCIA_ACTUAL = "ANPMN425825";
+	private static final String CTX_INTERES_MINIMO_REFERENCIA = "ANPMN425830";
+	private static final String CTX_FECHA_MINIMO_REFERENCIA = "ANPMN425835";
+	private static final String CTX_INTERES_MAXIMO_REFERENCIA = "ANPMN425840";
+	private static final String CTX_FECHA_MAXIMO_REFERENCIA = "ANPMN425845";
+	private static final String CTX_INTERES_MEDIO_REFERENCIA = "ANPMN425850";	
+	private static final String CTX_CUOTA_SUELO = "ANPMN425855";
+	private static final String CTX_CUOTA_TECHO = "ANPMN425860";
+	private static final String CTX_CUOTA_MINIMA = "ANPMN425865";
+	private static final String CTX_CUOTA_MAXIMA = "ANPMN425870";
+	private static final String CTX_CUOTA_MEDIA = "ANPMN425875";
+	private static final String CTX_VARIACION_REFERENCIA = "ANPMN425880";
+	private static final String CTX_TOTAL_INTERES_ORDINARIO= "ANPMN425885";
+	private static final String CTX_TOTAL_INTERES_DEMORA = "ANPMN425890";
+	private static final String CTX_IND_MAS_ELEMENTOS_MATRIZ = "ANPMN425895";
+	private static final String CTX_FECHA_REPOSIC_SI_RELLAMADA = "ANPMN425900";
+	
+	private static final String CTX_ID_REGISTRO_INTERES = "ANPMN425400";
+	
+    
+	 /**
+	 * Rellena el contexto de salida del proceso generación del
+	 * cuadro de amortización
+	 * @param error
+	 * @param ctxtoPrograma
+	 * @return object
+	 * 
+	 */
+	public static IContexto rellenarContextoGenerarCuadroAmortizacion(
+		BigDecimal error, IContexto ctxtoPrograma, GenerarCuadroAmortizacionVO generarCuadroAmortizacionVO,
+		String codErrorValidacion)
+	{
+		
+		return rellenarContextoGenerarCuadroAmortizacion(error, ctxtoPrograma,
+				generarCuadroAmortizacionVO, codErrorValidacion, null, 0);
+	}
+	
+	
+	 /**
+	 * Rellena el contexto de salida del proceso generación del
+	 * cuadro de amortización
+	 * @param error
+	 * @param ctxtoPrograma
+	 * @return object
+	 * 
+	 */
+	public static IContexto rellenarContextoGenerarCuadroAmortizacion(
+		BigDecimal error, IContexto ctxtoPrograma, GenerarCuadroAmortizacionVO generarCuadroAmortizacionVO,
+		String codErrorValidacion, IContexto[] salidaANPM048, int tipoCalculo)
+	{			
+		DatosSolicitudC datosSolicitud = null;
+		List<CondicionesInteresC> listaTramosInteres = null;
+		String tipoRef = null;
+		String tipoRefTruncado = null;
+		String plazoRef = null;
+		
+		String fechaPublTipoRef = null;
+		//el parámetro de entrada codErrorValidacion sólo viene informado cuando el error es = 2, (error validación campos entrada).
+		IContexto contextoRstdo = ContextoFactory.getInstance().getContexto(CTX_RETORNO_ID);
+		
+		if (error.equals(BigDecimal.ONE))
+		{
+			contextoRstdo.put(CTX_RETORNO_CODIGO_ERROR, "KO");
+			contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR,"Se ha producido un error generando el cuadro de amortización. Faltan datos de entrada obligatorios.");
+		
+		}
+		else if (error.equals (new BigDecimal(2)))
+		{
+			contextoRstdo.put(CTX_RETORNO_CODIGO_ERROR, "KO");
+			//20151001 indicamos el dato de entrada que no es válido.
+			if (Constantes.CTE_GENERAR_CUADRO_COD_ERROR_RANGO_IMPORTE.equals(codErrorValidacion))
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. El importe no está en rango.");			
+			}
+			else if (Constantes.CTE_GENERAR_CUADRO_COD_ERROR_RANGO_PLAZO.equals(codErrorValidacion))
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. El plazo no está en rango.");
+			}
+			else if (Constantes.CTE_GENERAR_CUADRO_COD_ERROR_RANGO_INTERES.equals(codErrorValidacion))
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. El interés no está en rango.");			
+			}
+			else if (Constantes.CTE_GENERAR_CUADRO_COD_ERROR_RANGO_PLAZO_INI_INTERES.equals(codErrorValidacion))
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. El plazo inicial interés no está en rango.");			
+			}
+			else if (Constantes.CTE_GENERAR_CUADRO_COD_ERROR_RANGO_DIFERENCIAL.equals(codErrorValidacion))
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. El diferencial no está en rango.");
+			}
+			else
+			{
+				contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR, "Se ha producido un error generando el cuadro de amortización. Un dato de entrada es incorrecto.");			
+			}
+		}
+		else if (error.equals (new BigDecimal(3)))
+		{
+			contextoRstdo.put(CTX_RETORNO_CODIGO_ERROR, "KO");
+			contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR,"Error. La opción introducida es incorrecta.");			
+		
+		}
+		else if (error.equals(BigDecimal.ZERO))
+		{
+			
+			contextoRstdo.put(CTX_RETORNO_PRODUCTO, ctxtoPrograma.getBigDecimal(CTX_PRODUCTO));
+			contextoRstdo.put(CTX_RETORNO_SUBPRODUCTO, ctxtoPrograma.getBigDecimal(CTX_SUBPRODUCTO));
+			contextoRstdo.put(CTX_RETORNO_COLECTIVO, ctxtoPrograma.getBigDecimal(CTX_COLECTIVO));	
+			contextoRstdo.put(CTX_RETORNO_VERSION_SUBP, ctxtoPrograma.getBigDecimal(CTX_VERSION_SUBP));			
+			contextoRstdo.put(CTX_RETORNO_OFICINA, ctxtoPrograma.getBigDecimal(CTX_OFICINA));
+			contextoRstdo.put(CTX_RETORNO_NUM_SOLIC, ctxtoPrograma.getBigDecimal(CTX_NUM_SOLIC));
+			contextoRstdo.put(CTX_RETORNO_VERSION_SOLIC,ctxtoPrograma.getBigDecimal(CTX_VERSION_SOLIC));
+			contextoRstdo.put(CTX_RETORNO_NUC_EXP, ctxtoPrograma.getBigDecimal(CTX_NUC_EXP));
+			contextoRstdo.put(CTX_RETORNO_DIGITO_SOLIC,ctxtoPrograma.getBigDecimal(CTX_DIGITO_SOLIC));
+			contextoRstdo.put(CTX_RETORNO_INDICADOR_TAE, ctxtoPrograma.getString(CTX_INDICADOR_TAE));   		
+			contextoRstdo.put(CTX_RETORNO_CODIGO_ERROR,ctxtoPrograma.getString(CTX_CODIGO_ERROR));
+			contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR,ctxtoPrograma.getString(CTX_MENSAJE_ERROR));
+			//contextoRstdo.put(CTX_RETORNO_NUM_CUOTAS,ctxtoPrograma.getBigDecimal(CTX_NUMERO_CUOTAS)); lo seteamos luego que tendremos el número de cuotas
+			contextoRstdo.put(CTX_RETORNO_PERIODO_AMORTIZACION,ctxtoPrograma.getString(CTX_PERIODO_AMORTIZACION));
+			contextoRstdo.put(CTX_RETORNO_PRIMERA_CUOTA,ctxtoPrograma.getBigDecimal(CTX_PRIMERA_CUOTA));
+			contextoRstdo.put(CTX_RETORNO_SUCESIVAS,ctxtoPrograma.getString(CTX_SUCESIVAS));
+			contextoRstdo.put(CTX_RETORNO_ULTIMA_CUOTA,ctxtoPrograma.getBigDecimal(CTX_ULTIMA_CUOTA));
+			contextoRstdo.put(CTX_RETORNO_CAPITAL_PRESTAMO,ctxtoPrograma.getBigDecimal(CTX_CAPITAL_PRESTAMO));
+			
+			contextoRstdo.put(CTX_RETORNO_IMPORTE_COMISION_APERTURA, generarCuadroAmortizacionVO.getImporteComisionApertura());
+			contextoRstdo.put(CTX_RETORNO_IMPORTE_TOTAL_A_FINANCIAR, generarCuadroAmortizacionVO.getImporteTotalFinanciar());
+			contextoRstdo.put(CTX_RETORNO_INDICADOR_CONDONAR_COMISION_APERTURA, generarCuadroAmortizacionVO.
+					getIndicadorCondonarComisionApertura());
+			contextoRstdo.put(CTX_RETORNO_INTERES_TRAMO3,generarCuadroAmortizacionVO.getInteresTramo3());
+			contextoRstdo.put(CTX_RETORNO_TIPO_REFERENCIA_TRAMO3,generarCuadroAmortizacionVO.getTipoReferenciaTramo3());
+			
+			//contextoRstdo.put(CTX_RETORNO_CUOTA_SCORING, ctxtoPrograma.getBigDecimal(CTX_PRIMERA_CUOTA));
+			contextoRstdo.put(CTX_RETORNO_CUOTA_SCORING, getCuotaScoring(generarCuadroAmortizacionVO, salidaANPM048, tipoCalculo));
+						
+			
+			List<IRegistro> lstTotalRegistrosPagosPrograma = new ArrayList<IRegistro>();
+			IRegistro[] regsPagosSalida = new IRegistro[1];
+			IRegistro regMatrizPagosSalida = null;			
+			
+			/*
+			for (IRegistro regMatrizPagosInclude : ctxtoPrograma.getRegistro(CTX_MATRIZ_PAGOS))
+			{
+				regMatrizPagosSalida = ContextoFactory.getInstance().getRegistro(contextoRstdo, "ANPMN424190");
+				if (regMatrizPagosInclude.getBigDecimal("ANPMN425771").intValue() != 0) {
+					
+					regMatrizPagosSalida.put("ANPMN424191", regMatrizPagosInclude.getBigDecimal("ANPMN425771"));
+					regMatrizPagosSalida.put("ANPMN424192", regMatrizPagosInclude.getString("ANPMN425772"));
+					regMatrizPagosSalida.put("ANPMN424193", regMatrizPagosInclude.getBigDecimal("ANPMN425773"));
+					regMatrizPagosSalida.put("ANPMN424194", regMatrizPagosInclude.getBigDecimal("ANPMN425774"));
+					regMatrizPagosSalida.put("ANPMN424195", regMatrizPagosInclude.getBigDecimal("ANPMN425775"));
+					regMatrizPagosSalida.put("ANPMN424196", regMatrizPagosInclude.getBigDecimal("ANPMN425776"));				
+					lstTotalRegistrosPagosPrograma.add(regMatrizPagosSalida);
+				}
+			}
+			regsPagosSalida = lstTotalRegistrosPagosPrograma.toArray(new IRegistro[lstTotalRegistrosPagosPrograma.size()]);		
+			contextoRstdo.put(CTX_RETORNO_MATRIZ_PAGOS, regsPagosSalida);
+			contextoRstdo.put(CTX_RETORNO_NUM_CUOTAS,new BigDecimal(regsPagosSalida.length));
+			*/
+			
+			if(!UtilidadesTramitacion.esMulticredito48H(ctxtoPrograma.getBigDecimal(CTX_PRODUCTO).toString(), 
+					ctxtoPrograma.getBigDecimal(CTX_SUBPRODUCTO).toString()))	
+			{	
+				for (IRegistro regMatrizPagosInclude : ctxtoPrograma.getRegistro(CTX_MATRIZ_PAGOS))
+				{
+					regMatrizPagosSalida = ContextoFactory.getInstance().getRegistro(contextoRstdo, "ANPMN424190");
+					if (regMatrizPagosInclude.getBigDecimal("ANPMN425771").intValue() != 0) 
+					{
+						regMatrizPagosSalida.put("ANPMN424191", regMatrizPagosInclude.getBigDecimal("ANPMN425771"));
+						regMatrizPagosSalida.put("ANPMN424192", regMatrizPagosInclude.getString("ANPMN425772"));
+						regMatrizPagosSalida.put("ANPMN424193", regMatrizPagosInclude.getBigDecimal("ANPMN425773"));
+						regMatrizPagosSalida.put("ANPMN424194", regMatrizPagosInclude.getBigDecimal("ANPMN425774"));
+						regMatrizPagosSalida.put("ANPMN424195", regMatrizPagosInclude.getBigDecimal("ANPMN425775"));
+						regMatrizPagosSalida.put("ANPMN424196", regMatrizPagosInclude.getBigDecimal("ANPMN425776"));				
+						lstTotalRegistrosPagosPrograma.add(regMatrizPagosSalida);
+					}
+				}
+				regsPagosSalida = lstTotalRegistrosPagosPrograma.toArray(new IRegistro[lstTotalRegistrosPagosPrograma.size()]);		
+				contextoRstdo.put(CTX_RETORNO_MATRIZ_PAGOS, regsPagosSalida);
+				contextoRstdo.put(CTX_RETORNO_NUM_CUOTAS,new BigDecimal(regsPagosSalida.length));
+			}
+			else
+			{ 	
+				IRegistro[] arrayInteres = new IRegistro[ctxtoPrograma.getRegistro(CTX_ID_REGISTRO_INTERES).length];
+				arrayInteres = ctxtoPrograma.getRegistro(CTX_ID_REGISTRO_INTERES);
+				
+				boolean esFijo = GestorCuadroAmortizacion.isPrestamoFijo(arrayInteres);
+				boolean esDivisa = UtilidadesTramitacion.esDivisaPorEspecialidad(ctxtoPrograma.getString("ANPMN425130"));
+				
+				GestorCuadroAmortizacion.reaplantillarConCarenciaDeInteres(ctxtoPrograma, contextoRstdo,esFijo,esDivisa);
+			}
+			
+			
+			contextoRstdo.put(CTX_RETORNO_PORCENTAJE_TAE,ctxtoPrograma.getBigDecimal(CTX_PORC_TAE_NORMAL));
+			contextoRstdo.put(CTX_RETORNO_PORCENTAJE_TAE_BONIFICADA,ctxtoPrograma.getBigDecimal(CTX_PORC_TAE_BONIFICADA));
+			contextoRstdo.put(CTX_RETORNO_FECHA_INICIO_PLAZO,ctxtoPrograma.getString(CTX_FECHA_INICIO_PLAZO));
+			contextoRstdo.put(CTX_RETORNO_INTERES_INICIAL,ctxtoPrograma.getBigDecimal(CTX_INTERES_INICIAL));
+			contextoRstdo.put(CTX_RETORNO_FECHA_PRIMERA_REVISION,ctxtoPrograma.getString(CTX_FECHA_PRIMERA_REVISION));
+			contextoRstdo.put(CTX_RETORNO_PORCENTAJE_REFERENCIA_ACTUAL,ctxtoPrograma.getBigDecimal(CTX_PORC_REFERENCIA_ACTUAL));
+			contextoRstdo.put(CTX_RETORNO_INTERES_MINIMO_REFERENCIA,ctxtoPrograma.getBigDecimal(CTX_INTERES_MINIMO_REFERENCIA));
+			contextoRstdo.put(CTX_RETORNO_FECHA_MINIMO_REFERENCIA,ctxtoPrograma.getString(CTX_FECHA_MINIMO_REFERENCIA));
+			contextoRstdo.put(CTX_RETORNO_INTERES_MAXIMO_REFERENCIA,ctxtoPrograma.getBigDecimal(CTX_INTERES_MAXIMO_REFERENCIA));
+			contextoRstdo.put(CTX_RETORNO_FECHA_MAXIMO_REFERENCIA,ctxtoPrograma.getString(CTX_FECHA_MAXIMO_REFERENCIA));
+			contextoRstdo.put(CTX_RETORNO_INTERES_MEDIO_REFERENCIA,ctxtoPrograma.getBigDecimal(CTX_INTERES_MEDIO_REFERENCIA));
+			contextoRstdo.put(CTX_RETORNO_CUIOTA_SUELO,ctxtoPrograma.getBigDecimal(CTX_CUOTA_SUELO));
+			contextoRstdo.put(CTX_RETORNO_CUOTA_TECHO,ctxtoPrograma.getBigDecimal(CTX_CUOTA_TECHO));
+			contextoRstdo.put(CTX_RETORNO_CUOTA_MINIMA,ctxtoPrograma.getBigDecimal(CTX_CUOTA_MINIMA));
+			contextoRstdo.put(CTX_RETORNO_CUOTA_MAXIMA,ctxtoPrograma.getBigDecimal(CTX_CUOTA_MAXIMA));
+			contextoRstdo.put(CTX_RETORNO_CUOTA_MEDIA,ctxtoPrograma.getBigDecimal(CTX_CUOTA_MEDIA));
+			contextoRstdo.put(CTX_RETORNO_VARIACION_REFERENCIA,ctxtoPrograma.getBigDecimal(CTX_VARIACION_REFERENCIA));
+			/* 20151001 Estos campos los informamos fuera con datos totales correctos.
+			 * 20151002 Lo dejamos como estaba
+			*/			
+			contextoRstdo.put(CTX_RETORNO_TOTAL_INTERES_ORDINARIO,ctxtoPrograma.getBigDecimal(CTX_TOTAL_INTERES_ORDINARIO));
+			contextoRstdo.put(CTX_RETORNO_TOTAL_INTERES_DEMORA,ctxtoPrograma.getBigDecimal(CTX_TOTAL_INTERES_DEMORA));
+			
+			contextoRstdo.put(CTX_RETORNO_IND_MAS_ELEMENTOS_MATRIZ,ctxtoPrograma.getString(CTX_IND_MAS_ELEMENTOS_MATRIZ));
+			contextoRstdo.put(CTX_RETORNO_FECHA_REPOS_SI_RELLAMADA,ctxtoPrograma.getString(CTX_FECHA_REPOSIC_SI_RELLAMADA));		
+			
+			/*20151016 Recuperamos la fecha de publicación del tipo de referencia y la devolvemos en el contexto ANPMN424*/
+			datosSolicitud = generarCuadroAmortizacionVO.getDatosSolicitudC();
+			listaTramosInteres = datosSolicitud.getCondicionesInteres();
+			/*  Tipo de referencia que enviamos ó PTMO_130:
+				   - Se o primeiro tramo é variable REFERENCIADO, enviamoslle o tipo de referencia do primeiro.
+				     * ELSE: se existe segundo tramo e é variable REFERENCIADO, enviamoslle o tipo de referencia do segundo.
+				 //RESUMINDO: Recorremos de primeiro a último dos principais: o primeiro que atopemos que sexa variable REFERENCIADO, break;
+			  */
+			for (CondicionesInteresC tramoInteres : listaTramosInteres)
+			{
+				//si es interés principal
+				if (0 == tramoInteres.getCondicionesInteresKey().getIntTipoCondicion().intValue())
+				{
+					//si es variable y REFERENCIADO
+					if ((IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE.equals(UtilidadesTramitacion.comprobarDatoNull(tramoInteres.getStrTipoDeInteres()))) ||
+					(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_BONIFICABLE.equals(UtilidadesTramitacion.comprobarDatoNull(tramoInteres.getStrTipoDeInteres()))) ||
+					(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_PENALIZABLE.equals(UtilidadesTramitacion.comprobarDatoNull(tramoInteres.getStrTipoDeInteres()))) ||
+					(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_CON_DIFER_BONIF.equals(UtilidadesTramitacion.comprobarDatoNull(tramoInteres.getStrTipoDeInteres()))))
+					{
+						if (! GestionConsultaDatosSolicitud.esTipoReferenciaNoReferenciado(tramoInteres.getIntTipoReferencia().toString()))
+						{
+							tipoRef = tramoInteres.getIntTipoReferencia().toString();
+							tipoRefTruncado = tipoRef.substring(0, IConstantesSolicitud.CTE_INT_2);
+							plazoRef = StringUtils.leftPad(
+									tipoRef.substring(IConstantesSolicitud.CTE_INT_2),
+									IConstantesSolicitud.CTE_INT_3,
+									IConstantesSolicitud.CTE_CHAR_0);
+							//if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getEspecialidad()) && 
+							//		datosSolicitud.getEspecialidad().equals(Constantes.CTE_ESPECIALIDAD_DIVISA) ) 
+							//{
+							if((null != datosSolicitud.getEspecialidad()) && 
+									datosSolicitud.getEspecialidad().equals(Constantes.CTE_ESPECIALIDAD_DIVISA)) 
+							{
+							
+								fechaPublTipoRef = UtilidadesComun.obtenerFechaPublicacionTipoReferenciaDivisa(datosSolicitud, tramoInteres);
+							}
+
+							break;
+						}
+					}
+				}
+			}
+			
+			if ((! UtilidadesTramitacion.isBlankOrNull(tipoRefTruncado)) && (! UtilidadesTramitacion.isBlankOrNull(plazoRef)))
+			{
+				//if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getEspecialidad()) && 
+				//	!datosSolicitud.getEspecialidad().equals(Constantes.CTE_ESPECIALIDAD_DIVISA) ) 
+				//{
+				if((null != datosSolicitud.getEspecialidad()) && 
+						!(datosSolicitud.getEspecialidad().equals(Constantes.CTE_ESPECIALIDAD_DIVISA))) 
+				{
+					//encontramos un tramo variable referenciado, procedemos a consultar la fecha de publicación del tipo de referencia asociado.
+					fechaPublTipoRef = UtilidadesTramitacion.obtenerFechaPublicacionTipoReferencia(tipoRefTruncado, plazoRef, Constantes.CTE_STR_P);
+
+					contextoRstdo.put(CTX_RETORNO_FECHA_PUBLICACION_TIPO_REF, fechaPublTipoRef);
+				}
+			}	
+		}
+		else 
+		{			
+			contextoRstdo.put(CTX_RETORNO_CODIGO_ERROR,ctxtoPrograma.getBigDecimal(CTX_CODIGO_ERROR));
+			contextoRstdo.put(CTX_RETORNO_MENSAJE_ERROR,ctxtoPrograma.getString(CTX_MENSAJE_ERROR));					
+		}	
+	
+		return contextoRstdo;
+		
+	}
+	
+	
+	/**
+	 * Metodo que calcula la cuota scoring para Aplazos. Se llama a la funcion que calcula la 
+	 * cuota scoring sin bonificar, pasandole importe solicitado, plazo e interes primer tramo. 
+	 * 
+	 * @param generarCuadroAmortizacionVO VO con informacion para generar el cuadro.
+	 * @param salidaANPM048
+	 * @param tipoCalculo
+	 * @return cuota scoring sin bonificar para Aplazos.
+	 */
+	private static BigDecimal getCuotaScoring(GenerarCuadroAmortizacionVO generarCuadroAmortizacionVO, 
+			IContexto[] salidaANPM048, int tipoCalculo){
+						
+		// Obtener plazo (en meses), importe e interesAplicar
+		BigDecimal plazo = generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoTotal(); // Plazo en meses
+		BigDecimal importeTotalFinanciar = generarCuadroAmortizacionVO.getImporteTotalFinanciar();
+		
+		// Los intereses se obtienen de la misma manera que en el servicio de calculo de cuota scoring
+		// (ANPM_403). Se llama a la misma funcion que en este servicio, indicando tipo de calculo 1
+		// (tipo de calculo a utilizar cuando el origen es simulacion).
+		/*
+		List<CondicionesInteresC> condicionesInteres = null;
+		condicionesInteres = generarCuadroAmortizacionVO.getDatosSolicitudC().getCondicionesInteres();
+		if (null != condicionesInteres){
+			for (CondicionesInteresC condicionInteres : condicionesInteres){
+				if (1 == condicionInteres.getCondicionesInteresKey().getIntOrdenDelTramo()){
+					interesAplicar = condicionInteres.getIntInteres();
+					break;
+				}
+			}
+		} */
+		
+		BigDecimal interesAplicar = GestionConsultaDatosSolicitud.obtenerInteresAplicar (null,
+				generarCuadroAmortizacionVO.getDatosSolicitudC().getIdTarifa(),
+				generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoTotal(),
+				generarCuadroAmortizacionVO.getDatosSolicitudC().getProducto(),
+				generarCuadroAmortizacionVO.getDatosSolicitudC().getSubproducto(), 
+				salidaANPM048, 
+				generarCuadroAmortizacionVO.getDatosSolicitudC().getVersionGeneral(), 
+				tipoCalculo);
+		
+		// Si el interes a aplicar es cero lo convertimos a un "valor cercano a cero" para 
+		// que no nos falle el calculo de la cuota scoring
+		if ((null != interesAplicar) && (Constantes.CTE_INT_CERO == BigDecimal.ZERO.compareTo(interesAplicar))){
+			interesAplicar = Constantes.CTE_INTERES_CERCANO_A_CERO;
+		}
+		
+		// Calcular cuota scoring
+		BigDecimal cuotaScoring = null;
+		if ((null != importeTotalFinanciar) && (null != plazo) && (null != interesAplicar)){
+			cuotaScoring = GestionConsultaDatosSolicitud.calcularCuotaScoring(importeTotalFinanciar, 
+				plazo, interesAplicar);
+		}
+		
+		// Devolver cuota scoring
+		return cuotaScoring;
+	}
+	
+}

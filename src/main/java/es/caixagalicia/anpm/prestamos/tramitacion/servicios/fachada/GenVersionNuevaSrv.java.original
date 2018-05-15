@@ -1,0 +1,694 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.aplicacion.GestionDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.parametro.ParametroC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionParametro;
+import es.caixagalicia.anpm.prestamos.comun.LogModificacionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionCondicionesInteres;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionConsultaDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionNivelesAutorizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ComparacionNivelesAutorizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ *  Servicio que genera nueva versión por cambio de tarifa (ANPM_455)
+ *  
+ *  Transacción: 
+ *  Contexto: ANPMN455
+ *  Cod_operación: ANPM_455
+ *  
+ *  @author V361749
+ *  
+ */
+
+public class GenVersionNuevaSrv extends ServicioNegocio
+{
+	private static final String CTE_ENTRADA_NUC = "NUC";
+	private static final String CTE_ID_TARIFA = "ID_TARIFA";
+	
+	private static final String CTE_RESULTADO_OK = "Se ha generado una nueva versión de la solicitud con la tarifa seleccionada";
+	private static final String CTE_RESULTADO_KO = "No se ha podido generar una nueva versión de la solicitud con la tarifa seleccionada";
+
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+	    BigDecimal nuc = null;
+		BigDecimal idTarifa = null;
+		Boolean estado = false;
+		String estadoTareaSolicitud = null;
+		BigDecimal datoCorreccion  = null;
+		BigDecimal codProd = null;
+		BigDecimal codSubprod = null;
+		BigDecimal versGeneral = null;
+		BigDecimal plazo = null;
+		BigDecimal importe = null;
+		BigDecimal origen = null;
+		final int cuentaContable = 507 ; 
+		final int cOperacion443 = 443;
+		IContexto[] retorno = null;
+		
+		Date dateMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO));
+		
+		DatosSolicitudC datosSolicitudActual = null;
+		DatosSolicitudC datosSolicitudVersionNueva = null;
+		Integer tipoReferencia = null;
+		
+		
+		/*Establecemos el diario electrónico*/
+		contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+		
+		/*Obtenemos las entradas*/
+
+		nuc = datosEntrada.getDecimal(CTE_ENTRADA_NUC);
+		idTarifa = datosEntrada.getDecimal(CTE_ID_TARIFA);
+		
+		/******FUNCIONALIDAD*****/ 
+				
+		GestionDatosSolicitud gds = new GestionDatosSolicitud(); 
+		List<CondicionesInteresC> listaInteres = null;
+		String identPrecioTarifa = null;
+		
+		if (! UtilidadesTramitacion.isBlankOrNull(nuc))// si los parámetros de entrada no son nulos
+		{
+			datosSolicitudActual = gds.getUltimaVersionCompleta(nuc);
+			
+			//20151123 Optimizamos la llamada para obtener la versión completa
+			
+		    datosSolicitudVersionNueva = gds.generarVersionCompleta(datosSolicitudActual);
+			
+			/*20151015 Rosa: "resetear os campos de fijación del tipo de referencia, valor de referencia, as duas taes e a fecha de impresón da fiper"*/
+			datosSolicitudVersionNueva.setDateFechaScoringDefinitivo(dateMinima);
+			datosSolicitudVersionNueva.setBidImporte1(BigDecimal.ZERO);
+			datosSolicitudVersionNueva.setTAE(BigDecimal.ZERO);
+			datosSolicitudVersionNueva.setTaeBonificada(BigDecimal.ZERO);
+			datosSolicitudVersionNueva.setDateFechaImpresionFipper(dateMinima);
+
+			
+			ResultadoDatosSolicitudVO resDatosSol = gds.updateSolicitud(datosSolicitudVersionNueva);
+
+			listaInteres = datosSolicitudVersionNueva.getCondicionesInteres();
+			
+			if (!UtilidadesTramitacion.isBlankOrNull(listaInteres)){
+				//Obtenemos el plazoTramoInicial para calcular la bonificacion maxima
+				Integer plazoTramoInicial = null;
+				for (CondicionesInteresC condicionInteres : listaInteres){
+					Integer ordenInteres = condicionInteres.getCondicionesInteresKey().getIntOrdenDelTramo();										
+					if (0 == BigDecimal.ONE.compareTo(new BigDecimal(ordenInteres))){
+						plazoTramoInicial = condicionInteres.getIntPlazo();
+						break;
+					} //del if
+				} //del for
+			
+				BigDecimal bonificacionMaxima = BigDecimal.ZERO;
+				if (!UtilidadesTramitacion.isBlankOrNull(plazoTramoInicial)){
+					bonificacionMaxima = UtilidadesTramitacion.obtenerBonificacionMaxima(datosSolicitudActual.getProducto(), 
+							datosSolicitudActual.getSubproducto(), datosSolicitudActual.getIdTarifa(), 
+							datosSolicitudActual.getDatosSolicitudKey().getNucExpediente(), new BigDecimal(plazoTramoInicial), 
+							datosSolicitudActual.getVersionGeneral());
+				}
+
+				
+				/*AN25TB01 -> Actualizamos 1590_ID_TARIFA con la nueva tarifa */ 
+				datosSolicitudVersionNueva.setIdTarifa(idTarifa);
+
+				List<ParametroC> valoresFijos = GestionParametro.obtenerParametros(null, "VALFIJOS");// recuperamos de la tabla 82 la constante a sumar (0.2)
+				
+				for (ParametroC parametro : valoresFijos)
+				{
+					if ("VALINT".equals(parametro.getStrParametro().trim()))
+					{
+						datoCorreccion = new BigDecimal(parametro.getStrValor().trim());
+					}
+				}
+				
+				//20151113 Se llama al método 443 para poder actualizar la IdRelacion (AN270770)
+				codProd = datosSolicitudVersionNueva.getProducto();
+				codSubprod = datosSolicitudVersionNueva.getSubproducto();
+				versGeneral = datosSolicitudVersionNueva.getVersionGeneral();
+				plazo = datosSolicitudVersionNueva.getPlazoTotal();
+				importe = datosSolicitudVersionNueva.getImporteSolicitado();
+				origen = Constantes.CTE_ORIGEN_CONSULTA_TARIFA_SOLICITUD;
+
+				// llamada al método anpm_443 -> Servicio que consulta los precios según la tarifa. 
+				IDatosEntradaTx datosConsultaPrecios= getPrograma(contextoEjecucion, cuentaContable, cOperacion443); 
+				datosConsultaPrecios.addCampo ("COD_PRODUCTO", codProd);
+				datosConsultaPrecios.addCampo ("COD_SUBPRODUCTO", codSubprod);
+				datosConsultaPrecios.addCampo ("VERSION_GENERAL", versGeneral);
+		  		datosConsultaPrecios.addCampo ("PLAZO", plazo);
+		  		datosConsultaPrecios.addCampo ("ID_TARIFA", idTarifa);
+		  		datosConsultaPrecios.addCampo ("ORIGEN_CONSULTA", origen);
+		  		datosConsultaPrecios.addCampo ("IND_LLAMADA_NSDK", BigDecimal.ONE); //nos devuelve el array de contextos ANPMN457
+		  		datosConsultaPrecios.addCampo ("IMPORTE", importe); // 20160519: se añade el importe para la llamada al ANPM_443
+		
+		  		retorno = invocarServicio(contextoEjecucion, datosConsultaPrecios);
+	
+		  		for (CondicionesInteresC  interes : listaInteres) {
+		  			if (0 == Constantes.CTE_BID_2.compareTo(idTarifa)) { //tarifa es penalizable		  			
+		  				// Si es variable y REFERENCIADO
+		  				if ((IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE.equals(UtilidadesTramitacion.comprobarDatoNull(interes.getStrTipoDeInteres()))) ||
+							(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_BONIFICABLE.equals(UtilidadesTramitacion.comprobarDatoNull(interes.getStrTipoDeInteres()))) ||
+							(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_PENALIZABLE.equals(UtilidadesTramitacion.comprobarDatoNull(interes.getStrTipoDeInteres()))) ||
+							(IConstantesSolicitud.CTE_TIPO_INTERES_VARIABLE_CON_DIFER_BONIF.equals(UtilidadesTramitacion.comprobarDatoNull(interes.getStrTipoDeInteres())))){
+						  // Comprobamos si tiene autorizacion
+						  if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitudVersionNueva.getIndicadorAutorizacion()) && 
+								  datosSolicitudVersionNueva.getIndicadorAutorizacion().compareTo(BigDecimal.ONE) == 0
+								  && UtilidadesComun.consultaParametro("PROD_C_LTV","GENERAL").equals(datosSolicitudVersionNueva.getProducto().toString())) {
+							  // Anulamos la autorizacion de precios y quitamos la marca de solicitud
+							  anularAutorizacionPrecios(datosSolicitudVersionNueva);
+							  
+							 // Si tiene autorizacion verificamos primeramente los datos de comision
+							  /**
+							   * Tenemos que verificar si el importe minimo y porcentaje se encuentran dentro del nivel oficina
+							   * , de lo contrario los reseteamos con el valor de el subproducto, valor estandar.
+							   */
+							 datosSolicitudVersionNueva = verificarDatosDeComisiones(datosSolicitudVersionNueva);
+							 
+							 // En segundo lugar verificamos los datos de interés 
+							 if (GestionConsultaDatosSolicitud.esTipoReferenciaNoReferenciado(interes.getIntTipoReferencia().toString())) { // NO referenciado  
+								if(!UtilidadesTramitacion.isBlankOrNull(obtenerValorEstandarTarifa(retorno, interes))){
+									 interes.setIntTecho(obtenerValorEstandarTarifa(retorno, interes));
+									 interes.setIntNivelTecho(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));
+								}
+								  
+							  }
+							  else { //sobreescribimos el diferencial 							  
+								if(!UtilidadesTramitacion.isBlankOrNull(obtenerValorEstandarTarifa(retorno, interes))){
+								  BigDecimal diferencial = obtenerValorEstandarTarifa(retorno, interes);
+								  interes.setIntDif(diferencial);
+								  interes.setIntNivelDif(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));
+								  BigDecimal diferencialAlternativo = diferencial.subtract(bonificacionMaxima);
+								  interes.setIntDifMinimoMaximo(diferencialAlternativo);
+								}
+							  }  
+						  }
+						  else {
+							  if (GestionConsultaDatosSolicitud.esTipoReferenciaNoReferenciado(interes.getIntTipoReferencia().toString())){ // NO referenciado
+							   //si es variable no referenciado sobreescribimos el techo con techo +=0.2
+								  interes.setIntTecho(interes.getIntTecho().add(datoCorreccion));
+							  }
+							  else {//sobreescribimos el diferencial 	
+								  BigDecimal diferencial = interes.getIntDif().add(datoCorreccion);
+								  interes.setIntDif(diferencial);	 
+								  BigDecimal diferencialAlternativo = diferencial.subtract(bonificacionMaxima); 
+								  interes.setIntDifMinimoMaximo(diferencialAlternativo);
+							  } 
+						  }
+						 
+					   }
+					   else  {
+					      //sobreescibirmos el interes fijo
+						  //Comprobamos si tiene autorizacion
+						  if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitudVersionNueva.getIndicadorAutorizacion()) && 
+								  datosSolicitudVersionNueva.getIndicadorAutorizacion().compareTo(BigDecimal.ONE) == 0
+								  && UtilidadesComun.consultaParametro("PROD_C_LTV","GENERAL").equals(datosSolicitudVersionNueva.getProducto().toString())) {
+							if(!UtilidadesTramitacion.isBlankOrNull(obtenerValorEstandarTarifa(retorno, interes))) {
+								interes.setIntInteres(obtenerValorEstandarTarifa(retorno, interes));
+								interes.setIntNivelInteres(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));
+							}  
+						  }
+						  else {
+							 interes.setIntInteres(interes.getIntInteres().add(datoCorreccion));  
+						  }
+			     	   }
+		  			}
+				    else{
+				  		/*AN27TB01 -> Actualizamos  130_INTERES  y 270_DIFERENCIAL*/
+				  		if (null != retorno) {// comprobamos que el ANPM_443 devuelve 			  			
+				  			for (IContexto cont : retorno) { // recorremos la lista de contextos(retorno) que nos devuelve el ANPM_443				  			
+			  					//filtramos por orden de tramo, tipo de interés y nivel.
+			  					if (((interes.getCondicionesInteresKey().getIntOrdenDelTramo()).compareTo(
+			  							cont.getBigDecimal("ANPMN457010").intValue()) == 0) && 
+			  			    		(cont.getString("ANPMN457020").equals(interes.getStrTipoDeInteres()) &&
+			  			    		(0 == Constantes.CTE_BID_10.compareTo(cont.getBigDecimal("ANPMN457070"))))) {
+			  						identPrecioTarifa = UtilidadesTramitacion.comprobarDatoNull(cont.getString("ANPMN457090"));
+			  						if ("INT".equals(identPrecioTarifa)) {// Identificador condición (INT: Interés fijo, DIF: Diferencial			  						
+			  							interes.setIntInteres(cont.getBigDecimal("ANPMN457040"));  // cogemos la fila de interes y sobrescribimos el valor concreto de tipo interes fijo
+			  							interes.setIntNivelInteres(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));
+			  						}
+			  						else if ("DIF".equals(identPrecioTarifa)){ // Identificador condición (INT: Interés fijo, DIF: Diferencial		  						
+			  							tipoReferencia = interes.getIntTipoReferencia();
+			  							//si es tipo referencia no referenciado guardamos el interés fijo en el techo.
+			  							if (GestionConsultaDatosSolicitud.esTipoReferenciaNoReferenciado(tipoReferencia.toString())){
+				  							interes.setIntTecho(cont.getBigDecimal("ANPMN457040"));
+				  							interes.setIntNivelTecho(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));
+			  							}
+			  							else{
+			  								BigDecimal diferencial = cont.getBigDecimal("ANPMN457040");
+				  							interes.setIntDif(diferencial);
+				  							interes.setIntNivelDif(new Integer(ConstantesAutorizacion.CTE_NIV_OFICINA.intValue()));				  							  
+											BigDecimal diferencialAlternativo = diferencial.subtract(bonificacionMaxima); 
+											interes.setIntDifMinimoMaximo(diferencialAlternativo);
+			  							}
+			  						}
+				  				}//FIN FOR
+				  			}// FIN FOR
+				  		}//FIN IF
+				    }
+				
+		  			for (IContexto cont : retorno) {// 20151118 recorremos la lista de contextos(retorno) que nos devuelve el ANPM_443					
+		  				// Filtramos por orden de tramo y nivel.
+		  				if (((interes.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) == 
+		  						(cont.getBigDecimal("ANPMN457010").intValue())) && 					// por tramo
+		  					((0 == Constantes.CTE_BID_10.compareTo(cont.getBigDecimal("ANPMN457070")))|| 
+		  					(0 == Constantes.CTE_BID_0.compareTo(cont.getBigDecimal("ANPMN457070"))))) {// por nivel 0 ó 10		  				
+		  					interes.setBidIdRelacion(cont.getBigDecimal("ANPMN457100"));
+		  				}
+		  			}//FIN FOR
+		  		}
+	 
+		  		// Persistimos
+		  		GestionCondicionesInteres gci = new GestionCondicionesInteres();	
+				
+		  		for (CondicionesInteresC condicionesInteres : listaInteres){
+					gci.guardarCondicionesInteres(condicionesInteres);
+				}
+			  
+		  		estado = true;
+	  		}
+	
+			estadoTareaSolicitud = obtenerEstadoTareaSolicitud(idTarifa, nuc, resDatosSol.getDatos().getIndicadorAutorizacion());
+			
+			UtilidadesTramitacion.actualizarEstadoTarea(
+				datosSolicitudVersionNueva.getDatosSolicitudKey().getNucExpediente(),
+				Constantes.CTE_CODIGO_PROCESO_SOLICITUD,estadoTareaSolicitud);
+			
+			// LOG que registra los campos modificados en los datos de solicitud.
+			LogModificacionDatosSolicitud.lanzarLogModificacionDatosSolicitud(
+					nuc,ConstantesComun.CTE_STR_COD_PROCEDENCIA_A455);
+			
+			// 20151103 Versionamos correctamente las autorizaciones, si existen
+			if (0 == BigDecimal.ONE.compareTo(resDatosSol.getDatos().getIndicadorAutorizacion())){
+				actualizarAutorizacion(gds,datosSolicitudActual,datosSolicitudVersionNueva,idTarifa,retorno);
+			}
+		}
+		
+		
+		
+		IContexto[] salida = new IContexto[1];
+		salida[0] = ContextoFactory.getInstance().getContexto("ANPMN455");
+		
+		if (estado){
+		  // si se ejecutó todo el código de forma correcta devolveríamos un 0 y la descripción 
+			salida[0].put("ANPMN455010", BigDecimal.ZERO);
+			salida[0].put("ANPMN455020", CTE_RESULTADO_OK);
+		}
+		else {
+		 // si algo salió mal -> devolvemos el código de error (1) y la descripción
+			salida[0].put("ANPMN455010", BigDecimal.ONE);
+			salida[0].put("ANPMN455020", CTE_RESULTADO_KO);
+		}
+		return salida;
+	}
+	
+	
+	/**
+	 * 
+	 - Recuperamos o nivel máximo da v. act. da solicitude, é o máximo entre o nivel "normal" da solicitdue e o nivel dos precios de tarifa.
+	 - Se nivel máximo versión actual = nivel máximo versión anterior:
+	   * Comparamos dato a dato.
+	   * Se Empiora ou iguala as condicions do cliente, entón:
+		 - Volcamos a fila da AN31TB01 na versión nova anulando a fila vella da 31.
+	     - Non chamamos a AGEN pra nada (imos facer o mesmo independientemente do estado da autorizacion).
+	   * Se millora as condicións:
+	     - Anulamos a autorización anterior en ANPM e en AGEN.
+		 - Xeneramos e enviamos unha nova.
+	 - Se o nivel máximo é diferente:
+	  * Anulamos en AGEN e en ANPM
+	  * xeneramos e enviamos unha nova.
+	 * 
+	 * @param gds
+	 * @param datosSolicitudActual
+	 * @param datosSolicitudVersionNueva
+	 * @param idTarifa
+	 * @param contextoPrecios
+	 * 
+	 */
+	private static void actualizarAutorizacion(
+		GestionDatosSolicitud gds,
+		DatosSolicitudC datosSolicitudActual,
+		DatosSolicitudC datosSolicitudVersionNueva,
+		BigDecimal idTarifa,
+		IContexto[] contextosPrecios)
+	{
+		GestionDatosAutorizacion gda = new GestionDatosAutorizacion();
+		GestionNivelesAutorizacion gna = new GestionNivelesAutorizacion();
+		DatosAutorizacionC datosAutorizacion = null;
+		DatosAutorizacionC datosAutorizacionNueva = null;
+		String estadoAutorizacion = null;
+		int comparacionDatoADato = ComparacionNivelesAutorizacion.SIN_VARIACION;
+		ResultadoDatosSolicitudVO resultado = null;
+		BigDecimal maximoNivelAutVersionAntigua = null;
+		BigDecimal maximoNivelAutVersionActualSinPreciosTarifa = null;
+		BigDecimal maximoNivelAutVersionActualConPreciosTarifa = null;
+		BigDecimal maximoNivelAutVersionActualFinal = null;
+		boolean soloVolcadoAutANPM = false;
+		
+		/*20151119 Necesitamos recuperar la autorización anterior no anulada, si el estado es Enviada en ANPM (nos vale el estado
+		 * que guardamos en AN310050) comparamos dato a dato la versión nueva y la anterior:
+		 *  -  si se baja el nivel de la autorización quiere decir
+		 * 		que pasó de nivel DIVISION a nivel OFICINA, entonces anulamos en AGEN y en ANPM la autorización
+		 *  - en caso contrario volcamos la versión anterior de la autorización a la versión nueva en la AN31TB01, lo que ya estábamos haciendo.
+		 * 
+		 * */
+		/*20151125 IMPLEMENTACIÓN PROVISIONAL HASTA NUEVO AVISO:
+		 * 
+		 * Si la tarifa es penalizable, lo único que tenemos que hacer es anular la autorización en ANPM y en AGEN.
+		 * Esto es así porque, ahora mismo, los productos con tarifas sólo pueden enviar autorización al nivel división, es decir, los niveles posibles
+		 * de los rangos de precios de una solicitud son:
+		 *  - División (genera autorización).
+		 *  - Oficina (no genera autorización).
+		 * 
+		 * Y como en la tarifa penalizable vamos a sobreescribir los precios de la versión nueva con los precios de la versión anterior + corrección
+		 * (la que haya parametrizada en la AN82TB01('VALFIJOS', 'VALINT')) entonces van a empeorar las condiciones para el cliente, así que hay dos opciones:
+		 *  1. O que los precios nuevos estén en el rango del nivel División de la tarifa Penalizable.
+			 * Si pasa esto tenemos tenemos que volcar la autorización de la versión anterior en la versión nueva.
+		 *  2. Que ahora los precios nuevos estén en el rango del nivel Oficina.
+		 *   * Si pasa esto tenemos que anular la autorización en ANPM (AN31TB01) y en AGEN.
+		 *   
+		 * 
+		 *   
+		 */
+		
+		datosAutorizacion = gda.buscarAutorizacionNoAnulada(
+				datosSolicitudVersionNueva.getDatosSolicitudKey().getOficinaSolicitud(),
+				datosSolicitudVersionNueva.getDatosSolicitudKey().getNumSolicitud());
+		
+		if (null != datosAutorizacion)
+		{
+			// Si la tarifa es Penalizable
+  			if (0 == Constantes.CTE_BID_2.compareTo(idTarifa))
+  			{
+  				
+				// 2017-01-26 - Si la tarifa es penalizable y tiene autorización, se hará siempre lo siguiente:
+				// - Si la autorización está en estado pendiente o enviada --> llamada ANPM_213:
+				//   > Se anula la autorización en AGEN y ANPM
+				//   > Se crea una nueva con los datos nuevos
+				// - Para el resto de estados de la autorización --> es válida la autorización actual, no se 
+				//   hace nada con ella.
+				// Para esto solo es necesario llamar a generarAutorizacionVersionNueva con soloVolcadoANPM = false.
+  				
+  				/*
+  				// Comparamos el nivel máximo de la versión actual de la solicitud con el nivel máximo de la versión actual.
+				maximoNivelAutVersionAntigua = 
+					gna.maximoNivelAutorizacion(datosSolicitudActual);
+  				
+				maximoNivelAutVersionActualSinPreciosTarifa = 
+					gna.maximoNivelAutorizacion(datosSolicitudVersionNueva);
+  				
+				maximoNivelAutVersionActualConPreciosTarifa = UtilidadesComun.obtenerNivelMaximoPreciosTarifa(
+					datosSolicitudVersionNueva,
+					contextosPrecios);
+
+				maximoNivelAutVersionActualFinal = UtilidadesComun.mayor(
+					maximoNivelAutVersionActualSinPreciosTarifa,
+					maximoNivelAutVersionActualConPreciosTarifa);
+				
+				// Si los niveles son iguales
+				if (0 == maximoNivelAutVersionAntigua.compareTo(maximoNivelAutVersionActualFinal))
+				{
+					comparacionDatoADato = gna.compararNivelesAutorizacion(datosSolicitudVersionNueva, datosSolicitudActual);
+					
+					// Si empeoran las condiciones del cliente o quedan igual
+					if ((ComparacionNivelesAutorizacion.EMPEORAN_CONDICIONES_CLIENTE == comparacionDatoADato) ||
+						(ComparacionNivelesAutorizacion.SIN_VARIACION == comparacionDatoADato))
+					{
+						// Sólo volcamos la autorización anterior en la versión nueva en la AN31TB01.
+						soloVolcadoAutANPM = true;
+					}
+					else
+					{
+						soloVolcadoAutANPM = false;
+					}
+				}
+				else
+				{
+					// Anulamos la anterior en AGEN y en ANPM y generamos una nueva.
+					soloVolcadoAutANPM = false;
+				}
+  				*/
+				
+				UtilidadesAutorizacion.generarAutorizacionVersionNueva(
+					datosSolicitudVersionNueva, soloVolcadoAutANPM);
+				
+			}
+  			else
+  			{
+  				/*se van a sobreescribir los precios al valor por defecto, así que no necesitamos autorización.
+  					Si existe autorización previa:
+  					 - La anulamos en AGEN y en ANPM.
+  					 - Desactivamos el indicador de autorización.
+  				 */
+  				
+				UtilidadesAutorizacion.anularAutorizacionAGEN(ServicioNegocio.getContexto(), datosAutorizacion);
+				UtilidadesAutorizacion.anularAutorizacion(datosAutorizacion, ServicioNegocio.getContexto().getUsuario());
+  				
+				datosSolicitudVersionNueva.setIndicadorAutorizacion(BigDecimal.ZERO);
+				resultado = gds.updateSolicitud(datosSolicitudVersionNueva);
+  					
+  			}
+
+		//Además de versionar la tabla de autorizaciones de ANPM, AN31TB01 anulamos la versión anterior llamando a AGEN si es necesario.
+		}
+	}
+	
+	/**
+	 * Obtiene el estado de una tarea de la solicitud
+	 * @param idTarifa
+	 * @param nucExpediente
+	 * @param indAutorizacion
+	 * @return
+	 */
+	private static String obtenerEstadoTareaSolicitud(BigDecimal idTarifa, BigDecimal nucExpediente, BigDecimal indAutorizacion)
+	{
+		String estadoTareaSolicitud = null;
+		
+		
+		if (0 == BigDecimal.ZERO.compareTo(indAutorizacion))
+		{
+			/*Si no hay autorizaciones vamos a dejar el mismo estado que tenía. */
+			estadoTareaSolicitud = UtilidadesTramitacion.obtenerEstadoTarea(
+				nucExpediente, Constantes.CTE_CODIGO_PROCESO_SOLICITUD);
+		}
+		else
+		{
+			if (0 == Constantes.CTE_BID_2.compareTo(idTarifa)) //tarifa es penalizable
+			{
+				//Dado que se genera una nueva versión, llamamos a expediente para actualizar la tabla de gestión de reaperturas para que tengan la última tira
+				//UtilidadesTramitacion.actualizarTablaReaperturasExpediente("A",datosSolicitudVersionNueva.getDatosSolicitudKey().getNucExpediente());
+				//20151017 En vez de llamar al EEXP_996 vamos a llamar al EEXPR114 para poner la tarea Solicitud como Reabierta
+				estadoTareaSolicitud = UtilidadesTramitacion.obtenerEstadoTarea(
+					nucExpediente, Constantes.CTE_CODIGO_PROCESO_SOLICITUD);
+			}
+			else
+			{
+				/*Dejamos el estado de la tarea Solicitud a Finalizado*/
+				/*Porque vamos a dejar los precios al valor por defecto y vamos a anular la autorización anterior.*/
+				estadoTareaSolicitud = ConstantesComun.CTE_ESTADO_TAREA_SOLIC_FINALIZADA;
+			}
+		}
+		
+		return estadoTareaSolicitud;
+	}
+	
+	/**
+	 * Extrae el interes o el diferencial de la tarifa 
+	 * @param retorno
+	 * @param strIdentificadorCondicion
+	 */
+	private static BigDecimal obtenerValorEstandarTarifa(IContexto[] retorno,CondicionesInteresC interes) {
+			
+		/*AN27TB01 -> Actualizamos  130_INTERES  y 270_DIFERENCIAL*/
+		if (null != retorno) // comprobamos que el ANPM_443 devuelve 
+		{	
+			for (IContexto cont : retorno) // recorremos la lista de contextos(retorno) que nos devuelve el ANPM_443
+			{ 
+				//filtramos por orden de tramo, tipo de interés y nivel.
+				if (((interes.getCondicionesInteresKey().getIntOrdenDelTramo()).compareTo(cont.getBigDecimal("ANPMN457010").intValue()) == 0) && 
+					(cont.getString("ANPMN457020").equals(interes.getStrTipoDeInteres()) &&
+					(0 == Constantes.CTE_BID_10.compareTo(cont.getBigDecimal("ANPMN457070")))))
+				{
+						return cont.getBigDecimal("ANPMN457040");// cogemos la fila de interes y sobrescribimos el valor concreto de tipo interes fijo
+				}
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Procesa y verifica los datos de comision asociados al objeto datosSolicitud
+	 * Verifica que cada una de esas comisiones este dentro del nivel oficina
+	 * Si no esta dentro del nivel oficina lo resetea al valor estandar (importe minimo y porcentaje de comision)
+	 * @param datosSolicitud
+	 * @return
+	 */
+	private DatosSolicitudC verificarDatosDeComisiones(DatosSolicitudC datosSolicitud) {
+		
+		List<ComisionC> lstDatosComision = new ArrayList<ComisionC>(1);
+		lstDatosComision = datosSolicitud.getComisiones();
+		/**
+		 * Tenemos que comprobar los datos de comisiones 
+		 * Si el porcentaje o el importe minimo de comision se sale del nivel de oficina debemos resetearlo
+		 * recuperamos los datos de catalogo y establecemos a su estandar.
+		 */
+		for(ComisionC comision:lstDatosComision) {
+			comision = comprobarDatosComision(comision);
+		}
+		
+		//Una vez verificados los datos de comisiones los volvemos a colocar en su objeto datos solicitud
+		datosSolicitud.setComisiones(lstDatosComision);
+		
+		return datosSolicitud; 
+	}
+	
+	/***
+	 * Comprueba los datos de comision y los modifica a nivel oficina si se salen de rango
+	 * @param comision
+	 * @return
+	 */
+	private ComisionC comprobarDatosComision(ComisionC comision) {
+		
+		IContexto[] datosSubproducto = null;
+		
+		//Si esta fuera del nivel de oficina debemos modificar 
+		if(comprobarEstaFueraNivelOficina(comision.getBidNivelPorcentajeComision()) || comprobarEstaFueraNivelOficina(comision.getBidNivelImporteMinimo())){
+			//Si alguno de los dos datos correspondientes a la comision esta fuera de nivel
+			//--invocamos al servicio de negocio que recupera los datos de catalogo
+			datosSubproducto = obtenerDatosComisionCatalogo(comision.getComisionesKey().getSolicitud());
+			//Restauramos el valor de la comision que sale de rango
+			comision = restaurarValorEstandarSubproducto(datosSubproducto, comision);
+		}
+		
+		
+		return comision;
+	}
+	
+	/**
+	 * Restaura el valor de una comision que sale fuera de rango de oficina al valor estandar del subproducto
+	 * @param datosSubproductoComision
+	 * @param comision
+	 * @return
+	 */
+	private ComisionC restaurarValorEstandarSubproducto(IContexto[] datosSubproductoComision,ComisionC comision) {
+
+		if(null != datosSubproductoComision) {
+			//Comprobar que viene el contexto de comision
+			for(IContexto contextoDatosComision:datosSubproductoComision) {
+				//Si es el contexto con los datos de la comision
+				if(contextoDatosComision.getNombre().equals("ANPMN005")) {
+					if(contextoDatosComision.getString("ANPMN005060").equals(comision.getComisionesKey().getStrTipoComision())) {
+						//Comprobar si el nivel del porcentaje esta fuera del nivel de oficina
+						if(!UtilidadesTramitacion.isBlankOrNull(comision.getBidNivelPorcentajeComision())  
+								&& comprobarEstaFueraNivelOficina(comision.getBidNivelPorcentajeComision())) {
+							//Si el nivel del porcentaje esta fuera se restaura al valor estandar
+							
+							comision.setBidPorcentajeComision(contextoDatosComision.getBigDecimal("ANPMN005080"));
+							comision.setBidNivelPorcentajeComision(ConstantesAutorizacion.CTE_NIV_OFICINA);
+						}
+						//Comprobar si el nivel del importe minimo esta fuera de nivel oficina
+						if(!UtilidadesTramitacion.isBlankOrNull(comision.getBidNivelImporteMinimo())  
+								&& comprobarEstaFueraNivelOficina(comision.getBidNivelImporteMinimo())) {
+							//Si el nivel del importe minimo esta fuera se restaura al valor estandar
+							comision.setBidImporteMinimo(contextoDatosComision.getBigDecimal("ANPMN005160"));
+							comision.setBidNivelImporteMinimo(ConstantesAutorizacion.CTE_NIV_OFICINA);
+						}
+					}
+				}
+			}
+		}
+		return comision;
+	}
+	
+	/**
+	 * Este metodo comprueba si el nivel que enviamos esta fuera de oficina
+	 * Para que un nivel esté en oficina tiene que ser 0 o 10
+	 * 
+	 * @return devuelve verdadero si estamos fuera de nivel oficina falso en caso contrario
+	 */
+	private static boolean comprobarEstaFueraNivelOficina(BigDecimal nivel) {
+		
+		if(!UtilidadesTramitacion.isBlankOrNull(nivel)) {
+			if(0 != nivel.compareTo(Constantes.CTE_BID_0) &&
+					0 != nivel.compareTo(Constantes.CTE_BID_10)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Obtiene los datos de comision de catalogo
+	 * @param datosSolicitud
+	 * @return array de contextos con los datos de comision
+	 */
+	private static IContexto[] obtenerDatosComisionCatalogo(DatosSolicitudC datosSolicitud) {
+		
+		IContexto[] retorno = null;
+		
+		retorno = UtilidadesTramitacion.recuperaDatosSubproductoCatalogo(datosSolicitud, Constantes.CTE_INT_CINCO);
+
+		return retorno;
+	}
+	
+	/**
+	 * Busca si hay una autorizacion pendiente y de ser así la elimina
+	 * @param datosSolicitud
+	 */
+	private void anularAutorizacionPrecios(DatosSolicitudC datosSolicitud) 
+	{
+		GestionDatosAutorizacion gda = new GestionDatosAutorizacion();
+		DatosAutorizacionC datosAutorizacion = new DatosAutorizacionC();
+		
+		if(null != datosSolicitud) 
+		{
+			datosAutorizacion = gda.buscarAutorizacionNoAnulada(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), 
+					datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+			
+			// Si existe alguna autorizaccion se elimina
+			if(null != datosAutorizacion) 
+			{
+				// Anular la autorizacion en AGEN
+				UtilidadesAutorizacion.anularAutorizacionAGEN(ServicioNegocio.getContexto(), datosAutorizacion);
+				// Anular la autorizacion en la AN31TB01
+				gda.anularAutorizacion(datosAutorizacion, ServicioNegocio.getContexto().getUsuario());
+				// Invocar 
+				UtilidadesComun.cambiarEstadoTareaExpediente(datosSolicitud.getDatosSolicitudKey().getNucExpediente(),ConstantesAutorizacion.CTE_TAREA_EEXP_SOLICITUD, ConstantesAutorizacion.CTE_ESTADO_TAREA_EEXP_PENDIENTE_FINALIZADO);
+			}
+			
+			// Se pone a cero el indicador de autorizacion de la solicitud
+			if(0 == datosSolicitud.getIndicadorAutorizacion().compareTo(BigDecimal.ONE)) 
+			{
+				datosSolicitud.setIndicadorAutorizacion(BigDecimal.ZERO);
+			}
+		}
+
+	}
+	
+	
+	
+}
+
+

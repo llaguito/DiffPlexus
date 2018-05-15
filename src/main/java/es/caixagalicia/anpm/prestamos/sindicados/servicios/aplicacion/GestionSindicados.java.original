@@ -1,0 +1,1039 @@
+package es.caixagalicia.anpm.prestamos.sindicados.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosKey;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.sindicados.ConstantesSindicados;
+import es.caixagalicia.anpm.prestamos.sindicados.SindicadosC;
+import es.caixagalicia.anpm.prestamos.sindicados.SindicadosEng;
+import es.caixagalicia.anpm.prestamos.sindicados.SindicadosKey;
+import es.caixagalicia.anpm.prestamos.sindicados.persistencia.condeconomicas.CondicionesInteresPactadasC;
+import es.caixagalicia.anpm.prestamos.sindicados.persistencia.condeconomicas.CondicionesInteresPactadasEng;
+import es.caixagalicia.anpm.prestamos.sindicados.persistencia.tramos.TramoC;
+import es.caixagalicia.anpm.prestamos.sindicados.persistencia.tramos.TramoEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.destinos.DestinosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.ParametrosTramitacionEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.tratamientoadelantos.TratamientoAdelantosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mainframe.ctgfacade.CtgFacade;
+import es.caixagalicia.ifrt.util.Helper;
+
+public class GestionSindicados{
+
+	
+	/**
+	 * Log de la Clase
+	 */
+	
+	private final static LogHelper LOGGER = LogHelper.getLog(GestionSindicados.class);
+	
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	/*
+	 * Constantes para busqueda de numero de solicitud
+	 */
+	private static final String CTE_TABLA_OFICINAS_NGB = "OFI";
+	private static final String CTE_TABLA_OFICINAS_EVO = "OFE";
+	
+	private static final Integer CTE_CUENTA_CONTABLE_LLAMADA = Integer.valueOf(100);
+	private static final Integer CTE_COD_OPERACION_DIGITO = Integer.valueOf(308);
+	private static final String CTE_APP = "PMOS";
+	private static final String CTE_CUENTAC = "500";	
+	private static final String CTE_CTX_DIGITOS = "CGS40CON";
+	private static final String CTE_CAMPO_DIGITO = "CGS400040";	
+	
+	private DatosSolicitudEng dao = new DatosSolicitudEng(CTE_JNDI_DATASOURCE);
+	private SindicadosEng daoMatriz = new SindicadosEng();
+	private TramoEng daoTramos = new TramoEng();
+	private CondicionesInteresPactadasEng daoCondiciones = new CondicionesInteresPactadasEng();
+	
+	
+	
+	/**
+	 * Constructor por defecto.
+	 */
+	public GestionSindicados(){
+	}
+
+	/**
+	 * Obtiene la descripcion del CNAE
+	 * 
+	 * @param codActividad
+	 * @return
+	 */
+	public static String obtenerDescripcionCNAE(final String codActividad)
+	{
+		String resultado = null;
+		final String CTE_CADENA_VACIA = "";
+		final String CTE_CNAE_NO_ENCONTRADO = "CNAE NO ENCONTRADO";
+		final Integer CTA_CONTABLE_CLIENTES = Integer.valueOf(555);
+
+		if (null == codActividad || CTE_CADENA_VACIA.equals(codActividad.trim()))
+		{
+			resultado = CTE_CNAE_NO_ENCONTRADO;
+		}
+		else
+		{
+			final IDatosEntradaTx entradaSrv = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+					CTA_CONTABLE_CLIENTES, Integer.valueOf(715));
+
+				entradaSrv.addCampo(0, "2");
+				entradaSrv.addCampo(1, codActividad.trim());
+
+				final IContexto[] salidaSrv = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entradaSrv);
+
+				if (0 < salidaSrv.length && !"0".equals(salidaSrv[0].getString("FC715C060")))
+				{
+					resultado = salidaSrv[0].getString("FC715C020");
+				}
+			
+				if (CTE_CADENA_VACIA.equals(resultado)) 
+				{
+					resultado = CTE_CNAE_NO_ENCONTRADO;
+				}
+		}
+
+		return resultado;
+	}
+
+	
+	/**
+	 * En ampm.sindicados.utilidades.DatosParticipesYAgencias tenemos 
+	 * getDatosParticipe con un código similar
+	 * 
+	 * @param agente
+	 * @return nombreAgente
+	 */
+	public static String getNombreAgente(final BigDecimal agente, final String tipo)
+	{
+		String nombreAgente = "";
+		//final int AMPM_ERROR_PROGRAMA_CICS = 10923; 
+		final IContexto contextoEntrada = ContextoFactory.getInstance().getContexto("AMPMN052");
+		contextoEntrada.put("AMPMN052000", BigDecimal.ZERO);
+		contextoEntrada.put("AMPMN052005", Helper.inicializarCadena("", 100, ' '));
+		contextoEntrada.put("AMPMN052010", agente);
+		contextoEntrada.put("AMPMN052020", Helper.inicializarCadena("", 1, ' ')); // Tipo
+		if (StringUtils.isNotEmpty(tipo) &&  ("2".equals(tipo)))
+		{
+			contextoEntrada.put("AMPMN052020", "S");
+		}
+			
+		contextoEntrada.put("AMPMN052030", Helper.inicializarCadena("", 50, ' '));// Nombre
+		contextoEntrada.put("AMPMN052040", Helper.inicializarCadena("", 13, ' '));
+		contextoEntrada.put("AMPMN052050", Helper.inicializarCadena("", 11, ' '));
+		contextoEntrada.put("AMPMN052060", Helper.inicializarCadena("", 1, ' '));
+		contextoEntrada.put("AMPMN052070", Helper.inicializarCadena("", 50, ' '));
+		contextoEntrada.put("AMPMN052080", Helper.inicializarCadena("", 50, ' '));
+		contextoEntrada.put("AMPMN052090", Helper.inicializarCadena("", 5, ' '));
+		
+		final CtgFacade ctg = new CtgFacade();
+		final IContexto[] contextosSalida = ctg.invocarProgramaCics(contextoEntrada, "AMPMR052");
+		
+		/*
+		if (0 != contextosSalida[0].getBigDecimal("AMPMN052000").intValue())
+		{
+			ServicioNegocio.rollback(
+					AMPM_ERROR_PROGRAMA_CICS,
+					null,
+					new String[] {"AMPMR052", contextosSalida[0].getBigDecimal("AMPMN052000").toString(), contextosSalida[0].getString("AMPMN052005")},
+					null);
+		}
+		*/
+		if (0 == contextosSalida[0].getBigDecimal("AMPMN052000").intValue())
+		{
+			nombreAgente = contextosSalida[0].getString("AMPMN052030");
+		}
+	
+		return nombreAgente;
+		
+	}		
+	
+	public SindicadosC obtenerSindicados(BigDecimal oficinaSolicitud, BigDecimal nucExpediente)
+	{
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("GestionSindicados.obtenerDatosSindicados() - Inicio");
+		}
+		
+				
+		SindicadosEng dao = new SindicadosEng();
+		SindicadosC datosSindicados = dao.obtenerDatosSindicados(oficinaSolicitud, null, nucExpediente);
+		
+		if(LOGGER.isDebugEnabled()){
+			LOGGER.debug("GestionSindicados.obtenerSindicados() - Fin");
+		}
+	
+		
+		return datosSindicados;
+	}
+	
+	public SindicadosC obtenerSindicadosPorNumero(BigDecimal oficinaSolicitud, BigDecimal numero)
+	{
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("GestionSindicados.obtenerDatosSindicados() - Inicio");
+		}
+		
+				
+		SindicadosEng dao = new SindicadosEng();
+		SindicadosC datosSindicados = dao.obtenerDatosSindicados(oficinaSolicitud, numero, null);
+		
+		if(LOGGER.isDebugEnabled()){
+			LOGGER.debug("GestionSindicados.obtenerSindicados() - Fin");
+		}
+	
+		
+		return datosSindicados;
+	}
+	
+	
+	public SindicadosC generarVersionAN38(SindicadosC sindicadoUltimaVersion, BigDecimal numeroVersion) 
+	{
+		
+		if (LOGGER.isDebugEnabled()){
+			LOGGER.debug("GestionSindicados.guardarDatosSindicados() - Inicio");
+		}
+		
+		SindicadosC sindicadoNuevaVersion = new SindicadosC();
+		sindicadoNuevaVersion.copiar(sindicadoUltimaVersion);
+		
+		sindicadoNuevaVersion.getSindicadosKey().setBidSolicitud(BigDecimal.ZERO);
+		sindicadoNuevaVersion.getSindicadosKey().setBidVersion(numeroVersion);
+		sindicadoNuevaVersion.setStrUsuario(ServicioNegocio.getContexto().getUsuario());
+		sindicadoNuevaVersion.setDateAltaModificacion(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		SindicadosEng dao = new SindicadosEng();
+		
+		dao.persist(sindicadoNuevaVersion);
+		
+		if (LOGGER.isDebugEnabled()){
+			LOGGER.debug("GestionSindicados.guardarDatosSindicados() - Fin");
+		}
+		
+		return sindicadoNuevaVersion;
+	}
+	
+	
+	public SindicadosC versionAnteriorSindicados(BigDecimal oficinaSolicitud, BigDecimal numSolicitud , BigDecimal versionSolicitud, BigDecimal nucExpediente)
+	{
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("GestionSindicados.versionAnteriorSindicados() - Inicio");
+		}
+		
+		
+				
+		SindicadosEng dao = new SindicadosEng();
+		SindicadosC	datosSindicados = dao.buscarVersionAnterior(oficinaSolicitud, numSolicitud, versionSolicitud, nucExpediente);
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("GestionSindicados.versionAnteriorSindicados() - Fin");
+		}
+		
+		
+		
+		return datosSindicados;
+	}
+	
+	
+	/**
+	 * Finaliza la solicitud que se ha guardado en los pasos. Para finalizarla
+	 * asignará el número de solicitud y el número de versión definitivos que le
+	 * correspondan, según sea un alta de una nueva solicitud o una modificación
+	 * de una solicitud ya existente (nueva versión de solicitud).
+	 * 
+	 * @param solicitud, Datos de la solicitud a finalizar.
+	 * @param usuario, código de usuario que finaliza la solicitud.
+	 * @param necesitaAutorizacion, indicador de si la nueva versión de la solicitud requiere o no
+	 * que se confirme la autorización de precios.
+	 * @return ResultadoDatosSolicitudVO, código de error en finalización de 
+	 */
+	public ResultadoDatosSolicitudVO finalizarSolicitudSindicados(DatosSolicitudC solicitud, BigDecimal numeroSolicitud, BigDecimal digito) 
+	{
+									
+		ResultadoDatosSolicitudVO resultado = this.altaSolicitudSindicados(solicitud, numeroSolicitud,  digito);
+		
+		DatosSolicitudC solicitudRET = null;
+		solicitudRET = resultado.getDatos();
+		
+		resultado.setDatos(solicitudRET);		
+		
+		return resultado;
+	}
+	
+
+	
+	/**
+	 * Asigna un número de solicitud 
+	 * @param solicitud Datos 
+	 * @param contexto Contexto de ejecución del servicio de negocio Metrópolis
+	 * @param numSolicitudDefinitivo Número de solicitud definitivo para finalizar la solicitud temporal
+	 * @return <code>BigDecimal</code> el número de la solicitud
+	 */
+	public ResultadoDatosSolicitudVO altaSolicitudSindicados(DatosSolicitudC solicitud, BigDecimal numeroSolicitud, BigDecimal digito)
+	{
+		ResultadoDatosSolicitudVO resultado = new ResultadoDatosSolicitudVO();
+		
+		DatosSolicitudC solicitudPenultimaVersionCompleta = null;
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("altaSolicitudSindicados() - Inicio");
+		}		
+		
+		// Actualizamos los registros de la solicitud con el número 
+		// de solicitud definitivo
+		DatosSolicitudC newSolicitud = new DatosSolicitudC();
+		newSolicitud.copiar(solicitud);		
+		newSolicitud.setTimestamp(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		//newSolicitud.setFechaSolicitud(DateUtils.toSQLDate(DateUtils.dateNow()));
+		newSolicitud.getDatosSolicitudKey().setNumSolicitud(numeroSolicitud);
+		newSolicitud.setDigitoSolicitud(digito);
+		
+		/*newSolicitud va a ser la última versión definitiva de esta solicitud, por lo tanto se hacen dos cosas:
+		 *  - Asignar una 'S' en la columna AN251280 (strIndicador3)
+		 *  - Eliminarle la 'S' de la columna AN251280 a la penúltima versión completa, si existe.
+		 * 
+		 * */
+		
+		newSolicitud.setStrIndicador3(Constantes.CTE_STR_S);
+		BigDecimal nucExpMatriz = solicitud.getDatosSolicitudKey().getNucExpediente();
+		BigDecimal version = solicitud.getDatosSolicitudKey().getVersionSolicitud();
+		if (gds.borrar(solicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+				solicitud.getDatosSolicitudKey().getNumSolicitud(),
+				solicitud.getDatosSolicitudKey().getVersionSolicitud(),
+				solicitud.getDatosSolicitudKey().getNucExpediente()) != null)
+		{
+			SindicadosC matriz = daoMatriz.getSindicado(nucExpMatriz, version);
+			SindicadosC newMatriz = new SindicadosC();
+			newMatriz.copiar(matriz);
+			daoMatriz.delete(matriz);
+			
+			
+			newMatriz.getSindicadosKey().setBidSolicitud(numeroSolicitud);
+			newMatriz.setBidDigitoSolicitud(digito);
+			daoMatriz.persist(newMatriz);
+			
+			
+			List<TramoC> lstTramos = daoTramos.getTramosPorVersion(nucExpMatriz, version);
+			for (TramoC tramo: lstTramos)
+			{
+				TramoC newTramo = new TramoC();
+				newTramo.copiar(tramo);
+				 
+				daoTramos.delete(tramo);
+				newTramo.getTramoKey().setBidSolicitud(numeroSolicitud);
+				newTramo.setBidDigitoSolicitud(digito);
+				daoTramos.persist(newTramo);
+				List<CondicionesInteresPactadasC> lstCondiciones = daoCondiciones.getCondicionesPorVersion(nucExpMatriz, tramo.getTramoKey().getBidTramo(), version);
+				
+				for (CondicionesInteresPactadasC condicion: lstCondiciones)
+				{
+					CondicionesInteresPactadasC newCondicion = new CondicionesInteresPactadasC();
+					newCondicion.copiar(condicion);
+					
+					daoCondiciones.delete(condicion);
+					
+					newCondicion.getCondicionesInteresPactadasKey().setBidNumero(numeroSolicitud);
+					
+					daoCondiciones.persist(newCondicion);
+					
+				}
+				
+			}
+			
+			dao.persist(newSolicitud);
+		
+			solicitudPenultimaVersionCompleta = dao.buscarVersionAnterior(
+				newSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+				newSolicitud.getDatosSolicitudKey().getNumSolicitud(),
+				newSolicitud.getDatosSolicitudKey().getVersionSolicitud(),
+				newSolicitud.getDatosSolicitudKey().getNucExpediente());
+		
+			if (null != solicitudPenultimaVersionCompleta)
+			{
+			//la versión generada en altaSolicitud no es la primera, es decir hay versiones previas completas.
+			solicitudPenultimaVersionCompleta.setStrIndicador3(StringUtils.EMPTY);
+			dao.update(solicitudPenultimaVersionCompleta);
+			}
+		}
+		
+			
+		
+	//	dao.persist(newSolicitud);
+	//	dao.flush();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("altaSolicitudSindicados() - Fin");
+		}
+		
+		resultado.setCodError(Constantes.CTE_CERO);
+		resultado.setDatos(newSolicitud);
+		
+		return resultado; 
+	}
+	
+	public boolean borrarVersionIncompleta (BigDecimal nucExpedienteMatriz)
+	{
+	
+		Boolean borrado = Boolean.FALSE;
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		
+		DatosSolicitudC solicitud =  gds.getUltimaVersionIncompleta(nucExpedienteMatriz);
+		if (null != solicitud)
+		{
+
+		
+		
+		
+		gds.borrar(solicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+				solicitud.getDatosSolicitudKey().getNumSolicitud(),
+				solicitud.getDatosSolicitudKey().getVersionSolicitud(),
+				solicitud.getDatosSolicitudKey().getNucExpediente());
+		
+		}
+		
+		SindicadosC matriz = daoMatriz.getUltimaVersionIncompleta(nucExpedienteMatriz);
+		if (null != matriz)
+		{
+			BigDecimal version = matriz.getSindicadosKey().getBidVersion();
+			daoMatriz.delete(matriz);
+	
+
+			List<TramoC> lstTramos = daoTramos.getTramosPorVersion(nucExpedienteMatriz, version);
+			
+			for (TramoC tramo: lstTramos)
+			{
+				
+				List<CondicionesInteresPactadasC> lstCondiciones = daoCondiciones.getCondicionesPorVersion(nucExpedienteMatriz, tramo.getTramoKey().getBidTramo(), version);
+			
+				for (CondicionesInteresPactadasC condicion: lstCondiciones)
+				{
+								
+					daoCondiciones.delete(condicion);
+				
+				}
+				
+				daoTramos.delete(tramo);
+			
+			}
+			
+		}
+		borrado = Boolean.TRUE;		
+		return borrado;
+		
+	}
+
+	/**
+	 * Asigna un número de solicitud 
+	 * @param solicitud Datos 
+	 * @param contexto Contexto de ejecución del servicio de negocio Metrópolis
+	 * @param numSolicitudDefinitivo Número de solicitud definitivo para finalizar la solicitud temporal
+	 * @return <code>BigDecimal</code> el número de la solicitud
+	 */
+	public ResultadoDatosSolicitudVO finalizarVersionAN25(DatosSolicitudC solicitud, BigDecimal numeroVersionAnterior)
+	{
+		ResultadoDatosSolicitudVO resultado = new ResultadoDatosSolicitudVO();
+		
+		DatosSolicitudC solicitudPenultimaVersionCompleta = null;
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("altaSolicitudSindicados() - Inicio");
+		}		
+		
+	
+		solicitud.setTimestamp(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		//solicitud.setFechaSolicitud(DateUtils.toSQLDate(DateUtils.dateNow()));
+		
+	
+		
+		/*newSolicitud va a ser la última versión definitiva de esta solicitud, por lo tanto se hacen dos cosas:
+		 *  - Asignar una 'S' en la columna AN251280 (strIndicador3)
+		 *  - Eliminarle la 'S' de la columna AN251280 a la penúltima versión completa, si existe.
+		 * 
+		 * */
+		
+		solicitud.setStrIndicador3(Constantes.CTE_STR_S);
+		
+		solicitudPenultimaVersionCompleta = dao.buscarDatosSolicitud(
+				solicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+				solicitud.getDatosSolicitudKey().getNumSolicitud(),
+				numeroVersionAnterior,
+				solicitud.getDatosSolicitudKey().getNucExpediente());
+		
+		if (null != solicitudPenultimaVersionCompleta)
+		{
+			//la versión generada en altaSolicitud no es la primera, es decir hay versiones previas completas.
+			solicitudPenultimaVersionCompleta.setStrIndicador3(StringUtils.EMPTY);
+			dao.update(solicitudPenultimaVersionCompleta);
+		}
+		
+	
+		dao.persist(solicitud);
+		dao.flush();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("altaSolicitudSindicados() - Fin");
+		}
+		
+		resultado.setCodError(Constantes.CTE_CERO);
+		resultado.setDatos(solicitud);
+		
+		return resultado; 
+	}
+	
+	/**
+	 * Obtiene el siguiente número de solicitud válido para la oficina.
+	 * 
+	 * @param bidOficinaSolicitud, Código de la oficina de la solicitud.
+	 * @return el número de solicitud
+	 */
+	public BigDecimal getSiguienteNumeroSolicitud(BigDecimal bidOficinaSolicitud) 
+	{
+		BigDecimal numeroSolicitud = null;
+		if (UtilidadesTramitacion.esEntornoEvo())
+		{
+			if(LOGGER.isDebugEnabled()){
+				LOGGER.debug("UtilidadesTramitacion.esEntornoEvo(): estamos en EVO ");
+			}
+			numeroSolicitud = getSiguienteNumeroSolicitudPorEntidad(
+				CTE_TABLA_OFICINAS_EVO, bidOficinaSolicitud);
+		}
+		else
+		{
+			if(LOGGER.isDebugEnabled()){
+				LOGGER.info("UtilidadesTramitacion.esEntornoEvo(): no estamos en EVO ");
+			}
+			numeroSolicitud = getSiguienteNumeroSolicitudPorEntidad(
+				CTE_TABLA_OFICINAS_NGB, bidOficinaSolicitud);
+		}
+		
+		return numeroSolicitud;
+	}
+	
+	
+	/**
+	 * Obtiene el siguiente número de solicitud válido para la oficina.
+	 * 
+	 * @param bidOficinaSolicitud, Código de la oficina de la solicitud.
+	 * @return el número de solicitud
+	 */
+	private BigDecimal getSiguienteNumeroSolicitudPorEntidad(String entidad, BigDecimal bidOficinaSolicitud) 
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionDatosSolicitud.calcularNumeroSolicitud() - Inicio");
+		}
+		
+		DateHelper dateHelper = DateHelper.getInstance();
+		BigDecimal numSol = null;
+		ParametrosTramitacionEng dao = new ParametrosTramitacionEng(CTE_JNDI_DATASOURCE);
+		String oficinaStr = StringUtils.leftPad(
+			bidOficinaSolicitud.toString(), 4, '0');
+//		
+//		// Obtenemos el siguiente numero de solicitud correspondiente a la oficina.
+//		BigDecimal numSol = dao.getSiguienteNumeroSolicitud(bidOficinaSolicitud);		
+		
+		ParametrosC oficina = dao.obtenerParametroTabla(entidad, oficinaStr);
+		if (oficina == null)
+		{
+			if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug("GestionDatosSolicitud.calcularNumeroSolicitud() - Se genera el primer registro para la oficina - Inicio");
+			}
+			oficina = dao.createNewObject();
+			
+			/*20151125 Tenemos que inicializar los valores del objeto persistente que apunta a la fila de la CG32TB01 DESPUES de instanciarlo,
+			 * no vale en el constructor, porque tenemos mapeada una tabla de CGAL en ANPM y al hacer esto e informar los campos a vacío en su
+			 * constructor hace movidas raras en la persistencia*/
+			oficina.inicializar();
+			
+			//oficina = new ParametrosC();
+			//oficina.getParametrosKey().setCodTabla(CTE_TABLA_OFICINAS);
+			//oficina.getParametrosKey().setClave(bidOficinaSolicitud.toString());
+			//Modificado por el correo enviado de Tino el 24-09-2012
+			ParametrosKey key = new ParametrosKey();
+            key.setClave(entidad);
+            key.setCodTabla(oficinaStr);
+            oficina.setParametrosKey(key);
+
+            oficina.setCG320210("1");
+            oficina.setCG320220("1");
+            
+			oficina.setCG320100(BigDecimal.ZERO.toString());
+			//oficina.setCG320230(DateHelper.stringASqlDate("1999-01-01", DateHelper.FORMATO_YYYY_MM_DD_GUION));
+			
+			oficina.setCG320250(dateHelper.askTimestampFromDB2());
+			
+			dao.insert(oficina);
+			oficina.persist();
+			if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug("GestionDatosSolicitud.calcularNumeroSolicitud() - Se genera el primer registro para la oficina - Inicio");
+			}
+		}
+		// Recuperamos el numero de solicitud para la oficina (parametro CG320100)
+		numSol = new BigDecimal(oficina.getCG320100());
+
+		// Incrementamos el numero de solicitud para la oficina (parametro CG320100) en la BD
+		numSol = numSol.add(BigDecimal.ONE);
+		oficina.setCG320100(numSol.toString());
+		oficina.persist();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionDatosSolicitud.calcularNumeroSolicitud() - Fin");
+		}
+		return BigDecimal.valueOf(numSol.intValue());
+	}
+	
+	/**
+	 * Pasándo un número de solicitud nos devolverá el dígito de solicitud 
+	 * correspondiente para escribirlo en el nuevo alta
+	 * @param numeroSolicitud
+	 * @return
+	 */
+	public BigDecimal digitoSolicitud(BigDecimal numeroSolicitud, IContextoEjecucion contexto,BigDecimal oficinaSolicitud)
+	{
+		BigDecimal digito = null;
+			
+		final IDatosEntradaTx generarDigito = ServicioNegocio.getPrograma(contexto, 
+				CTE_CUENTA_CONTABLE_LLAMADA, CTE_COD_OPERACION_DIGITO);
+		generarDigito.addCampo(0, CTE_APP);
+		generarDigito.addCampo(16, oficinaSolicitud.toString()); 
+		generarDigito.addCampo(19, CTE_CUENTAC);
+		generarDigito.addCampo(20, numeroSolicitud);
+		
+		IContexto[] datos = ServicioNegocio.invocarServicio(contexto, generarDigito);
+		
+		IContexto ctx = UtilidadesTramitacion.getContexto(datos, CTE_CTX_DIGITOS);
+		if (ctx != null)
+		{
+			digito = ctx.getBigDecimal(CTE_CAMPO_DIGITO);			
+		}		
+		return digito;
+	}
+	
+	/**
+	 * Méotodo que genera una nueva versión de una solicitud existente.
+	 * 
+	 * @param solicitudOriginal
+	 * @param usuario
+	 * @return un resultado con la nueva solicitud generada
+	 */
+	public DatosSolicitudC generarNuevaVersion(DatosSolicitudC solicitudOriginal, String usuario)
+	{
+		final java.sql.Date dateMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO));
+		
+		solicitudOriginal.getDatosSolicitudKey().setVersionSolicitud(dao.getUltimaVersion(solicitudOriginal));
+		
+		solicitudOriginal.setTimestamp(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		solicitudOriginal.setUsuario(usuario);
+		solicitudOriginal.setEstadoSolicitud(Constantes.ESTADO_SOL_SIN_RESOLVER);
+		solicitudOriginal.setFechaFormalizacion(dateMinima);
+		solicitudOriginal.setFechaValorFirma(dateMinima);
+		solicitudOriginal.setDateFechaImpresion(dateMinima);
+		//Modificación 8 de Mayo de 2013
+		//Cuando se genera una nueva version de la solicitud la fecha de impresion
+		//de la fiper será la fecha minima, para que se vuelva a imprirmir en caso
+		//de ser necesaria
+		solicitudOriginal.setDateFechaImpresionFipper(dateMinima);
+
+		// Alta de la nueva solicitud.
+		
+		return solicitudOriginal;
+	}
+	
+	
+	/**
+	 * Generamos una versión con número de versión 0. 
+	 * Si recibe una solicitud( DatosSolicitudC datosSolicitudUltimaVersion) lo duplica y lo guarda con versión 0.
+	 * Si no recibe la solicitud, crea el objeto con los datos recibidos y los guarda con versión 0. 
+	 * @param oficinaSolicitud
+	 * @param numeroSolicitud
+	 * @param nucExpediente
+	 * @param versionSolicitud
+	 * @param codigoProducto
+	 * @param codigoSubproducto
+	 * @param versionGeneral
+	 * @param colectivo
+	 * @param strCnae
+	 * @param bidSector
+	 * @param bidClaseRiesgo
+	 * @param bidTipoGarantia
+	 * @param bidImporte
+	 * @param strMonedaImporteTotal
+	 * @param bidPlazo
+	 * @param strUsuario
+	 * @param strEspecialidad
+	 * @param tipoExpediente
+	 * @param strEndidad
+	 * @param cteEstadoSolicitud
+	 * @param strUnidadPlazo
+	 * @param datosSolicitudUltimaVersion
+	 * @return
+	 */
+	public DatosSolicitudC crearDatosSolicitudSindicados(BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud, BigDecimal nucExpediente, 
+			BigDecimal versionSolicitud, BigDecimal codigoProducto, BigDecimal codigoSubproducto, BigDecimal versionGeneral, BigDecimal colectivo, 
+			String strCnae, BigDecimal bidSector, BigDecimal bidClaseRiesgo, BigDecimal bidTipoGarantia, 
+			BigDecimal bidImporteTotal, BigDecimal bidImporteMaxParticipacion,
+			String strMoneda, String strUsuario, String strEspecialidad, BigDecimal tipoExpediente, 
+			String strEndidad, BigDecimal cteEstadoSolicitud,  DatosSolicitudC datosSolicitudUltimaVersion)
+	{
+			DatosSolicitudC datosSolicitud = null;
+			DatosSolicitudKey datosSolicitudKey = null;
+			if (null != datosSolicitudUltimaVersion)
+			{
+				// Es una modificación -> Se hace sobre la ultima version con solicitud 0
+				datosSolicitud = datosSolicitudUltimaVersion;
+				 
+			}
+			else 
+			{
+				// Es una alta
+				datosSolicitud = new DatosSolicitudC();					
+				datosSolicitudKey = new DatosSolicitudKey();
+				datosSolicitudKey.setOficinaSolicitud(oficinaSolicitud);
+				datosSolicitudKey.setNumSolicitud(BigDecimal.ZERO);
+				datosSolicitudKey.setNucExpediente(nucExpediente);
+				datosSolicitudKey.setVersionSolicitud(BigDecimal.ONE);
+				datosSolicitud.setDatosSolicitudKey(datosSolicitudKey);
+				datosSolicitud.setEstadoSolicitud(cteEstadoSolicitud);
+			}
+	
+			datosSolicitud.setOficinaContable(oficinaSolicitud);
+			//datosSolicitud.setDigitoSolicitud(bidDigitoSolicitud);
+			datosSolicitud.setProducto(codigoProducto);
+			datosSolicitud.setSubproducto(codigoSubproducto);
+			datosSolicitud.setVersionGeneral(versionGeneral);
+			datosSolicitud.setLineaColectivo(colectivo);
+			datosSolicitud.setCnae(strCnae);
+			datosSolicitud.setSector(bidSector);
+			datosSolicitud.setClaseRiesgo(bidClaseRiesgo);
+			datosSolicitud.setGarantiaOficina(bidTipoGarantia);
+			datosSolicitud.setGarantiaContable(bidTipoGarantia);
+			datosSolicitud.setImporteTotal(bidImporteTotal);
+			datosSolicitud.setImporteSolicitado(bidImporteMaxParticipacion);
+			datosSolicitud.setMonedaImporteTotal(strMoneda);
+			datosSolicitud.setMonedaImporteSolicitado(strMoneda);
+			datosSolicitud.setPlazoTotal(BigDecimal.ZERO);
+			datosSolicitud.setUsuario(strUsuario);
+			datosSolicitud.setEspecialidad(strEspecialidad);
+			datosSolicitud.setTipoExpediente(tipoExpediente);
+			datosSolicitud.setEntidad(strEndidad);
+			//datosSolicitud.setEstadoSolicitud(cteEstadoSolicitud);	// Solo ponemos el estado	Pendinete de concesión si es alta.
+																		// Despues se cambiará a concedido al resolver y solo vovlerá a Pendiente
+																		// si se cumplen unas condiciones. Se hace al reabrir la tarea de Resolucion.
+			//datosSolicitud.setUnidadPlazo(strUnidadPlazo);
+			
+			datosSolicitud.setDestinos(new ArrayList<DestinosC>());
+			datosSolicitud.setCondicionesCapital(new ArrayList<CondicionCapitalC>());
+			datosSolicitud.setCondicionesInteres(new ArrayList<CondicionesInteresC>());
+			datosSolicitud.setComisiones(new ArrayList<ComisionC>());
+			datosSolicitud.setTratamientoAdelantos(new ArrayList<TratamientoAdelantosC>());
+			datosSolicitud.setCuentas(new ArrayList<DatosCuentasC>());
+			datosSolicitud.setDatosGeneralesEnotario(new ArrayList<DatosgeneralesC>());
+						
+			datosSolicitud.setIndicadorAutorizacion(BigDecimal.ZERO);
+			datosSolicitud.setStrIndicador3("S");
+			
+			return datosSolicitud;
+	}	
+	
+	public SindicadosC crearDatosSindicado(BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud, BigDecimal nucExpediente, 
+			BigDecimal versionSolicitud, BigDecimal bidClaseFinanciacion,
+			String strClaseFinanciacion, BigDecimal bidTipoFinanciacion,
+			String strTipoFinanciacion, BigDecimal bidSubFinanciacion,
+			String strSubtipoFinanciacion, BigDecimal bidTipoSindicado,
+			BigDecimal bidAgente, BigDecimal bidParticipacionEntidad, 
+			String strObservaciones, String strUsuario,
+			 String strMonedaParticipacionEntidad,
+			BigDecimal tipoAgente, BigDecimal garantiaMayoritaria, Date fechaUltVcto, String destinoPrincipal, SindicadosC matrizUltimaVersion)
+	{
+		
+		SindicadosC datosMatriz = null;
+		SindicadosKey sindicadosKey = null;
+		if (null != matrizUltimaVersion)
+		{
+			// Es una modificación -> Se hace sobre la ultima version con solicitud 0
+			datosMatriz = matrizUltimaVersion;
+			 
+		}
+		else 
+		{
+			// Es una alta
+			datosMatriz = new SindicadosC();					
+			sindicadosKey = new SindicadosKey();
+			sindicadosKey.setBidOficina(oficinaSolicitud);
+			sindicadosKey.setBidSolicitud(BigDecimal.ZERO);
+			sindicadosKey.setBidNucExpediente(nucExpediente);
+			sindicadosKey.setBidVersion(BigDecimal.ONE);
+			datosMatriz.setSindicadosKey(sindicadosKey);
+		}
+		
+		datosMatriz.setBidClaseFinanciacion(bidClaseFinanciacion);
+		datosMatriz.setStrClaseFinanciacion(strClaseFinanciacion);
+		datosMatriz.setBidTipoFinanciacion(bidTipoFinanciacion);
+		datosMatriz.setStrTipoFinanciacion(strTipoFinanciacion);
+		datosMatriz.setBidSubFinanciacion(bidSubFinanciacion);
+		datosMatriz.setStrSubtipoFinanciacion(strSubtipoFinanciacion);
+		datosMatriz.setBidTipoSindicado(bidTipoSindicado);
+		datosMatriz.setTipoAgente(tipoAgente.toString());
+		datosMatriz.setBidAgente(bidAgente);
+		datosMatriz.setBidParticipacionEntidad(bidParticipacionEntidad);
+		datosMatriz.setStrObservaciones(strObservaciones);
+		datosMatriz.setStrUsuario(strUsuario);
+		datosMatriz.setDateAltaModificacion(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		datosMatriz.setStrMonedaParticipacionEntidad(strMonedaParticipacionEntidad);
+		
+		datosMatriz.setGarantiaMayoritaria(garantiaMayoritaria);
+		datosMatriz.setFechaUltimoVcto(fechaUltVcto);
+		datosMatriz.setDestinoPrincipal(destinoPrincipal);
+			
+		return datosMatriz;
+			
+	}
+	/**
+	 * 
+	 * @param datosSolicitudUltimaVersion
+	 * @return
+	 */
+	public DatosSolicitudC nuevaVersionAN25(DatosSolicitudC	datosSolicitudUltimaVersion)
+	{
+		
+		// Duplicamos la solicitud con numero de solicitud 0	
+		DatosSolicitudC datosSolicitud = new DatosSolicitudC();
+		datosSolicitud.copiar(datosSolicitudUltimaVersion);
+		datosSolicitud.getDatosSolicitudKey().setNumSolicitud(BigDecimal.ZERO);
+		final java.sql.Date dateMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO));
+		
+		// Se incrementa la versión
+		datosSolicitud.getDatosSolicitudKey().setVersionSolicitud(dao.getUltimaVersion(datosSolicitudUltimaVersion));
+		
+		datosSolicitud.setTimestamp(DateUtils.toSQLTimestamp(DateUtils.dateNow()));
+		datosSolicitud.setUsuario(ServicioNegocio.getContexto().getUsuario());
+		//datosSolicitud.setEstadoSolicitud(Constantes.ESTADO_SOL_SIN_RESOLVER);
+		datosSolicitud.setFechaFormalizacion(dateMinima);
+		datosSolicitud.setFechaValorFirma(dateMinima);
+		datosSolicitud.setDateFechaImpresion(dateMinima);
+		datosSolicitud.setStrIndicador3("S");
+		//Modificación 8 de Mayo de 2013
+		//Cuando se genera una nueva version de la solicitud la fecha de impresion
+		//de la fiper será la fecha minima, para que se vuelva a imprirmir en caso
+		//de ser necesaria
+		datosSolicitud.setDateFechaImpresionFipper(dateMinima);
+		
+		dao.persist(datosSolicitud);
+		
+		return datosSolicitud;
+	}
+	
+	public BigDecimal getNumeroNuevaVersion(DatosSolicitudC solicitud)
+	{
+		BigDecimal version = dao.getUltimaVersion(solicitud);
+		return version;
+	}
+	
+	public void setVersionSolicitud(DatosSolicitudC solicitud, BigDecimal version)
+	{
+		if (null != solicitud)
+		{
+			solicitud.getDatosSolicitudKey().setVersionSolicitud(version);
+			dao.update(solicitud);
+		}
+		else
+		{
+		
+		}
+		dao.persist(solicitud);
+	}
+	
+
+	
+	
+
+	
+	public SindicadosC getSindicadoPorVersion(BigDecimal nucExpediente, BigDecimal version)
+	{
+		
+		
+		return daoMatriz.getSindicado(nucExpediente, version);
+		
+		
+	}
+	
+	public SindicadosC guardarMatriz(SindicadosC matriz)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarSolicitud() - Inicio");
+		}
+		
+	//	final Integer codError = CodigosError.NO_ERROR;
+		
+	//	ResultadoDatosSolicitudVO resultado = new ResultadoDatosSolicitudVO();		
+		
+		
+		daoMatriz.persist(matriz);
+		daoMatriz.flush();
+		
+	//	resultado.setDatos(matriz);
+	//	resultado.setCodError(codError);
+	
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarSolicitud() - Fin.");
+		}
+		return matriz;
+		
+	} 
+	
+	public BigDecimal getUltimaVersionIncompleta(BigDecimal nucExpedienteMatriz)
+	{
+		
+		DatosSolicitudC ultimaSolicitud = dao.getUltimaVersionIncompleta(nucExpedienteMatriz);
+		
+		return ultimaSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+	}
+	
+	public static IContexto getEstadoExpediente(BigDecimal nucExpediente)
+	{
+		
+		IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), Integer.valueOf(502), Integer.valueOf(272));
+		entrada.addCampo(0, nucExpediente); 
+
+		IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+		IContexto salidaCon = ContextoFactory.getInstance().getContexto("EE273CON");
+
+		if (null != salida && 0 != salida.length)
+		{
+			salidaCon = salida[0];
+			
+		}
+		else 
+		{
+			ServicioNegocio.rollback(ConstantesSindicados.ERROR_SERVICIO_COMUN, null,
+							new String[] {"(502-272)", "Se ha producido un error al intentar obtener el estado de un expediente"}, null);
+		}
+		
+		return salidaCon;
+		
+	}
+
+    public static DatosSolicitudC getDatosSolicitudUltimaConcesionOld(BigDecimal pOficinaSolicitud, BigDecimal pNumSolicitud, BigDecimal pNucExpediente)
+ 	 {
+    	Boolean estuvoConcedido = false;
+    	
+    	DatosSolicitudEng daoSolicitud = new DatosSolicitudEng();
+    	DatosSolicitudC solicitudConcedida = null;
+    	List<DatosSolicitudC> lstVersionesSolicitud = daoSolicitud.buscarVersionesSolicitud(pOficinaSolicitud, pNumSolicitud, pNucExpediente);
+    	if (null != lstVersionesSolicitud)
+    	{
+    		
+  		for (DatosSolicitudC  versionSolicitud : lstVersionesSolicitud)
+    		{
+    			
+    			// Encontramos una version concedida
+    			if (0==Constantes.ESTADO_SOL_CONCEDIDA.compareTo(versionSolicitud.getEstadoSolicitud()))
+    			{
+ /*   				// Si el importe que teniamos era mayor qeu el actual significa qeu hubo una modificacion que implicó nueva resolucion
+    				// Por tatno nos quedamos con la mas reciente de las 2 (actual + 1).
+    				// Si el imoprte es igual o menor hay qeu seguir buscando  el paso de 2 a 3
+    				if (estuvoConcedido && importe.compareTo(versionSolicitud.getImporteSolicitado()) > 0)
+    				{
+       					solicitudConcedida = daoSolicitud.obtenerDatosSolicitudPorNucVersion(pNucExpediente,
+					             versionSolicitud.getDatosSolicitudKey().getVersionSolicitud().add(BigDecimal.ONE), true);
+       					break;
+   				
+    				}
+    				*/
+    				estuvoConcedido = true;
+    			}
+    			else    //esta versión no está concedida
+    			{
+    				if (estuvoConcedido) //hay una versión posterior en la que estuvo concedida
+    				{
+    					solicitudConcedida = daoSolicitud.obtenerDatosSolicitudPorNucVersion(pNucExpediente,
+    							             versionSolicitud.getDatosSolicitudKey().getVersionSolicitud().add(BigDecimal.ONE), true);
+								 
+    					break;
+    				}
+    			}
+    		 }
+    	}
+    	return solicitudConcedida;
+     }
+    
+    public static Boolean solicitudConcedida(BigDecimal pOficinaSolicitud, BigDecimal pNumSolicitud, BigDecimal pNucExpediente)
+  	 {
+    	   	
+     	Boolean estuvoConcedido = false;
+     	
+     	DatosSolicitudEng daoSolicitud = new DatosSolicitudEng();
+       	
+     	List<DatosSolicitudC> lstVersionesSolicitud = daoSolicitud.buscarVersionesSolicitud(pOficinaSolicitud, pNumSolicitud, pNucExpediente);
+     	if (null != lstVersionesSolicitud)
+     	{
+     		
+	   		for (DatosSolicitudC  versionSolicitud : lstVersionesSolicitud)
+	     	{
+	     			
+	     		// Encontramos una version concedida
+	     		if (0==Constantes.ESTADO_SOL_CONCEDIDA.compareTo(versionSolicitud.getEstadoSolicitud()))
+	     		{
+	     			estuvoConcedido = true;
+	     			break;
+	     		}
+	 
+	     	}
+     	}
+     	return estuvoConcedido;
+      }
+ 	
+	
+	 public static BigDecimal getImporteConcedido (DatosSolicitudC pSolicitud)
+	 {
+		 BigDecimal importeConcedido = BigDecimal.ZERO;
+		 
+/*		 final DatosSolicitudC solicitudConcedida = getDatosSolicitudUltimaConcesion(pSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+		                       pSolicitud.getDatosSolicitudKey().getNumSolicitud(), pSolicitud.getDatosSolicitudKey().getNucExpediente());
+		
+		 if (null!=solicitudConcedida)
+		 {
+			 importeConcedido = solicitudConcedida.getImporteSolicitado();
+		 }
+*/
+		 
+		 // El importe concedido lo cogemos de AN38
+			GestionSindicados gs = new GestionSindicados();
+			SindicadosC sindicado = gs.getSindicadoPorVersion(pSolicitud.getDatosSolicitudKey().getNucExpediente(), 
+					pSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+			importeConcedido = sindicado.getBidParticipacionEntidad();
+			
+		 return importeConcedido;
+	 }
+}

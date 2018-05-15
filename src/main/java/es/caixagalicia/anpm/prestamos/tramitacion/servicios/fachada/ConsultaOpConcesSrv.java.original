@@ -1,0 +1,113 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+
+/**
+ *  Servicio de consulta: Se recupera la última versión completa para comprobar si en la tabla AN32TB01 el indicador de cuenta de
+ *  cargo, es decir, AN320100 = C, tiene el campo AN320200 el valor 2, lo que indicaría que la cuenta de cargo es externa.
+ *  Además se comprueba si el producto de la versión recuperada es de concesionarios.
+ *  
+ *  @return devuelve un mensaje y un código de error. Si tiene cuenta externa y es un producto válido para concesionarios devuelve 
+ *  un mensaje y el código de error 0. En otro caso devuelve un mensaje y el código de error 1.
+ *  
+ *  Transacción: ANT9
+ *  CNTX: ANPMN297
+ *  CO: ANPM_297
+ *
+ *  @autor V361749
+ */
+
+public class ConsultaOpConcesSrv extends ServicioNegocio
+{
+	private static final String CTE_ENTRADA_NUC = "NUC";
+	
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada)
+	{
+		// Declaración de variables 
+		
+		BigDecimal nuc = null;
+		Boolean indProdConcesio = false;
+		Boolean indCuenExterna = false;
+		String resultadoFinal = "Comprobar indicadores: el producto no es válido para concesionarios o no tiene cuenta externa"; 
+		BigDecimal prodConcesi = BigDecimal.ZERO; // devolverá 0 en caso de que el expediente  tenga un producto NO válido para concesionarios; devolverá 1 si es válido
+		BigDecimal cuentaExterna = BigDecimal.ZERO; // devolverá 0 en caso de no tener una cuenta externa ; devolverá 1 si la tiene
+		String resultadoCuenta = "No tiene cuenta externa";
+		String resultadoConcesi = "Producto no válido para concesionarios. ";
+		
+		// Se establece el diario electrónico
+		
+		contexto.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_CONSULTA));
+		
+		//Datos de entrada
+		
+		nuc = datosEntrada.getDecimal(CTE_ENTRADA_NUC);
+		
+		final GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		
+		if (!UtilidadesTramitacion.isBlankOrNull(nuc))
+		{
+			// si el nuc viene informado, recuperamos de la tabla AN25 la última versión completa
+			final DatosSolicitudC datosSolicitud = gds.getUltimaVersionCompleta(nuc);
+
+			if ((null != datosSolicitud) && (!UtilidadesTramitacion.isBlankOrNull(nuc))) // si el NUC existe en la tabla AN25
+			{
+						
+			   final String productoActual = datosSolicitud.getProducto().toString();   		// producto
+			   final String subproductoActual = datosSolicitud.getSubproducto().toString();		// subproducto
+			
+			   final List<DatosCuentasC> cuentas = datosSolicitud.getCuentas(); // se recuperan las cuentas de la tabla AN32
+			
+			   for (DatosCuentasC cuentaCargo : cuentas) // recorremos las cuentas asociadas al nuc
+			   {
+				   if ((cuentaCargo.getTipoCuenta().equals(Constantes.CTE_TIPO_CUENTA_CARGO)) &&		// si es la cuenta de cargo --> campo AN320100 = "C"
+						(0 == (cuentaCargo.getBidTipoCuenta().compareTo(Constantes.CTE_BID_2))))		// si la cuenta es externa	--> campo AN320200 =  2
+				   {
+					   indCuenExterna = true; // true si existe una cuenta externa
+					   cuentaExterna = BigDecimal.ONE;
+					   resultadoCuenta = "Tiene una cuenta externa.";
+    			   }
+			   }
+
+			   // se comprueba que es un producto válido para concesionarios
+			   
+			   indProdConcesio = UtilidadesComun.esProductoConcesionarios(productoActual, subproductoActual);
+			
+			   if ((indProdConcesio))
+				{
+				   // resultado si es producto válido para concesionarios y además, tiene una cuenta externa
+				   resultadoConcesi = "Producto válido para concesionarios."; 
+				   prodConcesi = BigDecimal.ONE; 
+				}
+			   
+			   if ((indProdConcesio)&&(indCuenExterna))
+			   {
+				   resultadoFinal = resultadoConcesi+""+resultadoCuenta;
+			   }
+			}
+		}
+		
+		IContexto[] salida = new IContexto[1];
+		salida[0] = ContextoFactory.getInstance().getContexto("ANPMN297");
+		salida[0].put("ANPMN297010", resultadoFinal);
+		salida[0].put("ANPMN297020", prodConcesi);
+		salida[0].put("ANPMN297030", cuentaExterna);
+		
+		return salida;
+	}
+}

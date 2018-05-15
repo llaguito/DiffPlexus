@@ -1,0 +1,664 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.utilidades;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.util.Helper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Clase que contiene los métodos necesarios para calcular el contravalor
+ * de un importe, teniendo en cuenta la divisa de origen y la destino.
+ * Extiende de AbstractItal y es la que se usa para entidades de España, por
+ * ejemplo la 2080.
+ *
+ * @author G2510
+ * @version 1.0
+ */
+public final class ItalEspana extends AbstractItal {
+
+    private static final int INT_000 = 0;
+
+    private static final int INT_001 = 1;
+
+    private static final int INT_002 = 2;
+
+    private static final int INT_003 = 3;
+
+    private static final int INT_004 = 4;
+
+    private static final int INT_005 = 5;
+
+    private static final int INT_006 = 6;
+
+    private static final int INT_007 = 7;
+
+    private static final int INT_008 = 8;
+
+    private static final int INT_009 = 9;
+
+    private static final int INT_010 = 10;
+
+    private static final int INT_340 = 340;
+
+    private static final int INT_600 = 600;
+
+    private static final int INT_601 = 601;
+
+    private static final int INT_606 = 606;
+
+    private static final int INT_607 = 607;
+
+    private static final int INT_302 = 302;
+
+    private static final BigDecimal BGD_100000000000 = new BigDecimal("100000000000");
+
+    private static final String CAMBIO_COMPRA = "-1";
+
+    private static final String CAMBIO_VENTA = "-2";
+
+    private static final String CAMBIO_DEFECTO = "-3";
+
+    /**
+     * Descripción de la operación de consulta de una cuenta
+     *	  $NON-NL-1$
+     */
+    private static final String CONSULTACUENTA = "CONSULTA_CUENTA_1823747885";
+
+    /**
+     * Descripción de la operación de consulta del digito de una cuenta
+     *	  $NON-NL-1$
+     */
+    private static final String CONSULTADIGITOCUENTA = "CONSULTA_DIGITO_CUENTA_1231841701";
+
+    private static final String STRIT013C005 = "IT013C005";
+
+    private static final String CTE_CODIGO_PAIS_BDE_ESPANA = "ESPAN";
+
+    /**
+     * Nombre de la clase
+     */
+    private static final String NOMBRE_CLASE = ItalEspana.class.getSimpleName();
+
+    /**
+     * Objeto que utilizaremos para escribir mensajes en el LOG de la plataforma
+     */
+    private static final LogHelper OBLOGHELPER = UtilidadesTramitacion.getLoggerANPM(NOMBRE_CLASE);
+
+    /**
+     * Creo un objeto persistente durante el thread para almacenar los cambios ya consultados
+     */
+    private static final ThreadLocal CAMBIOSALMACENADOS = new ThreadLocal() {
+
+        @Override
+        protected synchronized Object initialValue() {
+            return new ArrayList<CambioTO>(5);
+        }
+    };
+
+    /**
+     * Constructor de la clase
+     *
+     * @param strEntidad La entidad para la que se ejecuta la factoria abstracta
+     */
+    public ItalEspana(String strEntidad) {
+        super(strEntidad);
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#divisaConDecimales (java.lang.String)
+     */
+    @Override
+    public boolean divisaConDecimales(String strDivisa) {
+        boolean blDivisaConDecimales = true;
+        IContexto obContexto = null;
+        // Obtenemos los datos de la divisa
+        obContexto = consultaDivisa(strDivisa);
+        // Comprobamos si la divisa acepta o no decimales
+        blDivisaConDecimales = (0 != BigDecimal.ZERO.compareTo(obContexto.getBigDecimal("IT001C0080")));
+        return blDivisaConDecimales;
+    }
+
+    private IContexto consultaDivisa(String divisa) {
+        final String strNombreParDiv = "strDivisa";
+        IContexto[] salida = null;
+        IDatosEntradaTx entrada = null;
+        Integer inCtaContable = new Integer(INT_340);
+        Integer inCodOperacion = new Integer(INT_600);
+        String strDescError = null;
+        BigDecimal dcCodError = null;
+        IContexto obContexto = null;
+        String strDivisa = null;
+        if (!Helper.isNullOrEmpty(divisa).booleanValue()) {
+            strDivisa = divisa.trim();
+        }
+        // Comprobamos que el valor de los parámetros no sea nula
+        UtilidadesTramitacion.comprobarParametroNulo(strDivisa, strNombreParDiv, NOMBRE_CLASE);
+        // Obtenemos el objeto que nos permitira rellenar el registro de entrada del servicio
+        entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), inCtaContable, inCodOperacion);
+        // Rellenamos el registro de entrada del servicio
+        entrada.addCampo(0, "D");
+        entrada.addCampo(1, strDivisa.trim());
+        salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        // Comprobamos si hubo error en la invocacion al servicio
+        if ((null == salida) || (1 != salida.length) || (null == salida[0])) {
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion);
+        } else {
+            obContexto = salida[0];
+            dcCodError = obContexto.getBigDecimal("IT001C0190");
+            strDescError = UtilidadesTramitacion.comprobarDatoNull(obContexto.getString("IT001C0200"));
+            // Comprobamos si hubo error en la llamada
+            if ((null != dcCodError) && (!dcCodError.equals(BigDecimal.ZERO))) {
+                // Montamos el mensaje multiidioma
+                UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion, dcCodError.toString(), strDescError);
+            }
+        }
+        return obContexto;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#calculaContravalor(java.lang.String,
+     * java.math.BigDecimal, java.lang.String, java.math.BigDecimal)
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public ContravalorTO calculaContravalor(String strDivisaOrigen, BigDecimal dcImporte, String strDivisaDestino, BigDecimal tipoDeCambioRecibido, boolean blAplicarRedondeo) {
+        final String strNombreParImporte = "importeIn";
+        final String strNombreParDivOrig = "strDivisaOrigen";
+        final String strNombreParDivDest = "strDivisaDestino";
+        ContravalorTO contravalorTO = null;
+        BigDecimal tipoDeCambio = new BigDecimal(CAMBIO_DEFECTO);
+        BigDecimal importe = null;
+        BigDecimal dcImporteVenta = BigDecimal.ZERO;
+        List<CambioTO> cambiosGuardados = new ArrayList<CambioTO>(5);
+        // Comprobamos que el valor de los parámetros obligatorios no sea nulo
+        UtilidadesTramitacion.comprobarParametroNulo(dcImporte, strNombreParImporte, NOMBRE_CLASE);
+        UtilidadesTramitacion.comprobarParametroNulo(strDivisaOrigen, strNombreParDivOrig, NOMBRE_CLASE);
+        UtilidadesTramitacion.comprobarParametroNulo(strDivisaDestino, strNombreParDivDest, NOMBRE_CLASE);
+        // Si se envía un importe cero indica que sólo deseamos obtener el tipo de cambio de la divisa
+        if (0 == BigDecimal.ZERO.compareTo(dcImporte)) {
+            importe = BigDecimal.ONE;
+        } else {
+            importe = dcImporte;
+        }
+        if (StringUtils.isBlank(strDivisaOrigen)) {
+            strDivisaOrigen = UtilidadesTramitacion.obtenerMonedaEntidad();
+        }
+        if (StringUtils.isBlank(strDivisaDestino)) {
+            strDivisaDestino = UtilidadesTramitacion.obtenerMonedaEntidad();
+        }
+        // Comprobamos si se envía un tipo de cambio para realizar la operacion
+        if (null == tipoDeCambioRecibido) {
+            // usamos cambio compra.
+            if (strDivisaOrigen.trim().equalsIgnoreCase(UtilidadesTramitacion.obtenerMonedaEntidad())) {
+                if (!strDivisaDestino.trim().equalsIgnoreCase(UtilidadesTramitacion.obtenerMonedaEntidad())) {
+                    tipoDeCambio = new BigDecimal(CAMBIO_COMPRA);
+                }
+            } else {
+                // usamos cambio venta.
+                if (strDivisaDestino.trim().equalsIgnoreCase(UtilidadesTramitacion.obtenerMonedaEntidad())) {
+                    tipoDeCambio = new BigDecimal(CAMBIO_VENTA);
+                }
+            }
+        } else {
+            tipoDeCambio = tipoDeCambioRecibido;
+        }
+        // Recupero los datos guardados en el thead local.
+        // Esto lo hacemos para no llamar en cada ejecucion multiples veces
+        // al metodo que obtiene el tipo de cambio entre divisas y así
+        // agilizar los resultados.
+        cambiosGuardados = (List<CambioTO>) CAMBIOSALMACENADOS.get();
+        CambioTO valorCambio = obtenerCambioAplicar(cambiosGuardados, tipoDeCambio, strDivisaOrigen, strDivisaDestino);
+        // Guardamos los nuevos datos en el thead local.
+        // Esto lo hacemos para no llamar en cada ejecucion multiples veces
+        // al metodo que obtiene el tipo de cambio entre divisas y así
+        // agilizar los resultados.
+        CAMBIOSALMACENADOS.set(cambiosGuardados);
+        /*
+		 * Si se llega a este punto no se produjo error alguno en la llamada. Cargamos los datos devueltos 
+		 * por el servicio en el objeto que los transportará en la salida
+		 */
+        contravalorTO = new ContravalorTO();
+        // Antes de nada guardamos el cambio aplicado.
+        contravalorTO.setTipoCambio(valorCambio.getValorCambio());
+        // tiene que ser cero
+        if (0 == BigDecimal.ZERO.compareTo(dcImporte)) {
+            contravalorTO.setImporteCompra(BigDecimal.ZERO);
+            contravalorTO.setImporteVenta(BigDecimal.ZERO);
+        } else {
+            // Contravaloramos el importe del credito
+            if (0 != BigDecimal.ZERO.compareTo(importe)) {
+                if (strDivisaOrigen.trim().equalsIgnoreCase(strDivisaDestino.trim())) {
+                    dcImporteVenta = importe;
+                } else {
+                    // Se calcula el contravalor aplicando redondeo si es necesario
+                    dcImporteVenta = ImportesHelper.realizaDivisionSegura(importe, contravalorTO.getTipoCambio());
+                }
+            }
+            // Comprobamos si deseamos aplicar redondeo en el importe de salida en función de la divisa
+            if (blAplicarRedondeo) {
+                dcImporteVenta = ImportesHelper.redondeaImporte(dcImporteVenta, strDivisaDestino, super.getEntidad());
+            }
+            contravalorTO.setImporteCompra(importe);
+            contravalorTO.setImporteVenta(dcImporteVenta);
+        }
+        return contravalorTO;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#consultaCuenta(java.lang.String, java.math.BigDecimal,
+     * java.lang.String)
+     */
+    @Override
+    public IContexto consultaCuenta(String moneda, BigDecimal cuentaCble, String numCuenta) {
+        IContexto[] salida = null;
+        IContexto resultado = null;
+        String campoNull = null;
+        final String DESC_CAMPO_CTA_CONTABLE = new Mensaje(ServicioNegocio.getContexto(), CUENTA_CONTABLE_798100380).toString();
+        if ((Helper.isNullOrEmpty(moneda).booleanValue()) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), DIVISA_1331462586).toString();
+        }
+        if ((null == cuentaCble) && (null == campoNull)) {
+            campoNull = DESC_CAMPO_CTA_CONTABLE;
+        }
+        if ((Helper.isNullOrEmpty(numCuenta).booleanValue()) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), NUMERO_CUENTA_608862412).toString();
+        }
+        if (null != campoNull) {
+            ServicioNegocio.rollback(CodigosError.CTE_CLAVE_MENSAJE_PARAMETRO_NULO, null, new String[] { campoNull, new Mensaje(ServicioNegocio.getContexto(), CONSULTACUENTA).toString() }, null);
+        }
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), new Integer(INT_340), new Integer(INT_606));
+        // moneda
+        entrada.addCampo(0, moneda);
+        // cuenta contable
+        entrada.addCampo(1, cuentaCble);
+        // numero de cuenta
+        entrada.addCampo(2, numCuenta);
+        salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        if ((null != salida) && (0 < salida.length)) {
+            resultado = salida[0];
+        }
+        return resultado;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#consultaDigitoCuenta(java.lang.String, java.math.BigDecimal,
+     * java.lang.String, java.lang.String, java.math.BigDecimal)
+     */
+    @Override
+    public BigDecimal consultaDigitoCuenta(String divisa, BigDecimal cuentaContable, String numeroCuenta, String vencimiento, BigDecimal subnumero) {
+        IContexto[] salida = null;
+        String campoNull = null;
+        BigDecimal digitoCuenta = null;
+        if ((Helper.isNullOrEmpty(divisa).booleanValue()) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), DIVISA_1331462586).toString();
+        }
+        if ((null == cuentaContable) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), CUENTA_CONTABLE_798100380).toString();
+        }
+        if ((Helper.isNullOrEmpty(numeroCuenta).booleanValue()) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), NUMERO_CUENTA_608862412).toString();
+        }
+        if ((Helper.isNullOrEmpty(vencimiento).booleanValue()) && (null == campoNull)) {
+            campoNull = new Mensaje(ServicioNegocio.getContexto(), VENCIMIENTO_1447417093).toString();
+        }
+        if ((null == subnumero) && (null == campoNull)) {
+            campoNull = "subnumero";
+        }
+        if (null != campoNull) {
+            ServicioNegocio.rollback(CodigosError.CTE_CLAVE_MENSAJE_PARAMETRO_NULO, null, new String[] { campoNull, new Mensaje(ServicioNegocio.getContexto(), CONSULTADIGITOCUENTA).toString() }, null);
+        }
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), new Integer(INT_340), new Integer(INT_607));
+        // Divisa
+        entrada.addCampo(0, divisa);
+        // Cuenta
+        entrada.addCampo(1, cuentaContable);
+        // Numero de cuenta
+        entrada.addCampo(2, numeroCuenta);
+        // Vencimiento
+        entrada.addCampo(3, vencimiento);
+        // Subnumero
+        entrada.addCampo(4, subnumero);
+        salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        if ((null == salida) || (1 != salida.length) || (null == salida[0]) || (null == salida[0].getBigDecimal("ITALN003060"))) {
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(new Integer(INT_340), new Integer(INT_607));
+        }
+        digitoCuenta = salida[0].getBigDecimal("ITALN003060");
+        return digitoCuenta;
+    }
+
+    /**
+     * Realiza la conversion entre el codigo de teleproceso y el codigo de pais
+     * interno de la caja (p.e. "017" => "ESPAN").
+     * <p>
+     * En caso de ocurrir algun error en la invocacion del SN se realiza un
+     * rollback.
+     *
+     * @param codigoTeleproceso
+     *        el codigo de teleproceso a convertir
+     * @return el codigo de pais interno de la caja.
+     */
+    private String convertirCodigoTeleproceso(BigDecimal codigoTeleproceso) {
+        final Integer inCtaContable = new Integer(INT_340);
+        final Integer inCodOperacion = new Integer(INT_601);
+        final String strNombreParCodTeleproceso = "codigoTeleproceso";
+        String codigoPais = null;
+        BigDecimal dcCodError = null;
+        String strDescError = null;
+        // Comprobamos que el valor de los parámetros sean nulos
+        UtilidadesTramitacion.comprobarParametroNulo(codigoTeleproceso, strNombreParCodTeleproceso, NOMBRE_CLASE);
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), inCtaContable, inCodOperacion);
+        // Codigo de control
+        entrada.addCampo(0, "T");
+        // Codigo de Teleproceso
+        entrada.addCampo(4, codigoTeleproceso);
+        // Informacion abreviada
+        entrada.addCampo(5, IConstantesSolicitud.CTE_S);
+        // Multiidioma
+        entrada.addCampo(6, IConstantesSolicitud.CTE_S);
+        IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        // Comprobamos que la llamada devuelva resultados
+        if ((null == salida) || (1 < salida.length) || (null == salida[0])) {
+            // Confeccionamos el mensaje multiidioma
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion);
+        } else {
+            // Recuperamos la descripcion y el codigo de error
+            dcCodError = salida[0].getBigDecimal("IT013C000");
+            strDescError = salida[0].getString(STRIT013C005);
+            // Comprobamos si hubo error en la llamada
+            if ((0 != BigDecimal.ZERO.compareTo(dcCodError)) || (!Helper.isNullOrEmpty(strDescError).booleanValue())) {
+                // Confeccionamos el mensaje multiidioma
+                UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion, dcCodError.toString(), strDescError);
+            }
+        }
+        codigoPais = salida[0].getString("IT013C010");
+        return codigoPais;
+    }
+
+    /**
+     * Realiza la conversion entre el codigo de teleproceso y el codigo de pais
+     * interno de la caja (p.e. "017" => "ESPAN").
+     * <p>
+     * En caso de ocurrir algun error en la invocacion del SN se realiza un
+     * rollback.
+     *
+     * @param codigoTeleproceso
+     *        el codigo de teleproceso a convertir (el String debe
+     *        corresponderse con un numero)
+     * @return el codigo de pais interno de la caja. Si codigoTeleproceso es
+     *  <code>null</code>, vacio o no es numerico, devuelve codigoTeleproceso
+     */
+    @Override
+    public String convertirCodigoTeleproceso(String codigoTeleproceso) {
+        String codigoPais = null;
+        if ((!(Helper.isNullOrEmpty(codigoTeleproceso).booleanValue())) && (Helper.isNumeric(codigoTeleproceso.trim()).booleanValue())) {
+            codigoPais = convertirCodigoTeleproceso(new BigDecimal(codigoTeleproceso.trim()));
+        } else {
+            codigoPais = codigoTeleproceso;
+        }
+        return codigoPais;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#esFechaHabil(java.sql.Date, java.lang.String)
+     */
+    @Override
+    public String convertirCodigoPais(String inCodigoPais) {
+        String nombrePais = StringUtils.EMPTY;
+        IContexto datosPais = null;
+        if (!Helper.isNullOrEmpty(inCodigoPais).booleanValue()) {
+            datosPais = consultaPorPais(inCodigoPais);
+        }
+        if (null != datosPais) {
+            nombrePais = UtilidadesTramitacion.comprobarDatoNull(datosPais.getString("IT013C020"));
+        }
+        return nombrePais;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see es.caixagalicia.lttr.credocumentimp.comun.servicios.aplicacion.
+     * AbstractItalSrv#esFechaHabil(java.sql.Date, java.lang.String)
+     */
+    @Override
+    public BigDecimal obtenerCodigoTeleproceso(String inCodigoPais) {
+        BigDecimal codTeleproceso = null;
+        String codigoPais = inCodigoPais;
+        IContexto datosPais = null;
+        if (Helper.isNullOrEmpty(codigoPais)) {
+            codigoPais = CTE_CODIGO_PAIS_BDE_ESPANA;
+        }
+        datosPais = consultaPorPais(codigoPais);
+        if (null != datosPais) {
+            codTeleproceso = datosPais.getBigDecimal("IT013C040");
+        }
+        codTeleproceso = UtilidadesTramitacion.comprobarDatoNull(codTeleproceso);
+        return codTeleproceso;
+    }
+
+    /**
+     * Metodo que realiza la invocación del SN 640/601 con
+     * la opción de consulta por pais.
+     *
+     * @param codigoPaisIN
+     * @return IContexto con los datos obtenidos
+     */
+    private static IContexto consultaPorPais(String codigoPaisIN) {
+        final Integer inCtaContable = new Integer(INT_340);
+        final Integer inCodOperacion = new Integer(INT_601);
+        final String strNombreParCodPais = "codigoPais";
+        String codigoPais = null;
+        BigDecimal dcCodError = null;
+        String strDescError = null;
+        // String nombrePais = Constantes.getCadenaVacia();
+        IContexto[] salida = null;
+        if (!Helper.isNullOrEmpty(codigoPaisIN).booleanValue()) {
+            codigoPais = codigoPaisIN.trim();
+            // Comprobamos que el valor de los parámetros sean nulos
+            UtilidadesTramitacion.comprobarParametroNulo(codigoPais, strNombreParCodPais, NOMBRE_CLASE);
+            IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), inCtaContable, inCodOperacion);
+            // Codigo de control
+            entrada.addCampo(0, "P");
+            // Codigo de pais
+            entrada.addCampo(1, codigoPais);
+            // informacion abreviada
+            entrada.addCampo(5, IConstantesSolicitud.CTE_S);
+            // multiidioma
+            entrada.addCampo(6, IConstantesSolicitud.CTE_N);
+            salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        }
+        // Comprobamos que la llamada devuelva resultados
+        if ((null == salida) || (1 < salida.length) || (null == salida[0])) {
+            // Confeccionamos el mensaje multiidioma
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion);
+        } else {
+            // Recuperamos la descripcion y el codigo de error
+            dcCodError = salida[0].getBigDecimal("IT013C000");
+            strDescError = salida[0].getString(STRIT013C005);
+            // Comprobamos si hubo error en la llamada
+            if ((0 != BigDecimal.ZERO.compareTo(dcCodError)) || (!Helper.isNullOrEmpty(strDescError).booleanValue())) {
+                // Confeccionamos el mensaje multiidioma
+                UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion, dcCodError.toString(), strDescError);
+            }
+        }
+        return salida[0];
+    }
+
+    /**
+     * Metodo que consulta el cambio que hay que aplicar de la lista de cambios ya
+     * guardados, o lo obtiene.
+     *
+     * @param cambiosGuardados Lista de los cambios que ya tenemos almacenados
+     * @param tipoCambio
+     * @param divisaIn
+     * @param divisaOut
+     *
+     * @return CambioTO
+     */
+    private static CambioTO obtenerCambioAplicar(List<CambioTO> cambiosGuardados, BigDecimal tipoCambio, String divisaIn, String divisaOut) {
+        CambioTO cambioAAplicar = null;
+        String divisain = StringUtils.EMPTY;
+        String divisaout = StringUtils.EMPTY;
+        BigDecimal tipocambio = BigDecimal.ZERO;
+        IContexto[] salida = null;
+        IDatosEntradaTx entrada = null;
+        Integer inCtaContable = new Integer(INT_340);
+        Integer inCodOperacion = new Integer(INT_302);
+        String strMensaje = null;
+        IContexto obContextoSalida = null;
+        String strDescError = null;
+        BigDecimal dcCodError = BigDecimal.ZERO;
+        BigDecimal cambioAplicado = null;
+        // Comprobamos que el valor de los parámetros obligatorios no sea nulo
+        UtilidadesTramitacion.comprobarParametroNulo(divisaOut, "divisaOut", NOMBRE_CLASE);
+        UtilidadesTramitacion.comprobarParametroNulo(divisaIn, "divisaIn", NOMBRE_CLASE);
+        UtilidadesTramitacion.comprobarParametroNulo(tipoCambio, "tipoCambio", NOMBRE_CLASE);
+        // Recojemos los datos de entrada
+        divisain = divisaIn.trim();
+        divisaout = divisaOut.trim();
+        tipocambio = tipoCambio;
+        for (CambioTO cambio : cambiosGuardados) {
+            if ((cambio.getDivisaIn().trim().equalsIgnoreCase(divisain)) && (cambio.getDivisaOut().trim().equalsIgnoreCase(divisaout)) && (0 == cambio.getTipoCambio().compareTo(tipocambio))) {
+                cambioAAplicar = cambio;
+            }
+        }
+        if (null == cambioAAplicar) {
+            if (!Helper.isNullOrEmpty(divisain).booleanValue()) {
+                // Invocamos al servicio que nos da el tipo de cambio
+                entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), inCtaContable, inCodOperacion);
+                // Tipo de operacion
+                entrada.addCampo(0, "A");
+                // Aplicacion
+                entrada.addCampo(1, "ITAL");
+                // Acceso
+                entrada.addCampo(2, "MIGUELON");
+                // Divisa compra
+                entrada.addCampo(3, divisaout);
+                // Divisa venta
+                entrada.addCampo(5, divisain);
+                // Importe divisa compra
+                entrada.addCampo(7, BGD_100000000000);
+                // Importe divisa venta
+                entrada.addCampo(8, BigDecimal.ZERO);
+                // Tipo de cambio
+                entrada.addCampo(10, tipocambio);
+                salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+            }
+            // Comprobamos si hubo error en la llamada
+            if ((null == salida) || (1 != salida.length) || (null == salida[0])) {
+                // Escribimos un mensaje en el log de la plataforma
+                if (OBLOGHELPER.isDebugEnabled()) {
+                    OBLOGHELPER.debug(strMensaje);
+                }
+                UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion);
+            }
+            // Si se llega a este punto disponemos de un contexto de salida del servicio final
+            obContextoSalida = salida[0];
+            if ((0 != BigDecimal.ZERO.compareTo(obContextoSalida.getBigDecimal("IT006C010"))) || (!(Helper.isNullOrEmpty(obContextoSalida.getString("IT006C020")).booleanValue()))) {
+                if (OBLOGHELPER.isDebugEnabled()) {
+                    OBLOGHELPER.debug(strMensaje);
+                }
+                // Obtenemos el codigo y la descripcion del error
+                dcCodError = obContextoSalida.getBigDecimal("IT006C010");
+                strDescError = obContextoSalida.getString("IT006C020");
+                // Montamos un mensaje multiidioma
+                UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion, dcCodError.toString(), strDescError);
+            }
+            cambioAplicado = ImportesHelper.realizaDivisionSegura(obContextoSalida.getBigDecimal("IT006C040"), BGD_100000000000, 7, RoundingMode.DOWN);
+            UtilidadesTramitacion.comprobarParametroNulo(cambioAplicado, "cambioAplicado", NOMBRE_CLASE);
+            cambioAAplicar = new CambioTO(divisain, divisaout, tipocambio, cambioAplicado);
+            // Guardamos el cambio que se ha buscado.
+            cambiosGuardados.add(cambioAAplicar);
+        }
+        return cambioAAplicar;
+    }
+
+    /**
+     * Metodo que consulta el cambio oficial para una divisa a una fecha
+     *
+     * @param divisaIn Divisa de la que queremos obtener el cambio oficial
+     *
+     * @return BigDecimal
+     */
+    public BigDecimal obtenerCambioOficial(String divisaIn) {
+        BigDecimal cambioOficial = null;
+        BigDecimal tipocambio = BigDecimal.ZERO;
+        IContexto[] salida = null;
+        IDatosEntradaTx entrada = null;
+        Integer inCtaContable = new Integer(INT_340);
+        Integer inCodOperacion = new Integer(INT_302);
+        String strMensaje = null;
+        IContexto obContextoSalida = null;
+        String strDescError = null;
+        BigDecimal dcCodError = BigDecimal.ZERO;
+        // Tipo de llamada al servicio
+        String tipoOperacion = "R";
+        // Divisa
+        String tipoDivisa = "D";
+        // Oficial
+        String claseCambio = "O";
+        // Comprobamos que el valor de los parámetros obligatorios no sea nulo
+        UtilidadesTramitacion.comprobarParametroNulo(divisaIn, "divisaIn", NOMBRE_CLASE);
+        // Invocamos al servicio que nos da el tipo de cambio
+        entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), inCtaContable, inCodOperacion);
+        entrada.addCampo(INT_000, tipoOperacion);
+        entrada.addCampo(INT_001, IConstantesSolicitud.COD_APLICACION_4_LETRAS);
+        entrada.addCampo(INT_002, IConstantesSolicitud.COD_APLICACION_4_LETRAS);
+        entrada.addCampo(INT_003, divisaIn);
+        entrada.addCampo(INT_004, tipoDivisa);
+        entrada.addCampo(INT_005, IConstantesSolicitud.MONEDA_EURO);
+        entrada.addCampo(INT_006, tipoDivisa);
+        entrada.addCampo(INT_007, BigDecimal.ONE);
+        entrada.addCampo(INT_008, BigDecimal.ZERO);
+        entrada.addCampo(INT_009, claseCambio);
+        entrada.addCampo(INT_010, tipocambio);
+        salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        // Comprobamos si hubo error en la llamada
+        if ((null == salida) || (1 != salida.length) || (null == salida[0])) {
+            // Escribimos un mensaje en el log de la plataforma
+            if (OBLOGHELPER.isDebugEnabled()) {
+                OBLOGHELPER.debug(strMensaje);
+            }
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion);
+        }
+        // Si se llega a este punto disponemos de un contexto de salida del servicio final
+        obContextoSalida = salida[0];
+        if ((0 != BigDecimal.ZERO.compareTo(obContextoSalida.getBigDecimal("IT006C010"))) || (!(Helper.isNullOrEmpty(obContextoSalida.getString("IT006C020")).booleanValue()))) {
+            if (OBLOGHELPER.isDebugEnabled()) {
+                OBLOGHELPER.debug(strMensaje);
+            }
+            // Obtenemos el codigo y la descripcion del error
+            dcCodError = obContextoSalida.getBigDecimal("IT006C010");
+            strDescError = obContextoSalida.getString("IT006C020");
+            // Montamos un mensaje multiidioma
+            UtilidadesTramitacion.confeccionarMensajeErrorInvServNeg(inCtaContable, inCodOperacion, dcCodError.toString(), strDescError);
+        }
+        cambioOficial = obContextoSalida.getBigDecimal("IT006C080");
+        return cambioOficial;
+    }
+
+    private static final String DIVISA_1331462586 = "DIVISA_1331462586";
+
+    private static final String VENCIMIENTO_1447417093 = "VENCIMIENTO_1447417093";
+
+    private static final String CUENTA_CONTABLE_798100380 = "CUENTA_CONTABLE_798100380";
+
+    private static final String NUMERO_CUENTA_608862412 = "NUMERO_CUENTA_608862412";
+}

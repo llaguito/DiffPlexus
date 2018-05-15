@@ -1,0 +1,155 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos;
+
+import java.math.BigDecimal;
+
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IRegistro;
+
+/**
+ * @author V361732
+ *
+ */
+public final class ContextoTarifasValidas
+{
+	
+	private static final String CTE_TARIFAS_VALIDAS_ID_CTX 								= "ANPMN453";
+	
+	private static final String CTE_TARIFAS_VALIDAS_ID_TARIFA							= "ANPMN453010";
+	private static final String CTE_TARIFAS_VALIDAS_DESCRIPCION_TARIFA					= "ANPMN453020";
+	
+	
+	//private static final String CTE_TARIFAS_VALIDAS_ORDEN_TRAMO  						= "ANPMN453030";
+	private static final String CTE_TARIFAS_VALIDAS_PLAZO								= "ANPMN453040";
+	//private static final String CTE_TARIFAS_VALIDAS_TIPO_INTERES						= "ANPMN453050";
+	private static final String CTE_TARIFAS_VALIDAS_DESDE								= "ANPMN453060";
+	private static final String CTE_TARIFAS_VALIDAS_HASTA								= "ANPMN453070";
+	private static final String CTE_TARIFAS_VALIDAS_RESTO								= "ANPMN453080";
+	//private static final String CTE_TARIFAS_VALIDAS_TIPO_TRAMO						= "ANPMN453090";
+	private static final String CTE_TARIFAS_VALIDAS_PRIORIDAD_TARIFA					= "ANPMN453100";
+	private static final String CTE_TARIFAS_VALIDAS_DESDE_HASTA							= "ANPMN453110";
+	private static final String CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_1					= "ANPMN453120";
+	private static final String CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_2					= "ANPMN453130";
+	private static final String CTE_TARIFAS_VALIDAS_TIPO_TRAMO_1						= "ANPMN453140";
+	private static final String CTE_TARIFAS_VALIDAS_TIPO_TRAMO_2						= "ANPMN453150";
+	private static final String CTE_TARIFAS_VALIDAS_BONIFICACION_MAXIMA					= "ANPMN453160";
+	private static final String CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_3					= "ANPMN453170";
+	private static final String CTE_TARIFAS_VALIDAS_TIPO_TRAMO_3						= "ANPMN453180";
+	private static final String CTE_TARIFAS_VALIDAS_RESTO_TRAMO_3						= "ANPMN453190";
+	
+	/**
+	 * Constructor por defecto
+	 */
+	public ContextoTarifasValidas()
+	{		
+	}
+	
+	
+	/**
+	 * 
+	 * @param datoTarifasValidas
+	 * @param datosPreciosTarifas
+	 * @return datos contexto ANPMN453
+	 */
+	 public static IContexto obtenerContextoTarifasValidas(
+			 final IRegistro datosTarifasAplicables,
+			 IRegistro registroTramo1,
+			 IRegistro registroTramo2,
+			 IRegistro registroTramo3,
+			 final BigDecimal plazo,
+			 final String bonificacion)
+	{
+
+		 String strDesde = "";
+		 String strHasta = "";
+		 String strResto = "";
+		 String strRestoTr3 = "";
+		
+		 IContexto contexto = ContextoFactory.getInstance().getContexto(CTE_TARIFAS_VALIDAS_ID_CTX);
+		 
+		 if (null != registroTramo1.getBigDecimal("ANPMN443015"))
+			 strDesde = UtilidadesTramitacion.bigDecimalToString(
+					 									registroTramo1.getBigDecimal("ANPMN443015"),
+					 									3, 4, true
+					 									);
+		 
+		 if (null != registroTramo1.getBigDecimal("ANPMN443016"))
+			 strHasta = UtilidadesTramitacion.bigDecimalToString(
+					 									registroTramo1.getBigDecimal("ANPMN443016"),
+					 									3, 4, true
+					 									);
+		 
+		 if (null != registroTramo2)
+		 {
+			 if (null != registroTramo1.getBigDecimal("ANPMN443014"))
+			 	strResto = UtilidadesTramitacion.bigDecimalToString(
+						 									registroTramo2.getBigDecimal("ANPMN443014"),
+						 									3, 4, true
+						 									);
+		 }
+		 
+		 if (null != registroTramo3)
+		 {
+			 if (null != registroTramo1.getBigDecimal("ANPMN443014"))
+			 	strRestoTr3 = UtilidadesTramitacion.bigDecimalToString(
+						 									registroTramo3.getBigDecimal("ANPMN443014"),
+						 									3, 4, true
+						 									);
+		 }
+		 
+		 String desdeHasta = "de " + strDesde + " a " + strHasta;
+		 
+		 
+		 contexto.put(CTE_TARIFAS_VALIDAS_ID_TARIFA, datosTarifasAplicables.getBigDecimal("ANPMN442011").toString());
+		 contexto.put(CTE_TARIFAS_VALIDAS_DESCRIPCION_TARIFA, datosTarifasAplicables.getString("ANPMN442012").trim());
+		 
+		 //contexto.put(CTE_TARIFAS_VALIDAS_ORDEN_TRAMO, datosPreciosTarifas.getBigDecimal("ANPMN443011").toString());
+		 contexto.put(CTE_TARIFAS_VALIDAS_PLAZO, plazo.toString());
+		 //contexto.put(CTE_TARIFAS_VALIDAS_TIPO_INTERES, 
+		 //				(datosPreciosTarifas.getString("ANPMN443019").trim().equals("INT"))
+		 //											? "0" : "1");
+		 
+		 contexto.put(CTE_TARIFAS_VALIDAS_DESDE, strDesde);
+		 contexto.put(CTE_TARIFAS_VALIDAS_HASTA, strHasta);
+		 contexto.put(CTE_TARIFAS_VALIDAS_RESTO, strResto);
+		 contexto.put(CTE_TARIFAS_VALIDAS_RESTO_TRAMO_3, strRestoTr3);
+		 
+		 
+		 //contexto.put(CTE_TARIFAS_VALIDAS_TIPO_TRAMO, datosPreciosTarifas.getString("ANPMN443012").trim());
+		 contexto.put(CTE_TARIFAS_VALIDAS_PRIORIDAD_TARIFA, datosTarifasAplicables.getBigDecimal("ANPMN442013").toString());
+		 
+		 contexto.put(CTE_TARIFAS_VALIDAS_DESDE_HASTA, desdeHasta);
+		
+		 contexto.put(CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_1, registroTramo1.getBigDecimal("ANPMN443020").toString());
+		 contexto.put(CTE_TARIFAS_VALIDAS_TIPO_TRAMO_1, (
+				 						registroTramo1.getString("ANPMN443019").trim().equals("INT")
+		 								? "0" : "1"));
+		 
+		 if (null != registroTramo2)
+		 {
+			 contexto.put(CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_2, registroTramo2.getBigDecimal("ANPMN443020").toString());
+			 contexto.put(CTE_TARIFAS_VALIDAS_TIPO_TRAMO_2, (
+				 						registroTramo2.getString("ANPMN443019").trim().equals("INT")
+		 								? "0" : "1"));
+		 }
+		 
+		 if (null != registroTramo3)
+		 {
+			 contexto.put(CTE_TARIFAS_VALIDAS_CONTADOR_TRAMO_3, registroTramo3.getBigDecimal("ANPMN443020").toString());
+			 contexto.put(CTE_TARIFAS_VALIDAS_TIPO_TRAMO_3, (
+						registroTramo3.getString("ANPMN443019").trim().equals("INT")
+						? "0" : "1"));
+		 }
+		 
+		 contexto.put(CTE_TARIFAS_VALIDAS_BONIFICACION_MAXIMA, bonificacion);	 
+		 
+		 return contexto;
+		
+	}
+	
+	
+}

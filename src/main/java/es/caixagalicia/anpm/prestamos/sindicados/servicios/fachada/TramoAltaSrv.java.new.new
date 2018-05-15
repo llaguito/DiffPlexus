@@ -1,0 +1,254 @@
+/**
+ * anpm_303
+ * Alta de un tramo sin expediente. Se da de alta el tramo con unos datos mínimos. Aun no existe el expedinte de tramo.
+ */
+package es.caixagalicia.anpm.prestamos.sindicados.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.sindicados.ConstantesSindicados;
+import es.caixagalicia.anpm.prestamos.sindicados.SindicadosC;
+import es.caixagalicia.anpm.prestamos.sindicados.persistencia.tramos.TramoC;
+import es.caixagalicia.anpm.prestamos.sindicados.servicios.aplicacion.GestionSindicados;
+import es.caixagalicia.anpm.prestamos.sindicados.servicios.aplicacion.GestionTramos;
+import es.caixagalicia.anpm.prestamos.sindicados.servicios.fachada.contexto.ContextoSindicados;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+public class TramoAltaSrv extends ServicioNegocio {
+
+    // 0- Alta, 1-Modif, 2- Borrar
+    private static final String CTE_INDICADOR_MODIFICACION = "INDICADOR_MODIFICACION";
+
+    private static final String CTE_NUC_EXP_MATRIZ = "NUC_EXP_MATRIZ";
+
+    private static final String CTE_VERSION = "VERSION";
+
+    private static final String CTE_OFICINA = "OFICINA";
+
+    private static final String CTE_NUMERO = "NUMERO";
+
+    private static final String CTE_DIGITO = "DIGITO";
+
+    private static final String CTE_TRAMO = "TRAMO";
+
+    private static final String CTE_TIRA_IMPORTE_TOTAL = "IMPORTE_TOTAL";
+
+    private static final String CTE_TIRA_IMPORTE_MAX_PARTICPACION = "IMPORTE_MAX_PARTICIPACION";
+
+    private static final String CTE_TIRA_IMPORTE_FORMALIZAR = "IMPORTE_FORMALIZAR";
+
+    private static final String CTE_TIRA_MONEDA = "MONEDA";
+
+    private static final String CTE_TIRA_FECVTO_FINAL = "FECHA_VCTO_FINAL";
+
+    private static final String CTE_TIRA_DESCRIPCION = "DESCRIPCION";
+
+    // private static final String CTE_COMPROBACION_BO = "S";
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(TramoAltaSrv.class);
+
+    /**
+     * Constructor sin parametros
+     */
+    public TramoAltaSrv() {
+        super();
+    }
+
+    public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM268: Alta tramo sindicados.");
+        }
+        contexto.setDiarioElectronico(new DiarioElectronico(Constantes.CTE_OPERACION_AC, Integer.valueOf(0), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, BigDecimal.ZERO, BigDecimal.ZERO, Integer.valueOf(0)));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        final Date fechaMinima = new Date(DateUtils.dateLowest().getTime());
+        final BigDecimal nucMatriz = datosEntrada.getDecimal(CTE_NUC_EXP_MATRIZ);
+        final BigDecimal oficina = datosEntrada.getDecimal(CTE_OFICINA);
+        final BigDecimal numero = datosEntrada.getDecimal(CTE_NUMERO);
+        final BigDecimal digito = datosEntrada.getDecimal(CTE_DIGITO);
+        final BigDecimal tramo = datosEntrada.getDecimal(CTE_TRAMO);
+        final BigDecimal importeTotal = datosEntrada.getDecimal(CTE_TIRA_IMPORTE_TOTAL);
+        final BigDecimal importeMaxParticipacion = datosEntrada.getDecimal(CTE_TIRA_IMPORTE_MAX_PARTICPACION);
+        final BigDecimal importeFormalizar = datosEntrada.getDecimal(CTE_TIRA_IMPORTE_FORMALIZAR);
+        final String moneda = datosEntrada.getString(CTE_TIRA_MONEDA);
+        String descripcion = "";
+        if (!UtilidadesComun.isBlankOrNull(datosEntrada.getString(CTE_TIRA_DESCRIPCION))) {
+            descripcion = datosEntrada.getString(CTE_TIRA_DESCRIPCION).trim();
+        }
+        BigDecimal error = BigDecimal.ONE;
+        String msgError = "";
+        BigDecimal indicadorModificacion = datosEntrada.getDecimal(CTE_INDICADOR_MODIFICACION);
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        // BigDecimal esBO = datosEntrada.getDecimal(CTE_MODIFICACION_BO);
+        // boolean necesitaAutorizacion = false;
+        // final boolean esbolBO = esBO.equals(CTE_COMPROBACION_BO);
+        // Si hay modificaciones para cambio de version obtenemos la ultima version y damos de alta la nueva
+        TramoC tramoUltimaVersionIncompleta = null;
+        DatosSolicitudC solicitudAN25UltimaVersionIncompleta = gds.getUltimaVersionIncompleta(nucMatriz);
+        BigDecimal version = solicitudAN25UltimaVersionIncompleta.getDatosSolicitudKey().getVersionSolicitud();
+        GestionSindicados gs = new GestionSindicados();
+        SindicadosC sindicadoUltimaVersionIncompleta = gs.getSindicadoPorVersion(nucMatriz, version);
+        Date datFechaUltVcto = fechaMinima;
+        String fechaUltVcto = datosEntrada.getString(CTE_TIRA_FECVTO_FINAL);
+        if (!UtilidadesComun.isBlankOrNull(fechaUltVcto)) {
+            datFechaUltVcto = DateHelper.stringASqlDate(fechaUltVcto, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+            /* Validar fecha solo cuando no estemos borrando un tramo y venga especificada la fecha como parametro de entrada */
+            if (indicadorModificacion.intValue() != 2) {
+                final java.util.Date datFechaHoy = DateHelper.getInstance().askTime();
+                if (datFechaUltVcto.compareTo(datFechaHoy) <= 0) {
+                    ServicioNegocio.rollback(ConstantesSindicados.ERROR_FECHA_ACTUAL, null, new String[] { new Mensaje(ServicioNegocio.getContexto(), VENCIMIENTO_FINAL_1564798309).toString() }, null);
+                }
+                if (null != sindicadoUltimaVersionIncompleta.getFechaUltimoVcto() && sindicadoUltimaVersionIncompleta.getFechaUltimoVcto().compareTo(DateHelper.stringASqlDate("0001-01-01", DateHelper.FORMATO_DD_MM_YYYY_GUION)) != 0 && datFechaUltVcto.compareTo(sindicadoUltimaVersionIncompleta.getFechaUltimoVcto()) > 0) {
+                    ServicioNegocio.rollback(ConstantesSindicados.ERROR_FECHA_VCTO_MATRIZ, null, new String[] { new Mensaje(ServicioNegocio.getContexto(), VENCIMIENTO_FINAL_1564798309).toString() }, null);
+                }
+            }
+        }
+        /* Validar importes */
+        if (indicadorModificacion.intValue() != 2) {
+            // Validar importes tramo alta
+            if (null != importeFormalizar && null != importeTotal && importeFormalizar.compareTo(importeTotal) > 0) {
+                ServicioNegocio.rollback(ConstantesSindicados.ERROR_IMP_FORM, null, null, null);
+            }
+            // Validar importes tramo con matriz
+            BigDecimal impTotalTramos = importeTotal;
+            // Contravalorar a la moneda matriz si no es la misma
+            if (!StringUtils.equals(moneda, solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal())) {
+                impTotalTramos = UtilidadesTramitacion.calcularContravalor(moneda, importeTotal, solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal());
+            }
+            BigDecimal impPartTramos = importeFormalizar;
+            // Contravalorar a la moneda matriz si no es la misma
+            if (!StringUtils.equals(moneda, solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal())) {
+                impPartTramos = UtilidadesTramitacion.calcularContravalor(moneda, importeFormalizar, solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal());
+            }
+            final List<TramoC> tramos = GestionTramos.getUltimaVersionTramos(sindicadoUltimaVersionIncompleta.getSindicadosKey().getBidNucExpediente());
+            if (null != tramos) {
+                BigDecimal impTramo = BigDecimal.ZERO;
+                BigDecimal impPart = BigDecimal.ZERO;
+                for (TramoC tramoC : tramos) {
+                    if (GestionTramos.esTramoVigente(tramoC.getEstadoTramo())) {
+                        if (tramoC.getTramoKey().getBidTramo().compareTo(tramo) != 0) {
+                            if (null != tramoC.getBidImporteTotalTramo()) {
+                                impTramo = tramoC.getBidImporteTotalTramo();
+                                // Contravalorar a moneda matriz, cuando matriz y tramo en distinta moneda
+                                if (!StringUtils.equals(tramoC.getStrMoneda(), solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal())) {
+                                    impTramo = UtilidadesTramitacion.calcularContravalor(tramoC.getStrMoneda(), tramoC.getBidImporteTotalTramo(), solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal());
+                                }
+                                impTotalTramos = impTotalTramos.add(impTramo);
+                            }
+                            if (null != tramoC.getBidImporteFormalizar()) {
+                                impPart = tramoC.getBidImporteFormalizar();
+                                // Contravalorar a moneda matriz, cuando matriz y tramo en distinta moneda
+                                if (StringUtils.isNotBlank(sindicadoUltimaVersionIncompleta.getStrMonedaParticipacionEntidad()) && !StringUtils.equals(tramoC.getStrMoneda(), sindicadoUltimaVersionIncompleta.getStrMonedaParticipacionEntidad())) {
+                                    impPart = UtilidadesTramitacion.calcularContravalor(tramoC.getStrMoneda(), tramoC.getBidImporteFormalizar(), solicitudAN25UltimaVersionIncompleta.getMonedaImporteTotal());
+                                }
+                                impPartTramos = impPartTramos.add(impPart);
+                            }
+                        }
+                    }
+                }
+            }
+            if (impTotalTramos.compareTo(BigDecimal.ZERO) > 0) {
+                final BigDecimal impTotalSind = solicitudAN25UltimaVersionIncompleta.getImporteTotal();
+                if (null != impTotalSind && impTotalTramos.compareTo(impTotalSind) > 0) {
+                    ServicioNegocio.rollback(ConstantesSindicados.ERROR_IMP_TOT, null, null, null);
+                }
+            }
+            if (impPartTramos.compareTo(BigDecimal.ZERO) > 0) {
+                final BigDecimal impPartSind = solicitudAN25UltimaVersionIncompleta.getImporteSolicitado();
+                if (null != impPartSind && impPartSind.compareTo(BigDecimal.ZERO) > 0 && impPartTramos.compareTo(impPartSind) > 0) {
+                    ServicioNegocio.rollback(ConstantesSindicados.ERROR_IMP_PART, null, null, null);
+                }
+            }
+        }
+        // 1-Modificacion -> Recuperamos la version anterior para duplicarla en nueva version
+        if (indicadorModificacion.intValue() == 1) {
+            tramoUltimaVersionIncompleta = GestionTramos.getUltimaVersionTramo(nucMatriz, tramo);
+        } else if (indicadorModificacion.intValue() == 2) {
+            GestionTramos.borrarTramo(nucMatriz, tramo);
+        }
+        // Si es alta o modificacion creamos el nuevo tramo
+        if (indicadorModificacion.intValue() <= 1) {
+            TramoC nuevoTramo = GestionTramos.altaVersionTramoSinExpediente(nucMatriz, oficina, numero, tramo, version, digito, moneda, importeMaxParticipacion, importeTotal, importeFormalizar, datFechaUltVcto, descripcion, solicitudAN25UltimaVersionIncompleta.getGarantiaContable(), sindicadoUltimaVersionIncompleta.getGarantiaMayoritaria(), tramoUltimaVersionIncompleta);
+            boolean hayModificaciones = Boolean.TRUE;
+            if (indicadorModificacion.intValue() == 1) {
+                TramoC ultimaVersionCompleta = GestionTramos.getUltimaVersionTramoCompleta(nucMatriz, tramo, version);
+                if (null != ultimaVersionCompleta) {
+                    hayModificaciones = comprobarModificacion(ultimaVersionCompleta, nuevoTramo);
+                }
+                if (hayModificaciones) {
+                    // Si se mofifica alguno de los campos qeu implican reapertura de resolución cambiamos el estado a Pendiente de resolver
+                    if (solicitudAN25UltimaVersionIncompleta.getEstadoSolicitud().equals(Constantes.ESTADO_SOL_CONCEDIDA) && pasaAPendienteDeConceder(ultimaVersionCompleta, nuevoTramo)) {
+                        solicitudAN25UltimaVersionIncompleta.setEstadoSolicitud(Constantes.ESTADO_SOL_SIN_RESOLVER);
+                        solicitudAN25UltimaVersionIncompleta.persist();
+                    }
+                }
+            }
+            if (hayModificaciones) {
+                GestionTramos.guardaDatosTramo(nuevoTramo);
+            }
+        }
+        error = BigDecimal.ZERO;
+        IContexto[] salida = new IContexto[1];
+        final IContexto contextoSalida = ContextoSindicados.rellenarDatosContextoAltaMod(null, error, msgError);
+        salida[0] = contextoSalida;
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN SNANPM268: Alta tramo sindicados.");
+        }
+        return salida;
+    }
+
+    private boolean pasaAPendienteDeConceder(TramoC tramoVersionAnterior, TramoC tramoNuevo) {
+        Boolean hayCambios = Boolean.FALSE;
+        // Si se modifica el importe a formalizar y es mayor qeu el concedido
+        if (tramoVersionAnterior.getBidImporteFormalizar().compareTo(tramoNuevo.getBidImporteFormalizar()) != 0 && tramoNuevo.getBidImporteFormalizar().compareTo(tramoNuevo.getBidImporteMaxParticipacion()) > 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getStrMoneda().compareTo(tramoNuevo.getStrMoneda()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        return hayCambios;
+    }
+
+    private boolean comprobarModificacion(TramoC tramoVersionAnterior, TramoC tramoNuevo) {
+        Boolean hayCambios = Boolean.FALSE;
+        if (tramoVersionAnterior.getBidImporteMaxParticipacion().compareTo(tramoNuevo.getBidImporteMaxParticipacion()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getBidImporteFormalizar().compareTo(tramoNuevo.getBidImporteFormalizar()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getBidImporteTotalTramo().compareTo(tramoNuevo.getBidImporteTotalTramo()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getDatFechaUltimoPago().compareTo(tramoNuevo.getDatFechaUltimoPago()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getStrDescripcion().compareTo(tramoNuevo.getStrDescripcion()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        if (tramoVersionAnterior.getStrMoneda().compareTo(tramoNuevo.getStrMoneda()) != 0) {
+            hayCambios = Boolean.TRUE;
+        }
+        return hayCambios;
+    }
+
+    private static final String VENCIMIENTO_FINAL_1564798309 = "VENCIMIENTO_FINAL_1564798309";
+}
