@@ -9,39 +9,46 @@
 </head>
 <body>
 <!--<input id="fileInput" type="file" size="50" onchange="processFiles(this.files)">-->
-<table id="tablaVisualizar">
-	<tr class="trHead">
-		<th class="fileNamesList">Ficheros</th>
-		<th>Original</th>
-		<th>Nuevo</th>
-	</tr>
-	<tr>
-		<td class="fileNamesList">
-			<ul class="demo-list-icon mdl-list">
-				<li class="mdl-list__item">
-				  <span class="mdl-list__item-primary-content">
-				  <i class="material-icons mdl-list__item-icon">list_alt</i>
-				  Bryan Cranston
-			  </span>
-				</li>
-				<li class="mdl-list__item">
-				  <span class="mdl-list__item-primary-content">
-				  <i class="material-icons mdl-list__item-icon">list_alt</i>
-				  Aaron Paul
-				</span>
-				</li>
-				<li class="mdl-list__item">
-				  <span class="mdl-list__item-primary-content">
-				  <i class="material-icons mdl-list__item-icon">list_alt</i>
-				  Bob
-				</span>
-				</li>
-			  </ul>
-		</td>
-		<td contenteditable="true"></td>
-		<td contenteditable="true"></td>
-	</tr>
-</table>
+<div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
+	<div class="mdl-layout__drawer">
+	  <span class="mdl-layout-title">Ficheros</span>
+	  <nav class="mdl-navigation">
+		<ul class="demo-list-icon mdl-list">
+			<li class="mdl-list__item">
+			  <span class="mdl-list__item-primary-content">
+			  <i class="material-icons mdl-list__item-icon">list_alt</i>
+			  <a>Bryan Cranston</a>
+		  </span>
+			</li>
+			<li class="mdl-list__item">
+			  <span class="mdl-list__item-primary-content">
+			  <i class="material-icons mdl-list__item-icon">list_alt</i>
+			  <a>Aaron Paul</a>
+			</span>
+			</li>
+			<li class="mdl-list__item">
+			  <span class="mdl-list__item-primary-content">
+			  <i class="material-icons mdl-list__item-icon">list_alt</i>
+			 <a>Bob Odenkirk</a> 
+			</span>
+			</li>
+		  </ul>
+	  </nav>
+	</div>
+	<main class="mdl-layout__content">
+		<table id="tablaVisualizar">
+			<tr class="trHead">
+				<th>Original</th>
+				<th>Nuevo</th>
+			</tr>
+			<tr>
+				<td contenteditable="true"></td>
+				<td contenteditable="true"></td>
+			</tr>
+		</table>
+	</main>
+  </div>
+
 <!-- pueden usarse
 <script src="diff.js">
 </script>
