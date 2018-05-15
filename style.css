@@ -99,4 +99,8 @@ ins {
 
 .demo-list-icon {
 	width: 300px;
-  }
+}
+
+th {
+	font-size: 2em;
+}
