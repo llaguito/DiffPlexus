@@ -1,0 +1,502 @@
+/**
+ * Aplicacion de Activo
+ * Caixa Galicia © 2009-2010
+ * 
+ * Desarrollado por: Treelogic S.L.
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.utilidades;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Time;
+
+
+
+/**
+ * 
+ * @author Pablo González
+ *
+ */
+public final class Constantes
+{
+
+	public static final int PASO_SOLIC_PREST_TODOS = 0;
+	public static final int PASO_SOLIC_PREST_CLASIFICACION = 1;
+	public static final int PASO_SOLIC_PREST_CONDICIONES_ECONOMICAS = 2;
+	public static final int PASO_SOLIC_PREST_INTERES = 3;
+	public static final int PASO_SOLIC_PREST_SISTEMA_AMORTIZACION = 4;
+	public static final int PASO_SOLIC_PREST_GASTOS_COMISIONES = 5;
+	public static final int PASO_SOBREESCRITURA_TARIFAS_COMISIONES = 6;
+	public static final int PASO_PREFORMALIZCION = 9;
+	public static final int PASO_DATOS_COLECTIVOS = 10;
+	
+	
+	public static final String CTE_STRING_S = "S";
+	public static final String CTE_STRING_N = "N";
+	public static final String CTE_STRING_A = "A";
+	
+	public static final BigDecimal CTE_CONTROL_OPERATORIA_SUBROGACION = new BigDecimal(981000);
+
+	
+	public static final int CTE_INT_TAMANO_INICIAL_ARRAYS = 1;
+	//Diario electrónico
+	/**Constante del diario electronico para operacion de consulta detalle/listado*/
+	public final static String CTE_OPERACION_CO = "CO";
+	/**Constante del diario electronico para alta/modificacion/baja*/
+	public static final String CTE_OPERACION_AC = "AC";
+	
+	/** Cadena vacia */
+	public final static String CTE_STRING_EMPTY = "";
+	/** Espacio */
+	public final static String CTE_STRING_WHITE = " ";
+	/** Cero */
+	public static final Integer CTE_INTEGER_ZERO = new Integer(0);
+		
+	/** Constante Si */
+	public final static String SI = "S";
+	public final static String CTE_SI = "SI";
+	
+	/** Constante No */
+	public final static String NO = "N";
+	public final static String CTE_NO = "NO";
+	
+	/** Constante coma */
+	public static final String CTE_STRING_COMMA = ",";
+	
+	public static final String CTE_STRING_CERO = "0";
+	public static final String CTE_STRING_UNO = "1";
+	public static final String CTE_STRING_TRES = "3";
+	public static final String CTE_STRING_CUATRO = "4";
+	
+	public static final BigDecimal CTE_BID_CANAL = new BigDecimal(9);
+	
+	public static final char CTE_CHAR_CERO = '0';
+	
+	public static final Integer CTE_HASH_CODE = new Integer(1);
+	
+	
+	public static final Integer CTE_CERO = new Integer(0);
+	public static final Integer CTE_UNO = new Integer(1);
+	public static final Integer CTE_DOS = new Integer(2);
+	public static final Integer CTE_TRES = new Integer(3);
+	public static final Integer CTE_CUATRO = new Integer(4);
+	public static final Integer CTE_CINCO = new Integer(5);
+	public static final Integer CTE_SEIS = new Integer(6);
+	public static final Integer CTE_SIETE = new Integer(7);
+	public static final Integer CTE_OCHO = new Integer(8);
+	public static final Integer CTE_NUEVE = new Integer(9);
+	public static final Integer CTE_DIEZ = new Integer(10);
+	public static final Integer CTE_ONCE = new Integer(11);
+	public static final Integer CTE_DOCE = new Integer(12);
+	public static final Integer CTE_CIEN = new Integer(100);
+	public static final Integer CTE_MENOS_UNO = new Integer(-1);
+	
+	public static final BigDecimal CTE_ORIGEN_CONSULTA_TARIFA_SIMULACION = BigDecimal.ZERO;
+	public static final BigDecimal CTE_ORIGEN_CONSULTA_TARIFA_SOLICITUD = BigDecimal.ONE;
+	
+	/*contexto de interes en catálogo*/
+	public static final String CTE_ANPMN014 = "ANPMN014";
+	/*contexto diferencial y tipo ref en catálogo*/
+	public static final String CTE_ANPMN015 = "ANPMN015";
+	
+	public static final String CTE_ANPMN005 = "ANPMN005";
+
+	
+	public static final BigDecimal  CTE_CERO_DOUBLE = new BigDecimal(new BigInteger("0"), 4);
+	public static final BigDecimal  CTE_CERO_IMPORTE = new BigDecimal(new BigInteger("0"), 2);
+	public static final BigDecimal  CTE_CERO_BIG = new BigDecimal(0);
+	
+	public static final String CTE_MES = "M";
+	public static final String CTE_TIPO_PERIODO_VENCIDO = "V";
+	
+	
+	// Nombres de las tablas.
+	public static final String CTE_TBL_PRODUCTO = "AN01TB01";
+	public static final String CTE_TBL_SUBPRODUCTO = "AN02TB01";
+	public static final String CTE_TBL_COMISIONES = "AN06TB01";
+	public static final String CTE_TBL_ADELANTOS = "AN13TB01";
+	public static final String CTE_TBL_CONDICIONES = "AN04TB01";
+	public static final String CTE_TBL_DAT_ECO = "AN03TB01";
+	public static final String CTE_TBL_TECHOS_SUELOS = "AN08TB01";
+	public static final String CTE_TBL_INTERES = "AN07TB01";
+	
+	public static final String CTE_CAMPO_DAT_ECO = "An03tb01";
+	public static final String CTE_CAMPO_CAPITAL = "An04tb01";
+	
+	public static final Time CTE_HORA_DEFECTO = new Time(-3600000); // representa las 00:00:00
+	public static final Time CTE_HORA_FIN_DIA = new Time(82799000); // representa las 23:59:59
+	//public static final Time CTE_MILISEGUNDOS_HORA = new Time(0); // representa las 01:00:00
+	public static final int MILISEGUNDOS_HORA = 3600000;
+	public static final int MILISEGUNDOS_MINUTO = 60000;
+	public static final int MILISEGUNDOS_SEGUNDO = 1000;
+	
+	
+	public static final String CTE_OPE_ALTA = "A";
+	public static final String CTE_OPE_MODIFICACION = "M";
+	public static final String CTE_OPE_BAJA = "B";
+
+	public static final String CTE_CAMBIO_FECHA_INICIO = "I";
+	public static final String CTE_CAMBIO_FECHA_FIN = "F";
+	public static final String CTE_CAMBIO_DATOS = "M";	
+
+	
+	public static final String CTE_ESTADO_ANTIGUO = "A";
+	public static final String CTE_ESTADO_VIGENTE = "N";
+	public static final String CTE_ESTADO_FUTURO = "F";		
+
+	public static final Integer CTE_COD_OPE_ALTA_PRO = new Integer(1);
+	public static final Integer CTE_COD_OPE_ALTA_SUBPRO = new Integer(2);
+	
+	public static final String CTE_CLAVE_MODALIDADES = "MDA";
+	public static final String CTE_CLAVE_COMISIONES = "COM";
+	public static final String CTE_MODALIDADES_COD_DESCRIPCION = "9999";
+	
+	public static final String CTE_CLAVE_TIPO_REF = "IBN";
+	
+	
+	public static final String COD_CLAUSULA_DESTINO = "DET";
+	public static final String COD_CLAUSULA_GARANTIA = "GAR";
+	public static final String COD_CLAUSULA_DIVISA = "DIV";
+	public static final String COD_CLAUSULA_SECTOR = "PER";
+	public static final String COD_CLAUSULA_CANAL = "CAN";
+	public static final String COD_CLAUSULA_MODALIDAD_AMORT = "MDA";
+	public static final String COD_CLAVE_TIPO_REDONDEO = "RED";
+	public static final String COD_CLAVE_TIPO_REF = "IBN";
+	public static final String COD_CLAUSULA_TIPO_EXPEDIENTE = "EXP";
+	public static final String COD_CLAUSULA_PAIS_EXPEDIENTE = "PRC";
+	public static final String COD_SUBDESTINO = "CDT";
+	public static final String COD_CNAE = "CNA";
+	public static final String COD_CLAUSULA_CARTERA = "CAT";
+	public static final String COD_CLAUSULA_GARANTIA_MAYORITARIA = "GMR";
+	public static final String COD_CLAUSULA_TITULARIDAD = "TTL";
+	
+	public static final String COD_PAR_DEMORA = "PAR";
+	public static final String COD_MORC_DEMORA = "MORC";
+	
+	public static final String COD_GRUPO = "GRU";
+	public static final String COD_NIVEL = "NIV";
+	
+	
+	public static final String COD_DESTINO = "DET";
+	public static final String CLAUSULAS_DEFECTO = "001";
+	public static final String COD_GARANTIA = "GAR";
+	public static final String COD_MONEDA = "DIV";
+	public static final String COD_CANAL = "CAN";
+	public static final String COD_SECTOR = "PER";
+	public static final String COD_PAIS = "PRC";
+	
+	public static final String COD_BUSCAR_PRODUCTO = "TOD";
+	public static final String COD_BP_DESTINO_GRUPO = "DES";
+	public static final String COD_BP_SECTOR_GRUPO = "SEC";
+	public static final String COD_BP_SUBDESTINO_DESTINO = "SUB";
+	
+	public static final String COD_MONEDA_DEFECTO = "EUR";
+	
+	public static final String CTE_STRING_RELLENO_UN_CERO = "0";
+	public static final String CTE_STRING_RELLENO_DOS_CEROS = "00";
+	public static final String CTE_STRING_RELLENO_TRES_CEROS = "000";	
+	public static final String CTE_STRING_VACIO = " ";	
+	
+	
+
+	public static final String CTE_STRING_INICO_CAMPO_TAB_PARAMETROS = "CG320";
+	
+	public static final String CTE_STRING_TODAS = "TODAS";
+	
+	public static final String CTE_STRING_COD_TRAMO_FIJO = "00";
+	public static final String CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE = "01";
+	public static final String CTE_STRING_COD_TRAMO_VARIABLE = "02";
+	public static final String CTE_STRING_COD_TRAMO_VARIABLE_BONIFICADO = "03";
+	public static final String CTE_STRING_COD_TRAMO_VARIABLE_PENALIZABLE = "04";
+	public static final String CTE_STRING_COD_TRAMO_VARIABLE_DIFERENCIAL_BONIFICADO = "05";
+	public static final String CTE_STRING_COD_TRAMO_FIJO_REFERENCIADO = "06";
+	
+	public static final Integer CTE_TIPO_REFERENCIA_INTERES = Constantes.CTE_CERO;
+	public static final Integer CTE_TIPO_REFERENCIA_SUSTITUTIVO = Constantes.CTE_UNO;
+	public static final Integer CTE_TIPO_REFERENCIA_OPTATIVO = Constantes.CTE_DOS;
+	
+	
+	public static final String CTE_COD_COMISION = "COM";
+	public static final String CTE_TIPO_COMIS_NO_VALIDO = "9999";
+	
+	public static final Integer CTE_COMISION_AMORT_ANT = Constantes.CTE_UNO;
+	public static final Integer CTE_COMISION_AMORT_ANUAL = Constantes.CTE_DOS;
+	public static final Integer CTE_COMISION_APERTURA = Constantes.CTE_TRES;
+	public static final Integer CTE_COMISION_CANC_ANT = Constantes.CTE_CUATRO;
+	public static final Integer CTE_COMISION_GASTOS_ESTUDIO = Constantes.CTE_CINCO;	
+	public static final Integer CTE_COMISION_MODIF_CAMBIO = Constantes.CTE_SEIS;
+	public static final Integer CTE_COMISION_MODIF_GARANTIAS = Constantes.CTE_SIETE;
+	public static final Integer CTE_COMISION_RECLAMACION = Constantes.CTE_OCHO;
+	
+	public static final Integer CTE_COMISION_DESIST_PARCIAL = Constantes.CTE_NUEVE;
+	public static final Integer CTE_COMISION_DESIST_TOTAL = Constantes.CTE_DIEZ;
+
+	public static final String CTE_COMISION_AMORT_ANT_S = "001";
+	public static final String CTE_COMISION_AMORT_ANUAL_S = "002";
+	public static final String CTE_COMISION_APERTURA_S = "003";
+	public static final String CTE_COMISION_CANC_ANT_S = "004";
+	public static final String CTE_COMISION_GASTOS_ESTUDIO_S = "005";
+	public static final String CTE_COMISION_MODIF_CAMBIO_S = "006";
+	public static final String CTE_COMISION_MODIF_GARANTIAS_S = "007";	
+	public static final String CTE_COMISION_RECLAMACION_S = "008";
+	
+	public static final String CTE_COMISION_DESIST_PARCIAL_S = "009";
+	public static final String CTE_COMISION_DESIST_TOTAL_S = "010";
+	
+	public static final BigDecimal CTE_BID_NIVEL_TODOS = BigDecimal.ZERO;
+	public static final BigDecimal CTE_BID_NIVEL_OFICINA = new BigDecimal(10);
+	public static final BigDecimal CTE_BID_NIVEL_ZONA = new BigDecimal(20);
+
+	public static final Integer CTE_NIVEL_TODOS = new Integer(0);
+	public static final Integer CTE_NIVEL_OFICINA = new Integer(10);
+	public static final Integer CTE_NIVEL_ZONA = new Integer(20);
+	public static final Integer CTE_NIVEL_TERRITORIAL = new Integer(30);
+	public static final Integer CTE_NIVEL_DIVISION = new Integer(40);
+	/*20150216 Se añade nivel 50 - Dirección general.*/
+	public static final Integer CTE_NIVEL_DIR_GEN = new Integer(50);
+	
+	public static final String CTE_DES_NIVEL_TODOS = "Todos";
+	public static final String CTE_DES_NIVEL_OFICINA = "Oficina";
+	public static final String CTE_DES_NIVEL_ZONA = "Zona";
+	public static final String CTE_DES_NIVEL_TERRITORIAL = "Territorial";
+	public static final String CTE_DES_NIVEL_DIVISION = "Division";	
+	
+	public static final Integer CTE_ESTADO_VERSION_PASADO = new Integer(0);
+	public static final Integer CTE_ESTADO_VERSION_VIGENTE_CURSO = new Integer(1);
+	public static final Integer CTE_ESTADO_VERSION_VIGENTE_OTRA_CURSO = new Integer(2);
+	public static final Integer CTE_ESTADO_VERSION_VIGENTE_SIN_OTRA_CURSO = new Integer(3);
+	public static final Integer CTE_ESTADO_VERSION_FUTURA_CURSO = new Integer(4);
+	public static final Integer CTE_ESTADO_VERSION_FUTURA_OTRA_CURSO = new Integer(5);
+	public static final Integer CTE_ESTADO_VERSION_FUTURA_SIN_OTRA_CURSO = new Integer(6);
+	
+	public static final int CTE_NUMERO_PASADAS = 5;
+	
+	public static final String CTE_RED_COMERCIAL = "CO";
+//	public static final String CTE_RED_EMPRESAS = "CO";
+//	public static final String CTE_RED_ONLINE = "";
+//	public static final String CTE_RED_DIRECCION_GENERAL = "";
+	public static final String CTE_RED_NGB = "NG";
+	public static final String CTE_RED_MAYORIAS = "MA";
+	public static final String CTE_RED_UGAS = "UG";
+//	Constante para la consulta de clientes
+	public static final Object CODOPER_CONSULTA = "C";
+//	Estado de una solicitud sin resolver
+	public static final BigDecimal ESTADO_SOL_SIN_RESOLVER = BigDecimal.valueOf(2L);
+	
+	public static final String CTE_STR_F = "F";
+	public static final String CTE_STR_C = "C";
+	
+	/*Constantes para el SN de gestión de parámetros, CGAL_373*/
+	public final static Integer CTE_CC_GESTION_PARAM = new Integer(100);
+	public final static Integer CTE_CO_GESTION_PARAM = new Integer(373);
+	
+	public static final String CTE_CNAE_FAMILIAS = "0000";
+	public static final String CTE_CNAE_FAMILIAS_DESCRIPCION = "FAMILIAS";
+	
+	
+	public static final int CTE_ERROR_CAMPOS_OBLIGATORIOS = 99998; //param: {servicio}, null, null
+	
+	/*Servicio de llamada a ámbitos, CGAL_362*/
+	public static final Integer CTE_APLIC_CGAL = Integer.valueOf(100);
+	public static final Integer CTE_COD_CONS_PERMISOS = Integer.valueOf(362);
+
+	/*Constantes para llamar a ámbitos para saber si el centro contable cumple el criterio de ser una 
+	 * oficina de la Zona Asturias o de Territorial España*/
+	public static final String CTE_AMBIT_ZONAESPA_ID_APL = "ANPM";
+	public static final String CTE_AMBIT_ZONAESPA_TIPO_ENT = "ZONAESPA";
+	
+	/*Constantes propias del ámbito "Idealista": centro contable = centro virtual (806)*/
+	public static final String CTE_AMBIT_IDEALIST_ID_APL = "ANPM";
+	public static final String CTE_AMBIT_IDEALIST_TIPO_ENT = "IDEALIST";
+	
+	
+	public static final String CTE_AMBIT_TARISIMA_ID_APL = "ANPM";
+	public static final String CTE_AMBIT_TARISIMA_TIPO_ENT = "TARISIMA";
+
+	public static final String CTE_AMBIT_CENTRO = "CENTRO";
+	public static final String CTE_AMBIT_RECURSO = "RECURSO";
+	
+	public static final String CTE_AMBIT_PROD_SUBPROD_TARIFA_ID_APL = "ANPM";
+	public static final String CTE_AMBIT_PROD_SUBPROD_TARIFA_TIPO_ENT = "PROSUBTA";
+	
+	public static final String CTE_COD_CONS_PERM_SAL_TIENE_PERM = "CG1140900";
+	
+	
+	
+	public static final BigDecimal CTE_BID_2 = new BigDecimal(2);
+	public static final String CTE_STR_S = "S";
+	public static final String CTE_STR_N = "N";
+	// Tarifa posible
+	public static final String CTE_STR_P = "P";
+	/* EDIT 20141001 CAMPO NUEVO IND. CLIENTE CARTERIZADO B. PRIVADA O B. PREMIUM (S/N) */
+	public static final Integer CTE_SN_CC_CONSULTA_MODELO_CARTERA = new Integer(888); //YINT
+	public static final Integer CTE_SN_CO_CONSULTA_MODELO_CARTERA = new Integer(35);
+	
+	public static final Integer CTE_SN_CC_DETALLE_CARTERA = new Integer(888); //YINT
+	public static final Integer CTE_SN_CO_DETALLE_CARTERA = new Integer(13);
+	
+	// ***********  Contantes para el método estático de utilidades de catálogo "consultarSolicitudIncompleta" ***
+	public static final Integer ID_CUENTA_ANPM = Integer.valueOf(507);
+	public static final Integer ID_CODOP_CONSULTA_SOL = Integer.valueOf(150);
+	public static final int CTE_POSICION_TIRA_NUMERO_SOLICITUD = 1; // OBLIGATORIO
+	public static final int CTE_POSICION_TIRA_NUC_EXPEDIENTE = 3; // OBLIGATORIO
+	public static final int CTE_POSICION_TIRA_DETALLE_HIJOS = 4; // OPCIONAL
+	//**********************************************************************************************************
+
+	public final static String CTE_CONTEXTO_INTERES_SOLIC = "ANPMN052";
+	
+	public static final String CTE_RELACION_TITULAR = "01";
+	public static final String CTE_001 = "001";
+	public static final String CTE_DATOS_CLIENTE_SAL_RELACION = 				"FC722C0020";
+	public static final String CTE_DATOS_CLIENTE_SAL_SECUENCIA_EN_RELACION = 	"FC722C0030";
+	public static final String CTE_DATOS_CLIENTE_SAL_NUM_CLIENTE = 				"FC722C0040";
+	public final static Integer CTE_SN_CC_CONSULTA_CLIENTES_NUC = new Integer(555); //FCLI
+	public final static Integer CTE_SN_CO_CONSULTA_CLIENTES_NUC = new Integer(722);
+	
+	
+	public static final int CTE_INT_CERO = 0;
+	public static final int CTE_INT_UNO = 1;
+	public static final int CTE_INT_DOS = 2;
+	public static final int CTE_INT_TRES = 3;
+	public static final int CTE_INT_CUATRO = 4;
+	public static final int CTE_INT_CINCO = 5;
+	public static final int CTE_INT_SEIS = 6;
+	public static final int CTE_INT_SIETE = 7;
+	public static final int CTE_INT_OCHO = 8;
+	public static final int CTE_INT_CATORCE = 14;
+	public static final int CTE_INT_QUINCE = 15;
+	
+	public static final int CTE_INT_50 = 50;	
+	
+	public static final String CTE_INTERES_ID_CTX = "ANPMN014";
+	public static final String CTE_INTERES_PROP_ID_PRODUCTO = "ANPMN014010";
+	public static final String CTE_INTERES_PROP_ID_SUBPRODUCTO = "ANPMN014020";	
+	public static final String CTE_INTERES_PROP_ID_VERSION = "ANPMN014030";
+	public static final String CTE_INTERES_PROP_COLECTIVO = "ANPMN014040";
+	public static final String CTE_INTERES_PROP_NIVEL = "ANPMN014050";
+	public static final String CTE_INTERES_PROP_ORDEN = "ANPMN014060";
+	public static final String CTE_INTERES_PROP_TIPO = "ANPMN014070";
+	public static final String CTE_INTERES_PROP_CAMPANIAS = "ANPMN014080";
+	public static final String CTE_INTERES_PROP_VALORACION = "ANPMN014090";
+	public static final String CTE_INTERES_PROP_IND_VALORACION = "ANPMN014100";
+	public static final String CTE_INTERES_PROP_PLAZO = "ANPMN014110";
+	public static final String CTE_INTERES_PROP_PLAZO_DESDE = "ANPMN014120";
+	public static final String CTE_INTERES_PROP_PLAZO_HASTA = "ANPMN014130";
+	public static final String CTE_INTERES_PROP_IND_PLAZO = "ANPMN014140";
+	public static final String CTE_INTERES_PROP_INTERES = "ANPMN014150";
+	public static final String CTE_INTERES_PROP_INTERES_DESDE = "ANPMN014160";
+	public static final String CTE_INTERES_PROP_INTERES_HASTA = "ANPMN014170";
+	public static final String CTE_INTERES_PROP_IND_INTERES = "ANPMN014180";
+	public static final String CTE_INTERES_PROP_MAX_INTERES_INI = "ANPMN014190";
+	public static final String CTE_INTERES_PROP_TOMA_REF = "ANPMN014200";
+	public static final String CTE_INTERES_PROP_IND_TOMA_REF = "ANPMN014210";
+	public static final String CTE_INTERES_PROP_DIFERENCIAL_MIN_TIPOS = "ANPMN014220";
+	public static final String CTE_INTERES_PROP_IND_TIPO_REF = "ANPMN014270";	
+	public static final String CTE_INTERES_PROP_TIPO_INTERES_DEMORA = "ANPMN014360";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_CAPITAL = "ANPMN014370";
+	public static final String CTE_INTERES_PROP_IND_PORCENTAJE_SOBRE_CAPITAL = "ANPMN014380";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_CAPITAL_DESDE = "ANPMN014390";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_CAPITAL_HASTA = "ANPMN014400";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_INTERES = "ANPMN014410";
+	public static final String CTE_INTERES_PROP_IND_PORCENTAJE_SOBRE_INTERES = "ANPMN014420";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_INTERES_DESDE = "ANPMN014430";
+	public static final String CTE_INTERES_PROP_PORCENTAJE_SOBRE_INTERES_HASTA = "ANPMN014440";
+	public static final String CTE_INTERES_PROP_PERIODOS_REVISION = "ANPMN014450";
+	public static final String CTE_INTERES_PROP_PERIODOS_REVISION_DESDE = "ANPMN014460";
+	public static final String CTE_INTERES_PROP_PERIODOS_REVISION_HASTA = "ANPMN014470";
+	public static final String CTE_INTERES_PROP_IND_PERIODOS_REVISION = "ANPMN014480";
+	public static final String CTE_INTERES_PROP_UNIDAD_PERIODOS_REVISION = "ANPMN014490";
+	public static final String CTE_INTERES_PROP_IND_UNIDAD_PERIODOS_REVISION = "ANPMN014500";
+	public static final String CTE_INTERES_PROP_TIPO_PERIODOS_REVISION = "ANPMN014510";
+	public static final String CTE_INTERES_PROP_IND_TIPO_PERIODOS_REVISION = "ANPMN014520";
+	public static final String CTE_INTERES_PROP_IND_PERIODO_MIN_REVISION = "ANPMN014530";
+	public static final String CTE_INTERES_PROP_PAGO_UNICO_FINAL = "ANPMN014540";
+	public static final String CTE_INTERES_PROP_NUMERO_PERIODO_PERIO = "ANPMN014550";
+	public static final String CTE_INTERES_PROP_IND_NUMERO_PERIODO_PERIO = "ANPMN014560";
+	public static final String CTE_INTERES_PROP_UNIDAD_PERIODO_PERIO = "ANPMN014570";
+	public static final String CTE_INTERES_PROP_IND_UNIDAD_PERIODO_PERIO = "ANPMN014580";	
+	public static final String CTE_INTERES_PROP_TIPO_PERIODO_PERIO = "ANPMN014590";
+	public static final String CTE_INTERES_PROP_IND_TIPO_PERIODO_PERIO = "ANPMN014600";	
+	public static final String CTE_INTERES_PROP_IND_PER_MIN_LIQUIDACION = "ANPMN014610";
+	public static final String CTE_INTERES_PROP_PER_MIN_LIQUIDACION = "ANPMN014620";
+	public static final String CTE_INTERES_PROP_UNI_PER_MIN_LIQUIDACION = "ANPMN014630";
+	public static final String CTE_INTERES_PROP_FORZAR_FIN_TRAMO = "ANPMN014640";
+	public static final String CTE_INTERES_PROP_IND_FORZAR_FIN_TRAMO = "ANPMN014650";	
+	public static final String CTE_INTERES_PROP_COINCIDENCIA_FECHAS = "ANPMN014660";
+	//public static final String CTE_INTERES_PROP_IND_COINCIDENCIA_FECHAS = "ANPMN014670";
+	public static final String CTE_INTERES_PROP_IND_CONDICIONESS_PARA = "ANPMN014680";
+	public static final String CTE_INTERES_PROP_FECHA_DESDE = "ANPMN014690";
+	public static final String CTE_INTERES_PROP_HORA_DESDE = "ANPMN014700";	
+	public static final String CTE_INTERES_PROP_FECHA_HASTA = "ANPMN014710";
+	public static final String CTE_INTERES_PROP_HORA_HASTA = "ANPMN014720";	
+	public static final String CTE_INTERES_PROP_BORRADO = "ANPMN014730";
+	//public static final String CTE_INTERES_PROP_USUARIO = "ANPMN014740";
+	public static final String CTE_INTERES_PROP_TIPO_REFERENCIA = "ANPMN014750";
+	public static final String CTE_INTERES_PROP_DIFERENCIA_TIPO_REFERENCIAL = "ANPMN014760";
+	public static final String CTE_INTERES_PROP_VG = "ANPMN014770";
+	public static final String CTE_INTERES_PROP_TIENE_TIPOS = "ANPMN014780";
+	public static final String CTE_INTERES_PROP_TIENE_DIFERENCIALES = "ANPMN014790";
+	public static final String CTE_INTERES_PROP_TIENE_REDNDEOS = "ANPMN014800";
+	public static final String CTE_INTERES_PROP_DESC_TIPO_INTERES = "ANPMN014810";
+	public static final String CTE_INTERES_PROP_DESC_NIVEL = "ANPMN014820";
+	public static final String CTE_INTERES_PROP_UNI_PLAZO = "ANPMN014830";
+	public static final String CTE_INTERES_PROP_VERSION_GENERAL_SIGUIENTE = "ANPMN014840";
+	public static final String CTE_INTERES_PROP_ASUMIBLE = "ANPMN014850";
+	public static final String CTE_INTERES_PROP_TIPO_FLEXIBILIDAD = "ANPMN014860";	
+	
+	public static final BigDecimal CTE_BID_100000 = new BigDecimal(100000);
+	
+	// Constantes del servicio ANPM_442 e hijos ...
+	
+	public static final Integer SN_CONSULTA_TARIFAS_APLICABLES_CC = new Integer(507); //ANPM
+	public static final Integer SN_CONSULTA_TARIFAS_APLICABLES_CO = new Integer(442);
+
+	public static final String CTE_SALIDA_CONS_TARIFA_APL_MATRIZ = 	"ANPMN442010";
+	public static final String CTE_SALIDA_CONS_TARIFA_ID = 			"ANPMN442011";
+	public static final String CTE_SALIDA_CONS_TARIFA_DESCR = 		"ANPMN442012";
+	public static final String CTE_SALIDA_CONS_TARIFA_PRIORIDAD = 	"ANPMN442013";
+	
+	public static final BigDecimal CTE_TIPO_PRESCRIPTOR_OFICINA = 	BigDecimal.ZERO;
+	public static final BigDecimal CTE_TIPO_PRESCRIPTOR_PYMES = 	BigDecimal.ONE;
+	public static final BigDecimal CTE_TIPO_PRESCRIPTOR_EXTERNO = 	new BigDecimal(2);
+	public static final BigDecimal CTE_TIPO_PRESCRIPTOR_WEB = 		new BigDecimal(9);
+
+	
+	public static final String CTE_INCOMPLETA = "INCOMPLETA";
+	public static final String CTE_COMPLETA   = "COMPLETA";
+	
+	// Campos del contexto ANPMN050
+	public static final String CTE_NUMERO_SOLICITUD = "ANPMN050020";
+	
+	// Constantes del SN 451 de consulta de tarifas
+	
+	public static final String PRODUCTO 		= "PRODUCTO";
+	public static final String SUBPRODUCTO 		= "SUBPRODUCTO";
+	public static final String VERSION_GENERAL 	= "VERSION_GENERAL";
+	public static final String ID_TARIFA 		= "ID_TARIFA";
+	
+	public static final Integer CO_CONSULTA_TARIFAS = Integer.valueOf(451);
+	
+	//Constantes para el envio de correos para activar o desactivar subproductos
+	//Constantes para el envío de mail por cambio de estado de subproducto
+	public static final String CTE_AGRUP_MAIL_SUBPR = "MAIL_SUBPR";
+	public static final String CTE_AGRUP_MAIL_SUBPR_PARAM_ASUNTO = "ASUNTO";
+	public static final String CTE_AGRUP_MAIL_SUBPR_PARAM_DESTINOS = "DESTINOS";
+	public static final String CTE_AGRUP_MAIL_SUBPR_PARAM_AUTOR = "AUTOR";
+	public static final String CTE_AGRUP_MAIL_SUBPR_PARAM_MENSAJE = "MENSAJE";
+	public static final String CTE_AGRUP_MAIL_CODPLANT_DESACTIVADO = "ALERT11";
+	public static final String CTE_AGRUP_MAIL_CODPLANT_ACTIVADO = "ALERT12";
+	public static final String CTE_AGRUP_MAIL_GNRL = "MAIL_GNRL";
+	
+	// Control de operatoria 
+	public static final BigDecimal CTE_CONTROL_OPERATORIA_PREMIER = new BigDecimal(22000);
+	
+	//Constantes para las tarifas
+	public static final BigDecimal CTE_TARIFA_PREAUTORIZADO_OFICINA 		= new BigDecimal(4); 
+	public static final BigDecimal CTE_TARIFA_ESPANA_PREAUTORIZADO_OFICINA	= new BigDecimal(5);
+	public static final BigDecimal CTE_TARIFA_PREAUTORIZADO_CALL_CENTER		= new BigDecimal(6);    
+	
+	public static final String CTE_TERMINAL_BATCH = "TWE2";	
+}
+

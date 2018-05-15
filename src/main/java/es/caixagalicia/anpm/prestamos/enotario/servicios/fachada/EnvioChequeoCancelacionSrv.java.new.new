@@ -1,0 +1,356 @@
+/**
+ */
+package es.caixagalicia.anpm.prestamos.enotario.servicios.fachada;
+
+import java.math.BigDecimal;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionDatosGeneralesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionEnvioMensajesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoEnvMsjEnotarioChequeoCanc;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.CabeceraAncert_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.Chequeo;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.ChequeoResponse;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.ChequeoStub;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.Operacion_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.Request_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.chequeoCancelacion.Response_type0;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * @author V360173
+ */
+public class EnvioChequeoCancelacionSrv extends ServicioNegocio {
+
+    private static final LogHelper LOGGER = LogHelper.getLog(EnvioChequeoCancelacionSrv.class);
+
+    // $NON-NL-1$
+    public static final String CTE_LITERAL_ERROR_99 = "CANCELAR_PRESTAMO_1736317780";
+
+    /* ENTRADA */
+    private static final String CTE_CAMPO_ENTRADA_OPERACION = "OPERACION";
+
+    private static final String CTE_CAMPO_ENTRADA_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+
+    private static final String CTE_CAMPO_ENTRADA_NUMERO_SOLICITUD = "NUMERO_SOLICITUD";
+
+    private static final String CTE_CAMPO_ENTRADA_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+
+    private static final String CTE_CAMPO_ENTRADA_NUC_EXPEDIENTE = "NUC_EXPEDIENTE";
+
+    private static final String CTE_CAMPO_ENTRADA_CONTRATO_IBAN = "CONTRATO_IBAN";
+
+    // private static final String CTE_CAMPO_ENTRADA_CODIGO_BIC = "CODIGO_BIC";
+    /* OTRAS CONSTANTES */
+    public static final String CTE_NOVENTAYNUEVE = "99";
+
+    public static final String CTE_ESPACIO = " ";
+
+    private static final String CTE_CTX_CODIGO_RETORNO5 = "ANPMN199160";
+
+    private static final String CTE_CTX_CODIGO_ERROR5 = "ANPMN199170";
+
+    private static final String CTE_CTX_TEXTO_ERROR5 = "ANPMN199180";
+
+    /*CONSTANTES PARA LA INVOCACION A DistribuidorCancelChequeoSrv */
+    /*Operacion*/
+    private static final String CTE_ENTRADA_DISTR_CODIGO_APLICACION = "CODIGO_APLICACION";
+
+    private static final String CTE_ENTRADA_DISTR_CODIGO_OPERACION_E_NOTARIO = "CODIGO_OPERACION_E_NOTARIO";
+
+    private static final String CTE_ENTRADA_DISTR_NODO_RE_EMISOR = "NODO_RE_EMISOR";
+
+    private static final String CTE_ENTRADA_DISTR_NODO_ORIGINAL = "NODO_ORIGINAL";
+
+    private static final String CTE_ENTRADA_DISTR_TIPO_OPERACION = "TIPO_OPERACION";
+
+    /*Cabecera*/
+    private static final String CTE_ENTRADA_DISTR_CODIGO_PAIS = "CODIGO_PAIS";
+
+    private static final String CTE_ENTRADA_DISTR_CODIGO_ENTIDAD = "CODIGO_ENTIDAD";
+
+    private static final String CTE_ENTRADA_DISTR_TIPO_PRESTAMO = "TIPO_PRESTAMO";
+
+    private static final String CTE_ENTRADA_DISTR_CONTRATO_PRESTAMO = "CONTRATO_PRESTAMO";
+
+    private static final String CTE_ENTRADA_DISTR_DESCRIPCION = "DESCRIPCION";
+
+    private static final String CTE_ENTRADA_DISTR_CODIGO_RETORNO = "CODIGO_RETORNO";
+
+    private static final String CTE_ENTRADA_DISTR_CODIGO_ERROR = "CODIGO_ERROR";
+
+    private static final String CTE_ENTRADA_DISTR_TEXTO_ERROR = "TEXTO_ERROR";
+
+    // private static final String CTE_ENTRADA_DISTR_CONTRATO_IBAN = "CONTRATO_IBAN";
+    // private static final String CTE_ENTRADA_DISTR_CODIGO_BIC = "CODIGO_BIC";
+    /**
+     * Servicio de negocio Metrópolis (ANPM_199) que recibe como parámetros de
+     * entrada: código de operación, oficina, número, versión y NUC.
+     *
+     * - Se leen los datos de las tablas de e-Notario (CAG.AN39TB01 .. CAG.AN42TB01)
+     * y se rellena el contexto ANPMN199, en función de la operación de entrada.
+     *
+     * - Se inserta un registro en la tabla CAG.AN39TB01.
+     *
+     * - Se actualiza el contador de envíos (AN400080) en la tabla CAG.AN40TB01.
+     *
+     * @param datosEntrada
+     *        datos de entrada.
+     * @param contexto
+     *        contexto de ejecución.
+     * @return array de contextos con el contexto correspondiente.
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM199: Envío de mensajes a E-notario(Chequeo/Cancelación).");
+        }
+        contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        String codigoOperacion = datosEntrada.getString(CTE_CAMPO_ENTRADA_OPERACION);
+        BigDecimal oficinaSolicitud = datosEntrada.getDecimal(CTE_CAMPO_ENTRADA_OFICINA_SOLICITUD);
+        BigDecimal numeroSolicitud = datosEntrada.getDecimal(CTE_CAMPO_ENTRADA_NUMERO_SOLICITUD);
+        BigDecimal versionSolicitud = datosEntrada.getDecimal(CTE_CAMPO_ENTRADA_VERSION_SOLICITUD);
+        BigDecimal nucExpediente = datosEntrada.getDecimal(CTE_CAMPO_ENTRADA_NUC_EXPEDIENTE);
+        String contratoIban = datosEntrada.getString(CTE_CAMPO_ENTRADA_CONTRATO_IBAN);
+        // String codigoBic = datosEntrada.getString(CTE_CAMPO_ENTRADA_CODIGO_BIC);
+        String codigoOperacionEnotario = null;
+        String codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+        String codigoError = null;
+        String textoError = null;
+        BigDecimal division = null;
+        BigDecimal subdivision = null;
+        String estadoDatosGenerales = null;
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+        GestionEnvioMensajesEnotario geme = new GestionEnvioMensajesEnotario();
+        DatosSolicitudC datosSolicitud = gds.obtenerDatosSolicitud(oficinaSolicitud, numeroSolicitud, versionSolicitud, nucExpediente);
+        DatosgeneralesC datosGenerales = gdge.obtenerDatosGeneralesPorOficinaNumSolVersion(oficinaSolicitud, numeroSolicitud, versionSolicitud);
+        IContexto[] salida = new IContexto[IConstantesEnotario.CTE_UNO_INT];
+        IContexto contextoSalida = ContextoEnvMsjEnotarioChequeoCanc.obtenerCtxVacio();
+        /*Validaciones previas:*/
+        if ((null != datosSolicitud) && (null != datosGenerales)) {
+            if ((!UtilidadesEnotario.isBlankOrNull(contratoIban)) && (!UtilidadesEnotario.contratoIbanEsValido(contratoIban, datosSolicitud))) /*El campo CONTRATO_IBAN es opcional, por lo tanto si no va informado 
+				 * continúa la ejecución.*/
+            {
+                codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+                // ERROR: El estado del prestamo ha de ser 1.
+                codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_CONTRATO_NO_VALIDO;
+                textoError = IConstantesEnotario.CTE_TEXTO_ERROR_CONTRATO_NO_VALIDO;
+            } else if ((IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL.equals(codigoOperacion)) || (IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL_CON_AVISO.equals(codigoOperacion))) {
+                estadoDatosGenerales = datosGenerales.getEstado();
+                // Se incluye el estado "02" en la comprobacion (equivalente al "01")
+                if ((!IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO.equals(estadoDatosGenerales)) && (!IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales)) && (!IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL.equals(codigoOperacion))) {
+                    codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+                    // ERROR: El estado del prestamo ha de ser 1.
+                    codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_0;
+                    textoError = IConstantesEnotario.CTE_TEXTO_ERROR_0;
+                }
+                if (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales) || (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA.equals(estadoDatosGenerales))) {
+                    codigoOperacionEnotario = obtenerCodigoOperacionEnotario(codigoOperacion, estadoDatosGenerales);
+                    contextoSalida = opEnvioChequeoCancelacion(codigoOperacionEnotario, datosGenerales, datosSolicitud, contextoSalida);
+                    codigoRetorno = contextoSalida.getString(CTE_CTX_CODIGO_RETORNO5);
+                    codigoError = contextoSalida.getString(CTE_CTX_CODIGO_ERROR5);
+                    textoError = contextoSalida.getString(CTE_CTX_TEXTO_ERROR5);
+                    /*compruebo el codigoError sacado del contexto de salida por si
+					 * hubo algun fallo a la hora de realizar la petición a Ancert*/
+                    if ((IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno)) || (IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno))) {
+                        division = datosSolicitud.getDivision();
+                        subdivision = datosSolicitud.getSubDivision();
+                        int contadorFilas = geme.contarFilasComunicacionesEnotario(oficinaSolicitud, numeroSolicitud, division, subdivision);
+                        contadorFilas++;
+                        geme.actualizarContadorFilasDatosGenerales(oficinaSolicitud, numeroSolicitud, division, subdivision, contadorFilas);
+                    } else {
+                    // fallo en Ancert
+                    }
+                } else {
+                    // ERROR: "No se puede cancelar un prestamo con estado estado".
+                    codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+                    codigoError = CTE_NOVENTAYNUEVE;
+                    textoError = new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_LITERAL_ERROR_99).toString()).toString() + datosGenerales.getEstado();
+                }
+            } else if (IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion)) {
+                contextoSalida = opEnvioChequeoCancelacion(codigoOperacion, datosGenerales, datosSolicitud, contextoSalida);
+                codigoRetorno = contextoSalida.getString(CTE_CTX_CODIGO_RETORNO5);
+                codigoError = contextoSalida.getString(CTE_CTX_CODIGO_ERROR5);
+                textoError = contextoSalida.getString(CTE_CTX_TEXTO_ERROR5);
+            } else {
+                codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+                codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_OP_NO_VALIDA;
+                textoError = new Mensaje(ServicioNegocio.getContexto(), OPERACI_N_1662200596).toString().concat(codigoOperacion).concat(new Mensaje(ServicioNegocio.getContexto(), V_LIDA_399188887).toString());
+            }
+        } else {
+            codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+            // ERROR: "No existe el prestamo con NUC: nuc"
+            codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_100;
+            // $OP-LBL-NL-2$ $OP-LBL-NL-2$
+            textoError = new Mensaje(ServicioNegocio.getContexto(), EXISTE_PR_STAMO_OFICINA_1618362050).toString().concat(oficinaSolicitud.toString()).concat(new Mensaje(ServicioNegocio.getContexto(), _NUM_SOL_1554608360).toString()).concat(numeroSolicitud.toString().concat(new Mensaje(ServicioNegocio.getContexto(), _VERSION_SOL_2071640800).toString()).concat(versionSolicitud.toString()));
+        }
+        if ((!IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno)) && ((!IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno)))) {
+            contextoSalida = ContextoEnvMsjEnotarioChequeoCanc.rellenarDatosContextoError(codigoRetorno, codigoError, textoError, contextoSalida);
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN DEL SERVICIO SNANPM199: Se ha ejecutado correctamente.");
+        }
+        salida[0] = contextoSalida;
+        return salida;
+    }
+
+    public static Response_type0 respuestaAncert(String operacion, DatosSolicitudC datosSolicitud, String contratoPrestamo) throws org.apache.axis2.AxisFault, java.rmi.RemoteException {
+        ChequeoStub stub = new ChequeoStub(IConstantesEnotario.CTE_URL_WS_CHEQUEO_CANCEL);
+        Chequeo chequeo = new Chequeo();
+        Request_type0 request = new Request_type0();
+        CabeceraAncert_type0 cabecera = new CabeceraAncert_type0();
+        Operacion_type0 operacionAncert = new Operacion_type0();
+        cabecera.setContratoPrestamo(contratoPrestamo);
+        // cabecera.setEntidad(datosSolicitud.getEntidad());
+        cabecera.setEntidad(datosSolicitud.getEntidad());
+        cabecera.setPais(IConstantesEnotario.CTE_CODIGO_PAIS);
+        cabecera.setTipoPrestamo(IConstantesEnotario.CTE_TIPO_PRESTAMO_PERSONAL);
+        operacionAncert.setCodigoAplicacion(IConstantesEnotario.CTE_CODIGO_APLICACION);
+        operacionAncert.setCodigoOperacion(String.format("%1$s", operacion.trim()).replace(' ', '0'));
+        operacionAncert.setNodoOriginal(IConstantesEnotario.CTE_NODO_HOST);
+        operacionAncert.setNodoReemisor(IConstantesEnotario.CTE_NODO_HOST);
+        operacionAncert.setTipoOperacion(IConstantesEnotario.CTE_TIPO_OPERACION_REQUEST);
+        request.setCabeceraAncert(cabecera);
+        request.setOperacion(operacionAncert);
+        chequeo.setRequest(request);
+        ChequeoResponse chequeoResponse = stub.Chequeo(chequeo);
+        Response_type0 response = chequeoResponse.getResponse();
+        return response;
+    }
+
+    private static IContexto invocarDistrCancelChequeo(Response_type0 responseAncert) {
+        String codigoOperacion = null;
+        IContexto contextoDistrCancelChequeo = null;
+        IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+        IDatosEntradaTx datosEntradaDistrCancelChequeo = getPrograma(contextoEjecucion, // ANPM
+        new Integer(507), // distr. cancel/chequeo
+        new Integer(195));
+        if (null != responseAncert.getOperacion()) {
+            codigoOperacion = responseAncert.getOperacion().getCodigoOperacion();
+            if (IConstantesEnotario.CTE_UNO_INT == codigoOperacion.length()) {
+                codigoOperacion = UtilidadesEnotario.rellenarCerosDelante(codigoOperacion, 1);
+            // para que "2" pase a ser "02", por ejemplo.
+            }
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_APLICACION, responseAncert.getOperacion().getCodigoAplicacion());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_OPERACION_E_NOTARIO, codigoOperacion);
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_NODO_RE_EMISOR, responseAncert.getOperacion().getNodoReemisor());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_NODO_ORIGINAL, responseAncert.getOperacion().getNodoOriginal());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_TIPO_OPERACION, responseAncert.getOperacion().getTipoOperacion());
+        }
+        if (null != responseAncert.getCabeceraAncert()) {
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_PAIS, responseAncert.getCabeceraAncert().getPais());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_ENTIDAD, responseAncert.getCabeceraAncert().getEntidad());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_TIPO_PRESTAMO, responseAncert.getCabeceraAncert().getTipoPrestamo());
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CONTRATO_PRESTAMO, responseAncert.getCabeceraAncert().getContratoPrestamo());
+        }
+        if (!UtilidadesEnotario.isBlankOrNull(responseAncert.getTextoError())) {
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_DESCRIPCION, responseAncert.getTextoError());
+        }
+        datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_RETORNO, responseAncert.getCodigoRetorno());
+        if (!UtilidadesEnotario.isBlankOrNull(responseAncert.getCodigoError())) {
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_CODIGO_ERROR, responseAncert.getCodigoError());
+        }
+        if (!UtilidadesEnotario.isBlankOrNull(responseAncert.getTextoError())) {
+            datosEntradaDistrCancelChequeo.addCampo(CTE_ENTRADA_DISTR_TEXTO_ERROR, responseAncert.getTextoError());
+        }
+        IContexto[] resultadoDistrCancelChequeo = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntradaDistrCancelChequeo);
+        if ((null != resultadoDistrCancelChequeo) && (IConstantesEnotario.CTE_CERO_INT < resultadoDistrCancelChequeo.length)) {
+            contextoDistrCancelChequeo = resultadoDistrCancelChequeo[0];
+        }
+        return contextoDistrCancelChequeo;
+    }
+
+    private static IContexto opEnvioChequeoCancelacion(String codigoOperacion, DatosgeneralesC datosGenerales, DatosSolicitudC datosSolicitud, IContexto contextoSalida) {
+        String codigoRetornoAncert = null;
+        String codigoErrorAncert = null;
+        String textoErrorAncert = null;
+        String contratoPrestamo = null;
+        String codigoOperacionEnotario = null;
+        String estadoPrestamo = null;
+        Response_type0 responseAncert = new Response_type0();
+        estadoPrestamo = datosGenerales.getEstado();
+        codigoOperacionEnotario = obtenerCodigoOperacionEnotario(codigoOperacion, estadoPrestamo);
+        contratoPrestamo = UtilidadesEnotario.getContratoPrestamo(datosSolicitud);
+        try {
+            responseAncert = respuestaAncert(codigoOperacionEnotario, datosSolicitud, contratoPrestamo);
+        // coller o response e rellenar a salida
+        } catch (org.apache.axis2.AxisFault e) {
+            e.printStackTrace();
+            codigoRetornoAncert = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+            codigoErrorAncert = IConstantesEnotario.CTE_CODIGO_ERROR_AXIS_FAULT;
+            textoErrorAncert = IConstantesEnotario.CTE_TEXTO_ERROR_AXIS_FAULT;
+        // aunque pase por aquí la ejecución sigue.
+        } catch (java.rmi.RemoteException e) {
+            e.printStackTrace();
+            codigoRetornoAncert = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+            codigoErrorAncert = IConstantesEnotario.CTE_CODIGO_ERROR_RMI_REMOTE_EXCEPTION;
+            textoErrorAncert = IConstantesEnotario.CTE_TEXTO_ERROR_RMI_REMOTE_EXCEPTION;
+        // aunque pase por aquí la ejecución sigue.
+        }
+        if (UtilidadesEnotario.isBlankOrNull(codigoErrorAncert)) {
+            codigoRetornoAncert = responseAncert.getCodigoRetorno();
+            codigoErrorAncert = responseAncert.getCodigoError();
+            textoErrorAncert = responseAncert.getTextoError();
+            invocarDistrCancelChequeo(responseAncert);
+            /*hago algo con los campos de salida de este contexto??? */
+            contextoSalida = ContextoEnvMsjEnotarioChequeoCanc.rellenarDatosContextoMensajesEnotarioNOOP5(responseAncert, contextoSalida);
+        } else {
+            contextoSalida = ContextoEnvMsjEnotarioChequeoCanc.rellenarDatosContextoError(codigoRetornoAncert, codigoErrorAncert, textoErrorAncert, contextoSalida);
+        }
+        return contextoSalida;
+    }
+
+    /**
+     * Devuelve el código de operación de E-Notario en función de la operación introducida
+     * como parámetro para la operación de chequeo/cancelacion del servicio de
+     * envío de mensajes a E-Notario.
+     * La operación puede ser: alta, modificacion o modificacion + aviso.
+     * El código de operación E-Notario, PMNOT020, se calcula a partir del
+     * código de operación PM531E_070 de esta forma:
+     *
+     * codigoOperacion (PM531E_070) | estadoPrestamo (PME10260) | codigoOperacionEnotario (PMNOT020)
+     * -----------------------------------------------------------------
+     *       '99'					|		x					|	'99'
+     *       otro caso				| 		'02'				|	'06'
+     *       otro caso				|		otro caso			|	'10'
+     *
+     * @param operacion
+     * @return codigo de la operación corrrespondiente.
+     */
+    private static String obtenerCodigoOperacionEnotario(String codigoOperacion, String estadoDatosGenerales) {
+        String codigoOperacionEnotario = null;
+        if (IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion)) {
+            codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA;
+        } else {
+            if (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales)) {
+                codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL;
+            } else {
+                codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL_CON_AVISO;
+            }
+        }
+        return codigoOperacionEnotario;
+    }
+
+    private static final String OPERACI_N_1662200596 = "OPERACI_N_1662200596";
+
+    private static final String _VERSION_SOL_2071640800 = "_VERSION_SOL_2071640800";
+
+    private static final String _NUM_SOL_1554608360 = "_NUM_SOL_1554608360";
+
+    private static final String EXISTE_PR_STAMO_OFICINA_1618362050 = "EXISTE_PR_STAMO_OFICINA_1618362050";
+
+    private static final String V_LIDA_399188887 = "V_LIDA_399188887";
+}

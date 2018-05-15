@@ -1,0 +1,557 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesEng;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoEnvMsjEnotarioChequeoCanc2;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioEntradaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionDatosGeneralesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionEnvioMensajesEnotario;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * @author V361732
+ *
+ */
+public class GestionEnvioChequeoCancelacion
+{
+	
+	/* OTRAS CONSTANTES */
+	public static final String CTE_LITERAL_ERROR_99 = "No se puede cancelar un prestamo con estado ";
+	public static final String CTE_NOVENTAYNUEVE = "99";
+	public static final String CTE_ESPACIO = " ";
+	
+	private static final String CTE_CTX_CODIGO_RETORNO5 = "ANPMN199160";
+	private static final String CTE_CTX_CODIGO_ERROR5 = "ANPMN199170";
+	private static final String CTE_CTX_TEXTO_ERROR5 = "ANPMN199180";
+	
+	private static final String CTE_CTX_CODIGO_RETORNO601 = "ANPMN601120";
+	private static final String CTE_CTX_CODIGO_ERROR601 = "ANPMN601130";
+	private static final String CTE_CTX_TEXTO_ERROR601 = "ANPMN601140";
+	
+	/*CONSTANTES PARA LA INVOCACION A DistribuidorCancelChequeoSrv */
+	/*Operacion*/
+	private static final String CTE_ENTRADA_DISTR_CODIGO_APLICACION = "CodigoAplicacion";
+	private static final String CTE_ENTRADA_DISTR_CODIGO_OPERACION_E_NOTARIO = "CodigoOperacion";
+	private static final String CTE_ENTRADA_DISTR_NODO_RE_EMISOR = "NodoReemisor";
+	private static final String CTE_ENTRADA_DISTR_NODO_ORIGINAL = "NodoOriginal";
+	private static final String CTE_ENTRADA_DISTR_TIPO_OPERACION = "TipoOperacion";
+	private static final String CTE_ENTRADA_DISTR_CODIGO_PAIS = "Pais";
+	private static final String CTE_ENTRADA_DISTR_CODIGO_ENTIDAD = "Entidad";
+	private static final String CTE_ENTRADA_DISTR_TIPO_PRESTAMO = "TipoPrestamo";
+	private static final String CTE_ENTRADA_DISTR_CONTRATO_PRESTAMO = "contratoPrestamo";
+	private static final String CTE_ENTRADA_DISTR_CODIGO_BIC = "CodBic";
+	private static final String CTE_ENTRADA_DISTR_CONTRATO_IBAN	= "ContratoIban";
+	
+	private static final String CTE_COP_SERVICIO = "ANPM_468";
+	
+	/* Chequeo y cancelación */
+	private final static String CTE199_CODIGO_OPERACION = "ANPMN199080";
+	private final static String CTE199_NODO_ORIGINAL = "ANPMN199090";
+	private final static String CTE199_NODO_REEMISOR = "ANPMN199100";
+	private final static String CTE199_TIPO_OPERACION = "ANPMN199110";
+	private final static String CTE199_PAIS = "ANPMN199120";
+	private final static String CTE199_ENTIDAD = "ANPMN199130";
+	private final static String CTE199_TIPO_PRESTAMO = "ANPMN199140";
+	private final static String CTE199_CONTRATO_PRESTAMO = "ANPMN199150";
+	
+	private String codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0;
+	private String codigoError = null;
+	private String textoError = null;
+	
+	public GestionEnvioChequeoCancelacion()
+	{
+	}
+
+
+	/**
+	 * Se actualiza el contador de envíos (AN400080) en la tabla CAG.AN40TB01.
+	 * 
+	 * @param oficinaSolicitud
+	 * @param numSolicitud
+	 * @param division
+	 * @param subDivision
+	 * @param contadorFilas
+	 */
+	public void actualizarContadorFilasDatosGenerales(BigDecimal oficinaSolicitud, BigDecimal numSolicitud,
+			BigDecimal division, BigDecimal subDivision, int contadorFilas)
+	{
+		
+		
+		DatosgeneralesEng dgEng = new DatosgeneralesEng();
+		List<DatosgeneralesC> datosGenerales = dgEng.getDetalleDatosGenerales(oficinaSolicitud, 
+				numSolicitud, division, subDivision);
+		
+		for (DatosgeneralesC dg : datosGenerales)
+		{
+			dg.setContador(new BigDecimal(contadorFilas));
+			dg.setEstado(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SOLIC_CANCEL);
+			dgEng.update(dg);
+			dgEng.persist(dg);
+		}	
+	}
+	
+	/**
+	 * Limpia las fechas de impresion en AN25TB01
+	 * @param solicitud
+	 */
+	public void limpiarFechasImpresionFormalizacion(DatosSolicitudC solicitud){
+			//DatosSolicitudEng dao = new DatosSolicitudEng();
+			solicitud.setDateFechaImpresion(DateUtils.toSQLDate( DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_CORTO)));
+			solicitud.setFechaValorFirma(DateUtils.toSQLDate( DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_CORTO)));
+			solicitud.update();
+	}
+	
+	
+	/**
+	 * Invoca al servicio de negocio de cancelacion generico de BizTalk
+	 * @param oficinaSolicitud
+	 * @param numeroSolicitud
+	 * @param versionSolicitud
+	 * @param nucExpediente
+	 * @param codigoOperacion
+	 * @return
+	 */
+	public IContexto[] llamadaAncertBiztalk(BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud,
+										BigDecimal versionSolicitud, BigDecimal nucExpediente, String codigoOperacion)
+	{
+		String codigoOperacionEnotario = null;
+		String codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+		String codigoError = null;
+		String textoError = null;
+		
+		String estadoDatosGenerales = null;
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		GestionEnvioMensajesEnotario geme = new GestionEnvioMensajesEnotario();
+		
+		DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO = new DistribuidorEnotarioEntradaVO();
+		
+		DatosSolicitudC datosSolicitud = gds.getUltimaVersion(nucExpediente);
+		//Se coge la unica tupla de datos generales asociada a la version.
+		DatosgeneralesC datosGenerales = gdge.obtenerDatosGeneralesPorNucVersion(nucExpediente, datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+		
+		// 2016-10-26 - Se modifica la funcion que comprueba si existe alguna version
+		// anterior enviada para que tenga en cuenta tambien los estados 02 y 03 
+		// (la nueva funcion devuelve true si alguna version anterior esta en estado
+		// 01, 02 o 03). Esta comprobacion se hace solo para cancelar.
+		//boolean enviado = gdge.existeVersionEnviada(nucExpediente);
+		boolean enviado = gdge.existeVersionEnviadaCancelar(nucExpediente);
+		//boolean cancelado = gdge.estaEnvioCancelado(nucExpediente);
+
+		IContexto[] salida = new IContexto[IConstantesEnotario.CTE_UNO_INT];
+		IContexto contextoSalida = ContextoEnvMsjEnotarioChequeoCanc2.obtenerCtxVacio();
+		
+		String contratoIBAN = UtilidadesEnotario.getContratoIban(datosSolicitud);
+		String codigoBIC 	= UtilidadesComun.obtenerCodigoBic();
+
+		/*Validaciones previas:*/
+		if ((null != datosSolicitud) &&
+			(null != datosGenerales))
+		{
+			
+			//Limpiar as fechas de impresion
+			this.limpiarFechasImpresionFormalizacion(datosSolicitud);
+			
+			distrEnotarioEntradaVO = rellenarDistribuidorEnotarioEntradaVO(codigoOperacion, datosGenerales, datosSolicitud, codigoBIC, contratoIBAN, distrEnotarioEntradaVO);
+			
+			if(null == distrEnotarioEntradaVO.getCodigoOficina()
+			|| BigDecimal.ZERO == distrEnotarioEntradaVO.getCodigoOficina())
+			{
+				distrEnotarioEntradaVO.setCodigoOficina(oficinaSolicitud);
+			}
+			
+			if(null == distrEnotarioEntradaVO.getNumeroSolicitud()
+			|| BigDecimal.ZERO == distrEnotarioEntradaVO.getNumeroSolicitud())
+			{
+				distrEnotarioEntradaVO.setNumeroSolicitud(numeroSolicitud);
+			}
+			
+			// Llamada al servicio ANPM_476 antes de la aplicación de la lógica del Servicio
+			geme.registrarComunicacionEnotarioPrevio(
+												distrEnotarioEntradaVO,
+												datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+			
+			if(!UtilidadesEnotario.isBlankOrNull(contratoIBAN)
+			&& !UtilidadesEnotario.contratoIbanEsValido(contratoIBAN, datosSolicitud))
+				/*El campo CONTRATO_IBAN es opcional, por lo tanto si no va informado 
+				 * continúa la ejecución, si.*/
+			{
+					codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+					codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_CONTRATO_NO_VALIDO;
+					textoError = IConstantesEnotario.CTE_TEXTO_ERROR_CONTRATO_NO_VALIDO;
+			}
+			else if(IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL.equals(codigoOperacion)
+				 || IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL_CON_AVISO.equals(codigoOperacion))
+			{
+				estadoDatosGenerales = datosGenerales.getEstado();
+				
+				// Se incluye el estado "02" en la comprobacion (equivalente al "01")
+				if(!IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO.equals(estadoDatosGenerales) &&
+						!IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales) &&
+						!IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL.equals(codigoOperacion))
+				{
+					codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+					codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_0;
+					textoError = IConstantesEnotario.CTE_TEXTO_ERROR_0;
+				}
+				
+				if(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales) 
+				|| IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO.equals(estadoDatosGenerales)
+				|| IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA.equals(estadoDatosGenerales)
+				|| IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion)
+				/**
+				 * Esta ultima comprobacion corresponde a la siguiente situacion
+				 * 	1-Se envia una solicitud a ancert
+				 * 	2-Se modifica quedando pendiente de envio
+				 * 	3-Se desea cancelar en ancert mediante el boton
+				 */
+				/**
+				 * Se añade una comprobacion para saber si ya esta cancelado si esta cancelado y no ha sido enviado
+				 * de nuevo este valor sera true, false de lo contrario
+				 */
+				|| enviado && IConstantesEnotario.CTE_DATOS_GEN_ESTADO_PENDIENTE_ENVIO.equals(estadoDatosGenerales))
+				{
+					codigoOperacionEnotario = obtenerCodigoOperacionEnotario(codigoOperacion, estadoDatosGenerales);
+					
+					contextoSalida = opEnvioChequeoCancelacion(
+														codigoOperacionEnotario, 
+														datosGenerales, 
+														datosSolicitud, 
+														contextoSalida, 
+														codigoBIC, 
+														contratoIBAN, 
+														distrEnotarioEntradaVO);
+					
+					codigoRetorno = contextoSalida.getString(CTE_CTX_CODIGO_RETORNO5);
+					codigoError = contextoSalida.getString(CTE_CTX_CODIGO_ERROR5);
+					textoError = contextoSalida.getString(CTE_CTX_TEXTO_ERROR5);
+					
+					
+				}
+				else
+				{
+					// ERROR: "No se puede cancelar un prestamo con estado estado".
+					codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+					codigoError = CTE_NOVENTAYNUEVE;
+					textoError = CTE_LITERAL_ERROR_99
+							+ datosGenerales.getEstado();
+				}
+			}
+			else if (!IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion))
+			{
+				codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+				codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_OP_NO_VALIDA;
+				textoError = IConstantesEnotario.CTE_LIT_CODIGO_OPERACION_INCORRECTO.concat(codigoOperacion);
+			}
+			
+			// En el caso en que no se informe el contexto se le asignan los datos de entrada
+			if(null == contextoSalida.getString(CTE199_CODIGO_OPERACION))
+			{
+				contextoSalida.put(CTE199_CODIGO_OPERACION, distrEnotarioEntradaVO.getCodigoOperacionEnotario());
+				contextoSalida.put(CTE199_NODO_REEMISOR, distrEnotarioEntradaVO.getNodoReEmisor());
+				contextoSalida.put(CTE199_NODO_ORIGINAL, distrEnotarioEntradaVO.getNodoOriginal());
+				contextoSalida.put(CTE199_TIPO_OPERACION, distrEnotarioEntradaVO.getTipoOperacion());
+				contextoSalida.put(CTE199_PAIS, distrEnotarioEntradaVO.getCodigoPais());
+				contextoSalida.put(CTE199_ENTIDAD, distrEnotarioEntradaVO.getCodigoEntidad().toString());
+				contextoSalida.put(CTE199_TIPO_PRESTAMO, distrEnotarioEntradaVO.getTipoPrestamo());
+				contextoSalida.put(CTE199_CONTRATO_PRESTAMO, distrEnotarioEntradaVO.getContratoPrestamo());
+			}
+			
+			// Llamada al servicio ANPM_476 tras la aplicación de la lógica del Servicio
+			geme.registrarComunicacionEnotarioPosterior(
+												datosGenerales,
+												CTE_COP_SERVICIO, 
+												contextoSalida,
+												geme.restoBloquesGeneralPosterior(
+																			codigoRetorno,
+																			codigoError,
+																			textoError)
+												);
+			
+			// Actualiza la tabla AN40TB01 y volcado a PMOS
+			geme.actualizaDatosGenerales(
+									datosGenerales, 
+									datosSolicitud);
+		}
+		else
+		{
+			codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+			// ERROR: "No existe el prestamo con NUC: nuc"
+			codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_100;
+			textoError  = IConstantesEnotario.CTE_LIT_NO_EXISTE_PRESTAMO_CON_OFICINA
+						+ oficinaSolicitud.toString()
+						+ IConstantesEnotario.CTE_LIT_NUM_SOL
+						+ numeroSolicitud.toString()
+						+ IConstantesEnotario.CTE_LIT_VERSION_SOL
+						+ versionSolicitud.toString();
+		}
+		
+		if(!IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno) 
+		&& !IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno))
+		{
+			contextoSalida = ContextoEnvMsjEnotarioChequeoCanc2.rellenarContextoError465(codigoRetorno, codigoError, textoError);
+		}else{
+			contextoSalida = ContextoEnvMsjEnotarioChequeoCanc2.rellenarContextoError465(codigoRetorno, codigoError, textoError);
+		}
+
+		
+		
+		salida[0] = contextoSalida;
+		
+		return salida;
+	}
+	
+	
+	/**
+	 * 
+	 * 	Metodo hace la llamada a Ancert Biztalk a traves del servicio ANPM_601.
+	 * 
+	 * @param vo
+	 * @return
+	 */
+	private static IContexto invocarDistrCancelChequeo(
+			DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO,
+			DatosSolicitudC datosSolicitud,
+			DatosgeneralesC datosGenerales)
+	{
+		String codigoOperacion = null;
+		IContexto contextoDistrCancelChequeo = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		IDatosEntradaTx datosEntradaDistrCancelChequeo = ServicioNegocio.getPrograma(contextoEjecucion,
+				new Integer(507), //ANPM
+				new Integer(601)); //distr. cancel/chequeo
+		
+		
+		if (null != distrEnotarioEntradaVO)
+		{
+			codigoOperacion = distrEnotarioEntradaVO.getCodigoOperacionEnotario();
+			if (IConstantesEnotario.CTE_UNO_INT == codigoOperacion.length())
+			{
+				codigoOperacion = UtilidadesEnotario.rellenarCerosDelante(codigoOperacion, 1);
+				//para que "2" pase a ser "02", por ejemplo.
+			}
+			
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CODIGO_APLICACION,
+				distrEnotarioEntradaVO.getCodigoAplicacion());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CODIGO_OPERACION_E_NOTARIO,
+				codigoOperacion);
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_NODO_RE_EMISOR,
+				distrEnotarioEntradaVO.getNodoReEmisor());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_NODO_ORIGINAL,
+				distrEnotarioEntradaVO.getNodoOriginal());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_TIPO_OPERACION,
+				distrEnotarioEntradaVO.getTipoOperacion());
+
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CODIGO_PAIS,
+				distrEnotarioEntradaVO.getCodigoPais());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CODIGO_ENTIDAD,
+				distrEnotarioEntradaVO.getCodigoEntidad().toString());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_TIPO_PRESTAMO,
+				distrEnotarioEntradaVO.getTipoPrestamo());
+			datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CONTRATO_PRESTAMO,
+				distrEnotarioEntradaVO.getContratoPrestamo());
+			
+			if(null != distrEnotarioEntradaVO.getContratoIban())
+			{
+				datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CONTRATO_IBAN,
+				distrEnotarioEntradaVO.getContratoIban());
+			}
+			
+			if(null != distrEnotarioEntradaVO.getCodigoBic())
+			{
+				datosEntradaDistrCancelChequeo.addCampo(
+				CTE_ENTRADA_DISTR_CODIGO_BIC,
+				distrEnotarioEntradaVO.getCodigoBic());
+			}
+			
+		}
+
+		
+		IContexto[] resultadoDistrCancelChequeo = ServicioNegocio.invocarServicio(
+				contextoEjecucion, datosEntradaDistrCancelChequeo);
+		
+		if ((null != resultadoDistrCancelChequeo) &&
+			(IConstantesEnotario.CTE_CERO_INT < resultadoDistrCancelChequeo.length))
+		{
+			contextoDistrCancelChequeo = resultadoDistrCancelChequeo[0];
+		}
+		
+		return contextoDistrCancelChequeo;
+	}	
+	
+	
+	
+	/**
+	 * 	Metodo que carga los datos necesarios para hacer la llamada a Ancert Biztalk
+	 * 
+	 * @param codigoOperacion
+	 * @param datosGenerales
+	 * @param datosSolicitud
+	 * @param contextoSalida
+	 * @param codigoBIC
+	 * @param contratoIBAN
+	 * @return
+	 */
+	private IContexto opEnvioChequeoCancelacion(
+			String codigoOperacion, DatosgeneralesC datosGenerales,
+			DatosSolicitudC datosSolicitud, IContexto contextoSalida,
+			String codigoBIC, String contratoIBAN, DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO)
+	{	
+		if ((null != distrEnotarioEntradaVO) && (UtilidadesEnotario.isBlankOrNull(codigoError)))
+		{
+			// Vuelca los datos a PMOS.
+			//UtilidadesEnotario.volcadoDatosPmos(datosSolicitud);
+
+			IContexto contextoSalidaDistrCancelChequeo = invocarDistrCancelChequeo(distrEnotarioEntradaVO, datosSolicitud, datosGenerales);
+			
+			// Comprobacion de si ha ocurrido algun error en la llamada al servicio de Ancert Biztalk.
+			if(null != contextoSalidaDistrCancelChequeo)
+			{
+				// Si el codigo es distinto de "0" hay un error.
+				codigoRetorno = contextoSalidaDistrCancelChequeo.getString(CTE_CTX_CODIGO_RETORNO601).trim();
+				if ((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno)) &&
+						((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno))))
+				{
+					codigoError = contextoSalidaDistrCancelChequeo.getString(CTE_CTX_CODIGO_ERROR601);
+					textoError = contextoSalidaDistrCancelChequeo.getString(CTE_CTX_TEXTO_ERROR601);
+				}else{
+					//Todo fue bien actualizamos el estado
+					datosGenerales.setEstado(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SOLIC_CANCEL);
+				}
+			}
+			
+			contextoSalida = ContextoEnvMsjEnotarioChequeoCanc2
+					.rellenarDatosContextoMensajesEnotarioNOOP5(distrEnotarioEntradaVO, contextoSalida, codigoRetorno,
+																codigoError, textoError);
+		}
+		else
+		{
+			contextoSalida = ContextoEnvMsjEnotarioChequeoCanc2.rellenarDatosContextoError(
+					codigoRetorno, codigoError, textoError, contextoSalida);
+		}
+		return contextoSalida;
+	}
+	
+	private static DistribuidorEnotarioEntradaVO rellenarDistribuidorEnotarioEntradaVO(String codigoOperacion, DatosgeneralesC datosGenerales,
+			DatosSolicitudC datosSolicitud, String codigoBIC, String contratoIBAN, DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO)
+	{
+		String contratoPrestamo = null;
+		String codigoOperacionEnotario = null;
+		
+		String estadoPrestamo = null;
+		
+		estadoPrestamo = datosGenerales.getEstado();
+		codigoOperacionEnotario = obtenerCodigoOperacionEnotario(codigoOperacion, estadoPrestamo);
+		contratoPrestamo = UtilidadesEnotario.getContratoPrestamo(datosSolicitud);
+		
+		distrEnotarioEntradaVO.setCodigoAplicacion(IConstantesEnotario.CTE_CODIGO_APLICACION);
+		distrEnotarioEntradaVO.setCodigoOperacionEnotario(codigoOperacion);
+		distrEnotarioEntradaVO.setNodoReEmisor(IConstantesEnotario.CTE_NODO_HOST);
+		distrEnotarioEntradaVO.setNodoOriginal(IConstantesEnotario.CTE_NODO_HOST);
+		distrEnotarioEntradaVO.setTipoOperacion(IConstantesEnotario.CTE_TIPO_OPERACION_REQUEST);
+		
+		distrEnotarioEntradaVO.setCodigoPais(IConstantesEnotario.CTE_CODIGO_PAIS);
+		distrEnotarioEntradaVO.setCodigoEntidad(new BigDecimal(datosSolicitud.getEntidad()));
+		distrEnotarioEntradaVO.setNucSolicitud(datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+		distrEnotarioEntradaVO.setTipoPrestamo(IConstantesEnotario.CTE_TIPO_PRESTAMO_PERSONAL);
+		
+		codigoOperacionEnotario = UtilidadesEnotario.obtenerCodigoOperacionEnotario(codigoOperacion);
+
+		if (IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacionEnotario))
+		{
+			//CCC dummy.
+			contratoPrestamo = new String();
+			contratoPrestamo = contratoPrestamo.concat(datosSolicitud.getEntidad());
+			contratoPrestamo = contratoPrestamo.concat("9999");
+			contratoPrestamo = contratoPrestamo.concat("99");
+			contratoPrestamo = contratoPrestamo.concat("999");
+			contratoPrestamo = contratoPrestamo.concat("999999");
+			contratoPrestamo = contratoPrestamo.concat("9");
+		}
+		else
+		{
+			contratoPrestamo = UtilidadesEnotario.getContratoPrestamo(datosSolicitud);
+		}
+		if (StringUtils.isBlank(contratoPrestamo) || (IConstantesEnotario.CTE_INT_35 < contratoPrestamo.length()))
+		{
+			ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CONTRATO_PRESTAMO_NO_VALIDO, null, null, null);
+		}
+		distrEnotarioEntradaVO.setContratoPrestamo(UtilidadesEnotario.comprobarDatoNull(contratoPrestamo));
+		
+		distrEnotarioEntradaVO.setCodigoBic(codigoBIC);
+		distrEnotarioEntradaVO.setContratoIban(contratoIBAN);
+		
+		distrEnotarioEntradaVO.setCopServicio(CTE_COP_SERVICIO);
+		distrEnotarioEntradaVO.setDescripcion("Chequeo/Cancelacion de una solicitud con nuc: " + datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+	
+		return distrEnotarioEntradaVO;
+	}
+	
+	
+	/**
+	 * Devuelve el código de operación de E-Notario en función de la operación introducida
+	 * como parámetro para la operación de chequeo/cancelacion del servicio de 
+	 * envío de mensajes a E-Notario.
+	 * La operación puede ser: alta, modificacion o modificacion + aviso.
+	 * El código de operación E-Notario, PMNOT020, se calcula a partir del
+	 * código de operación PM531E_070 de esta forma:
+	 * 
+	 * codigoOperacion (PM531E_070) | estadoPrestamo (PME10260) | codigoOperacionEnotario (PMNOT020) 
+	 * -----------------------------------------------------------------
+	 *       '99'					|		x					|	'99'
+	 *       otro caso				| 		'02'				|	'06'
+	 *       otro caso				|		otro caso			|	'10'
+	 *
+	 * @param operacion
+	 * @return codigo de la operación corrrespondiente.
+	 */
+	private static String obtenerCodigoOperacionEnotario(String codigoOperacion, String estadoDatosGenerales)
+	{
+		String codigoOperacionEnotario = null;
+		if (IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion))
+		{
+			codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA;
+		}
+		else
+		{
+			if (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoDatosGenerales))
+			{
+				codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL;
+			}
+			else
+			{
+				codigoOperacionEnotario = IConstantesEnotario.CTE_OP_E_NOTARIO_CANCEL_CON_AVISO;
+			}
+		}
+		return codigoOperacionEnotario;
+		
+	}
+
+}

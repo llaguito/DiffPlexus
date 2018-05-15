@@ -1,0 +1,54 @@
+package es.caixagalicia.anpm.prestamos.tramitacionmultimedio.servicios.fachada.contextos;
+
+import java.math.BigDecimal;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+public class ContextoActualizacionPricing {
+
+    private static final String CTE_ID_CONTEXTO = "ANPMN510";
+
+    private static final String CTE_CODIGO = "ANPMN510010";
+
+    private static final String CTE_DESCRIPCION = "ANPMN510020";
+
+    private static final String CTE_NEW_VERSION = "ANPMN510030";
+
+    // $NON-NL-1$
+    private static final String ACTUALIZACION = "ACTUALIZADO_PRICING_1964609459";
+
+    // $NON-NL-1$
+    private static final String NON_ACTUALIZACION = "PRODUCIDO_ACTUALIZACI_N_1238324526";
+
+    public static IContexto[] rellenarDatosActualizacionPricing(ResultadoDatosSolicitudVO resultado, boolean actualizacion) {
+        IContexto[] salida = new IContexto[1];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_ID_CONTEXTO);
+        if (resultado != null) {
+            datos.put(CTE_CODIGO, new BigDecimal(resultado.getCodError()));
+            datos.put(CTE_DESCRIPCION, new Mensaje(ServicioNegocio.getContexto(), ACTUALIZACION).toString());
+            /*
+			 * EDIT 20140623: se cambia el criterio para saber si hay nueva versión.
+			//si no existe error se produce la actualizacion
+			if (resultado.getCodError() == 0) {
+				datos.put(CTE_NEW_VERSION,BigDecimal.ONE);
+			}else {
+				datos.put(CTE_NEW_VERSION,BigDecimal.ZERO);
+			}
+			*/
+            if (actualizacion) {
+                datos.put(CTE_NEW_VERSION, BigDecimal.ONE);
+            } else {
+                datos.put(CTE_NEW_VERSION, BigDecimal.ZERO);
+            }
+        } else {
+            datos.put(CTE_CODIGO, BigDecimal.ONE);
+            datos.put(CTE_DESCRIPCION, new Mensaje(ServicioNegocio.getContexto(), NON_ACTUALIZACION).toString());
+            datos.put(CTE_NEW_VERSION, BigDecimal.ZERO);
+        }
+        salida[0] = datos;
+        return salida;
+    }
+}

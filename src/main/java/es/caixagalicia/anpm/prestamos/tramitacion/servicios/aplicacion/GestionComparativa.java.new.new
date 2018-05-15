@@ -1,0 +1,598 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionClausulasRestringuidas;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.busqueda.ComparativaVersionSolicitudObj;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.destinos.DestinosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.ComparativaVersionesSolicitudSrv;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesTramitacion;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+public class GestionComparativa {
+
+    /**
+     * Logger de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(ComparativaVersionesSolicitudSrv.class);
+
+    /**
+     * Devuelve la 'Comisión Solicitud' de orden uno del tipo comisión indicado.
+     *
+     * @param listComisiones
+     * @param tipoComision
+     * @return
+     */
+    private ComisionC buscarComisionTipo(List<ComisionC> listComisiones, String tipoComision) {
+        ComisionC comisionTipo = null;
+        for (ComisionC comision : listComisiones) {
+            ComisionKey key = comision.getComisionesKey();
+            if ((Constantes.CTE_UNO_INT.equals(key.getIntOrden())) && (tipoComision.equals(key.getStrTipoComision()))) {
+                comisionTipo = comision;
+                break;
+            }
+        }
+        return comisionTipo;
+    }
+
+    /**
+     * @param listDestinos
+     * @return
+     */
+    public DestinosC buscarDestinoPrincipal(List<DestinosC> listDestinos) {
+        DestinosC destinoPrincipal = null;
+        for (DestinosC destino : listDestinos) {
+            if (Constantes.SI.equals(destino.getEsPrincipal())) {
+                destinoPrincipal = destino;
+                break;
+            }
+        }
+        return destinoPrincipal;
+    }
+
+    /**
+     * @param listCondicionesInteres
+     * es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.ComparativaSubproductosSrv#getInteresMayorPlazo
+     * @return
+     */
+    private CondicionesInteresC buscarInteresMayorPlazo(List<CondicionesInteresC> listCondicionesInteres) {
+        CondicionesInteresC condInteresMayorPlazo = listCondicionesInteres.get(0);
+        Integer mayorPlazo = condInteresMayorPlazo.getIntPlazo();
+        final int size = listCondicionesInteres.size();
+        for (int cont = 0; cont < size; cont++) {
+            CondicionesInteresC condInteres = listCondicionesInteres.get(cont);
+            Integer plazo = condInteres.getIntPlazo();
+            if (plazo.intValue() > mayorPlazo.intValue()) {
+                condInteresMayorPlazo = condInteres;
+                mayorPlazo = plazo;
+            }
+        }
+        return condInteresMayorPlazo;
+    }
+
+    /**
+     * @param listComisiones
+     * @param versionSolicitud
+     * @see es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.ComparativaSubproductosSrv#setComisiones
+     */
+    public void construirInfoComisiones(List<ComisionC> listComisiones, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de comisiones");
+        }
+        // Comisión apertura.
+        ComisionC comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_APERTURA);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionApertura(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionApertura(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionApertura(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionApertura(new BigDecimal(0.000));
+        }
+        // Comisión gastos estudio.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_ESTUDIO);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeGastosEstudio(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinGastosEstudio(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeGastosEstudio(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinGastosEstudio(new BigDecimal(0.000));
+        }
+        // Comisión cancelación.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_CANCELACION);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionCancelacion(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionCancelacion(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionCancelacion(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionCancelacion(new BigDecimal(0.000));
+        }
+        // Comisión amortización anticipada.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_ADELANTO);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionAnticipada(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionAnticipada(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionAnticipada(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionAnticipada(new BigDecimal(0.000));
+        }
+        // Comisión cambio deudor.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_SUBROGACION_TERCERO);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionCambioDeudor(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionCambioDeudor(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionCambioDeudor(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionCambioDeudor(new BigDecimal(0.000));
+        }
+        // Comisión modificación.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_MODIF_COND);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionModificacion(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionModificacion(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionModificacion(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionModificacion(new BigDecimal(0.000));
+        }
+        // Comisión reclamación.
+        comision = buscarComisionTipo(listComisiones, Constantes.TIPO_COMISION_RECLAMACION_DEUDA);
+        if (comision != null) {
+            versionSolicitud.setPorcentajeComisionReclamacion(comision.getBidPorcentajeComision());
+            versionSolicitud.setImporteMinComisionReclamacion(comision.getBidImporteMinimo());
+        } else {
+            versionSolicitud.setPorcentajeComisionReclamacion(new BigDecimal(0.000));
+            versionSolicitud.setImporteMinComisionModificacion(new BigDecimal(0.000));
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de comisiones");
+        }
+    }
+
+    /**
+     * @param listCondicionesCapital
+     * @param versionSolicitud
+     */
+    public void construirInfoCondicionesCapital(List<CondicionCapitalC> listCondicionesCapital, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de condiciones de capital");
+        }
+        if (!(listCondicionesCapital.isEmpty())) {
+            CondicionCapitalC condicionCapital = listCondicionesCapital.get(0);
+            // Modalidad de amortización.
+            String mda = String.format("%1$04d", condicionCapital.getIntModalidadDeAmortizacion());
+            mda = obtenerDescripcionClausulas(Constantes.CTE_CLAVE_MODALIDADES, mda);
+            versionSolicitud.setModalidadAmortizacion(mda);
+            // Razón progresión.
+            versionSolicitud.setRazonProgresion(condicionCapital.getIntRazonProgresion());
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de condiciones de capital");
+        }
+    }
+
+    /**
+     * @param listCondicionesInteres
+     * @param versionSolicitud
+     * @see es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.ComparativaSubproductosSrv#setIntereses
+     */
+    public void construirInfoCondicionesInteres(List<CondicionesInteresC> listCondicionesInteres, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de intereses");
+        }
+        CondicionesInteresC condicionInteres1 = null;
+        CondicionesInteresC condicionInteres2 = null;
+        List<CondicionesInteresC> soloIntereses = new ArrayList<CondicionesInteresC>(0);
+        // Se filtra la lista de intereses y sustitutivos, para capturar solo los intereses
+        for (CondicionesInteresC interes : listCondicionesInteres) {
+            if (Constantes.CTE_CERO.intValue() == interes.getCondicionesInteresKey().getIntTipoCondicion().intValue()) {
+                soloIntereses.add(interes);
+            }
+        }
+        /*EDIT V360144 20140625*/
+        final int numeroIntereses = soloIntereses.size();
+        switch(numeroIntereses) {
+            case 0:
+                {
+                    // Tipo de interés.
+                    versionSolicitud.setTipoInteres(new Mensaje(ServicioNegocio.getContexto(), INTER_S_1958066822).toString());
+                    break;
+                }
+            case 1:
+                {
+                    // condicionInteres1 = listCondicionesInteres.get(0);
+                    condicionInteres1 = soloIntereses.get(Constantes.CTE_CERO);
+                    String tipoInteres1 = condicionInteres1.getStrTipoDeInteres();
+                    // Tipo de interés.
+                    String tipoInteres = obtenerDescripcionTipoInteres(tipoInteres1);
+                    versionSolicitud.setTipoInteres(tipoInteres);
+                    construirInfoCondicionesInteresInicial(condicionInteres1, versionSolicitud);
+                    construitInfoCondicionesInteresVariable(listCondicionesInteres, versionSolicitud);
+                    break;
+                }
+            default:
+                {
+                    // condicionInteres1 = listCondicionesInteres.get(0);
+                    condicionInteres1 = soloIntereses.get(Constantes.CTE_CERO);
+                    String tipoInteres1 = condicionInteres1.getStrTipoDeInteres();
+                    // condicionInteres2 = listCondicionesInteres.get(1);
+                    condicionInteres2 = soloIntereses.get(Constantes.CTE_UNO_INT);
+                    String tipoInteres2 = condicionInteres2.getStrTipoDeInteres();
+                    // Tipo de interés.
+                    String tipoInteres = Constantes.CTE_STRING_EMPTY;
+                    if ((Constantes.CTE_STRING_COD_TRAMO_FIJO.equals(tipoInteres1)) && (Constantes.CTE_STRING_COD_TRAMO_VARIABLE.equals(tipoInteres2))) {
+                        tipoInteres = new Mensaje(ServicioNegocio.getContexto(), VARIABLE_TRAMO_INICIAL_FIJO_519048334).toString();
+                    } else {
+                        CondicionesInteresC condInteresMayorPlazo = buscarInteresMayorPlazo(listCondicionesInteres);
+                        tipoInteres = condInteresMayorPlazo.getStrTipoDeInteres();
+                        tipoInteres = obtenerDescripcionTipoInteres(tipoInteres);
+                    }
+                    versionSolicitud.setTipoInteres(tipoInteres);
+                    construirInfoCondicionesInteresInicial(condicionInteres1, versionSolicitud);
+                    construirInfoCondicionesInteresSucesivo(condicionInteres2, versionSolicitud);
+                    construitInfoCondicionesInteresVariable(listCondicionesInteres, versionSolicitud);
+                    break;
+                }
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de intereses");
+        }
+    }
+
+    /**
+     * Captura el techo y suelo de la lista de intereses
+     * Siempre se capturan los datos del primer tramo variable
+     * @param listCondicionesInteres
+     * @param versionSolicitud
+     */
+    private void construitInfoCondicionesInteresVariable(List<CondicionesInteresC> listCondicionesInteres, ComparativaVersionSolicitudObj versionSolicitud) {
+        boolean encontrado = false;
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de interés variable");
+        }
+        for (CondicionesInteresC interes : listCondicionesInteres) {
+            if (encontrado == false) {
+                String tipoInteres = interes.getStrTipoDeInteres();
+                // Se capturan el suelo y techo en caso de que sea un interés variable
+                if (Constantes.CTE_STRING_COD_TRAMO_VARIABLE.equals(tipoInteres) || Constantes.CTE_STRING_COD_TRAMO_VARIABLE_BONIFICADO.equals(tipoInteres) || Constantes.CTE_STRING_COD_TRAMO_VARIABLE_PENALIZABLE.equals(tipoInteres) || Constantes.CTE_STRING_COD_TRAMO_VARIABLE_DIFERENCIAL_BONIFICADO.equals(tipoInteres)) {
+                    versionSolicitud.setInteresMinimo(interes.getIntSuelo());
+                    versionSolicitud.setInteresMaximo(interes.getIntTecho());
+                    encontrado = true;
+                }
+            }
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de interés variable");
+        }
+    }
+
+    /**
+     * @param condicionesInteres
+     * @param versionSolicitud
+     * @see es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.ComparativaSubproductosSrv#setInteresesINI
+     */
+    private void construirInfoCondicionesInteresInicial(CondicionesInteresC condicionesInteres, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de interés inicial");
+        }
+        String tipoInteres = condicionesInteres.getStrTipoDeInteres();
+        // Constantes.CTE_STRING_COD_TRAMO_FIJO = "00".
+        if (Constantes.CTE_STRING_COD_TRAMO_FIJO.equals(tipoInteres)) {
+            // Tipo referencia inicial.
+            versionSolicitud.setTipoReferenciaInicial(new Mensaje(ServicioNegocio.getContexto(), _0000_FIJO_348629637).toString());
+            // Interés inicial.
+            versionSolicitud.setInteresInicial(condicionesInteres.getIntInteres());
+        } else // Constantes.CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE = "01"
+        if (Constantes.CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE.equals(tipoInteres)) {
+            // Tipo referencia inicial.
+            versionSolicitud.setTipoReferenciaInicial(new Mensaje(ServicioNegocio.getContexto(), _0001_FIJO_REFERENCIADO_128896253).toString());
+            // Interés inicial.
+            versionSolicitud.setInteresInicial(condicionesInteres.getIntInteres());
+        } else {
+            GestionCondicionesInteres gci = new GestionCondicionesInteres();
+            // Búsqueda de la 'Condición Interés Solicitud' inicial.
+            CondicionesInteresKey key = condicionesInteres.getCondicionesInteresKey();
+            // Una 'Condición Interés Solicitud' de tipo Interés siempre tiene prioridad 0.
+            // miguel
+            // key.setIntPrioridad(Constantes.CTE_CERO);
+            // key.setIntTipoCondicion(Constantes.CTE_TIPO_REFERENCIA_INTERES);
+            // CondicionesInteresC condInteresInicial = gci.obtenerCondicionesInteres(key);
+            CondicionesInteresC condInteresInicial = condicionesInteres;
+            if (condInteresInicial != null) {
+                if ((condInteresInicial.getIntTipoReferencia()) != Constantes.CTE_CERO) {
+                    // Tipo referencia inicial.
+                    String tipoReferencia = String.format("%1$04d", condInteresInicial.getIntTipoReferencia());
+                    tipoReferencia = obtenerDescripcionClausulas(Constantes.CTE_CLAVE_TIPO_REF, tipoReferencia);
+                    versionSolicitud.setTipoReferenciaInicial(tipoReferencia);
+                }
+                // Diferencial inicial.
+                versionSolicitud.setDiferencialInicial(condInteresInicial.getIntDif());
+                // Diferencial bonificado.
+                versionSolicitud.setDiferencialBonificado(condInteresInicial.getIntDifBonificado());
+            }
+            // Búsqueda de la 'Condición Interés Solicitud' sustitutivo de prioridad 1.
+            key.setIntPrioridad(Constantes.CTE_UNO_INT);
+            key.setIntTipoCondicion(Constantes.CTE_TIPO_REFERENCIA_SUSTITUTIVO);
+            CondicionesInteresC condInteresSustitutivo = gci.obtenerCondicionesInteres(key);
+            if (condInteresSustitutivo != null) {
+                if ((condInteresSustitutivo.getIntTipoReferencia()) != Constantes.CTE_CERO) {
+                    // Tipo referencia inicial sustitutivo.
+                    String tipoReferencia = String.format("%1$04d", condInteresSustitutivo.getIntTipoReferencia());
+                    tipoReferencia = obtenerDescripcionClausulas(Constantes.CTE_CLAVE_TIPO_REF, tipoReferencia);
+                    versionSolicitud.setTipoReferenciaInicialSustitutivo(tipoReferencia);
+                }
+                // Diferencial inicial sustitutivo.
+                versionSolicitud.setDiferencialInicialSustitutivo(condInteresSustitutivo.getIntDif());
+            }
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de interés inicial");
+        }
+    }
+
+    /**
+     * @param condicionesInteres
+     * @param versionSolicitud
+     * @see es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.ComparativaSubproductosSrv#setInteresesSEC
+     */
+    private void construirInfoCondicionesInteresSucesivo(CondicionesInteresC condicionesInteres, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de interés sucesivo");
+        }
+        String tipoInteres = condicionesInteres.getStrTipoDeInteres();
+        // Constantes.CTE_STRING_COD_TRAMO_FIJO = "00".
+        if (Constantes.CTE_STRING_COD_TRAMO_FIJO.equals(tipoInteres)) {
+            // Tipo referencia sucesivo.
+            versionSolicitud.setTipoReferenciaSucesivo(new Mensaje(ServicioNegocio.getContexto(), _0000_FIJO_348629637).toString());
+            // Interés sucesivo.
+            versionSolicitud.setInteresSucesivo(condicionesInteres.getIntInteres());
+        } else // Constantes.CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE = "01"
+        if (Constantes.CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE.equals(tipoInteres)) {
+            // Tipo referencia sucesivo.
+            versionSolicitud.setTipoReferenciaSucesivo(new Mensaje(ServicioNegocio.getContexto(), _0001_FIJO_REFERENCIADO_128896253).toString());
+            // Interés sucesivo.
+            versionSolicitud.setInteresSucesivo(condicionesInteres.getIntInteres());
+        } else {
+            GestionCondicionesInteres gci = new GestionCondicionesInteres();
+            // Búsqueda de la 'Condición Interés Solicitud' inicial.
+            CondicionesInteresKey key = condicionesInteres.getCondicionesInteresKey();
+            // Una 'Condición Interés Solicitud' de tipo Interés siempre tiene prioridad 0.
+            // miguel
+            // key.setIntPrioridad(Constantes.CTE_CERO);
+            // key.setIntTipoCondicion(Constantes.CTE_TIPO_REFERENCIA_INTERES);
+            // CondicionesInteresC condInteresSucesivo = gci.obtenerCondicionesInteres(key);
+            // miguel
+            CondicionesInteresC condInteresSucesivo = condicionesInteres;
+            if (condInteresSucesivo != null) {
+                if ((condInteresSucesivo.getIntTipoReferencia()) != Constantes.CTE_CERO) {
+                    // Tipo referencia sucesivo.
+                    String tipoReferencia = String.format("%1$04d", condInteresSucesivo.getIntTipoReferencia());
+                    tipoReferencia = obtenerDescripcionClausulas(Constantes.CTE_CLAVE_TIPO_REF, tipoReferencia);
+                    versionSolicitud.setTipoReferenciaSucesivo(tipoReferencia);
+                }
+                // Diferencial sucesivo.
+                versionSolicitud.setDiferencialSucesivo(condInteresSucesivo.getIntDif());
+                if ((versionSolicitud.getInteresMinimo() == null) && (versionSolicitud.getInteresMaximo() == null) && (versionSolicitud.getDiferencialBonificado() == null)) {
+                    // Diferencial bonificado.
+                    versionSolicitud.setDiferencialBonificado(condInteresSucesivo.getIntDifBonificado());
+                }
+            }
+            // Búsqueda de la 'Condición Interés Solicitud' sustitutivo de prioridad 1.
+            key.setIntPrioridad(Constantes.CTE_UNO_INT);
+            key.setIntTipoCondicion(Constantes.CTE_TIPO_REFERENCIA_SUSTITUTIVO);
+            CondicionesInteresC condInteresSustitutivo = gci.obtenerCondicionesInteres(key);
+            if (condInteresSustitutivo != null) {
+                if ((condInteresSustitutivo.getIntTipoReferencia()) != Constantes.CTE_CERO) {
+                    // Tipo referencia sucesivo sustitutivo.
+                    String tipoReferencia = String.format("%1$04d", condInteresSustitutivo.getIntTipoReferencia());
+                    tipoReferencia = obtenerDescripcionClausulas(Constantes.CTE_CLAVE_TIPO_REF, tipoReferencia);
+                    versionSolicitud.setTipoReferenciaSucesivoSustitutivo(tipoReferencia);
+                }
+                // Diferencial sucesivo sustitutivo.
+                versionSolicitud.setDiferencialSucesivoSustitutivo(condInteresSustitutivo.getIntDif());
+            }
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de interés sucesivo");
+        }
+    }
+
+    /**
+     * @param datosSolicitud
+     * @param versionSolicitud
+     */
+    public void construirInfoDatosSolicitud(DatosSolicitudC datosSolicitud, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de solicitud");
+        }
+        // Version solicitud.
+        DatosSolicitudKey key = datosSolicitud.getDatosSolicitudKey();
+        versionSolicitud.setVersionSolicitud(key.getVersionSolicitud());
+        // Fecha solicitud.
+        String fechaSolicitud = DateUtils.formatDate(datosSolicitud.getTimestamp(), DateUtils.FORMATO_FECHA_CORTO);
+        versionSolicitud.setFechaSolicitud(fechaSolicitud);
+        // Usuario.
+        versionSolicitud.setUsuario(datosSolicitud.getUsuario());
+        /*EDIT V360144 20140625*/
+        // CNAE.
+        String cnae = datosSolicitud.getCnae().trim();
+        if (IConstantesTramitacion.CTE_CNAE_FAMILIAS_EUR.equals(cnae)) {
+            cnae = IConstantesTramitacion.CTE_CNAE_FAMILIAS;
+        }
+        if (IConstantesTramitacion.CTE_CNAE_FAMILIAS.equals(cnae.trim())) {
+            cnae = IConstantesTramitacion.CTE_CNAE_FAMILIAS_DESCRIPCION;
+        } else {
+            cnae = obtenerDescripcionClausulas(Constantes.COD_CNAE, cnae);
+        }
+        versionSolicitud.setCNAE(cnae);
+        // Tipo garantía.
+        BigDecimal tipoGarantia = datosSolicitud.getTipoGarantia();
+        versionSolicitud.setTipoGarantia(tipoGarantia);
+        // Garantía oficina.
+        String garantiaOficina = "";
+        if (BigDecimal.ZERO.compareTo(tipoGarantia) == 0) {
+            garantiaOficina = String.format("%1$04d", datosSolicitud.getGarantiaOficina().intValue());
+            garantiaOficina = obtenerDescripcionClausulas(Constantes.COD_CLAUSULA_GARANTIA, garantiaOficina);
+        } else if (BigDecimal.ONE.compareTo(tipoGarantia) == 0) {
+            garantiaOficina = String.format("%1$04d", datosSolicitud.getGarantiaGMR().intValue());
+            garantiaOficina = obtenerDescripcionClausulas("GMR", garantiaOficina);
+        }
+        versionSolicitud.setGarantiaOficina(garantiaOficina);
+        // Sector.
+        String sector = String.format("%1$04d", datosSolicitud.getSector().intValue());
+        sector = obtenerDescripcionClausulas(Constantes.COD_CLAUSULA_SECTOR, sector);
+        versionSolicitud.setSector(sector);
+        // Clase del riesgo.
+        versionSolicitud.setClaseRiesgo(datosSolicitud.getClaseRiesgo());
+        // Importe solicitado.
+        versionSolicitud.setImporteSolicitado(datosSolicitud.getImporteSolicitado());
+        // Importe productos financiar.
+        versionSolicitud.setImporteProductosFinanciar(datosSolicitud.getImporteProductosFinanciar());
+        // Importe total.
+        versionSolicitud.setImporteTotal(datosSolicitud.getImporteTotal());
+        // Plazo total.
+        versionSolicitud.setPlazoTotal(datosSolicitud.getPlazoTotal());
+        // Plazo carencia.
+        versionSolicitud.setPlazoCarencia(datosSolicitud.getPlazoCarencia());
+        // Plazo diferimiento.
+        versionSolicitud.setPlazoDiferimiento(datosSolicitud.getPlazoDiferimiento());
+        // Plazo desembolso.
+        versionSolicitud.setPlazoDesembolso(datosSolicitud.getPlazoDesembolso());
+        // Plazo amortización = Plazo total - Plazo carencia.
+        BigDecimal plazoTotal = datosSolicitud.getPlazoTotal();
+        BigDecimal plazoCarencia = datosSolicitud.getPlazoCarencia();
+        BigDecimal plazoAmortizacion = plazoTotal.subtract(plazoCarencia);
+        versionSolicitud.setPlazoAmortizacion(plazoAmortizacion);
+        // Depósito.
+        versionSolicitud.setDeposito(datosSolicitud.getDeposito());
+        // Porcentaje depósito.
+        versionSolicitud.setPorcentajeDeposito(datosSolicitud.getPorcentajeDeposito());
+        // Importe depósito.
+        versionSolicitud.setImporteDeposito(datosSolicitud.getImporteDeposito());
+        // Condiciones desembolso.
+        versionSolicitud.setCondicionesDesembolso(datosSolicitud.getCondicionDesembolso());
+        // Permite adelantar.
+        versionSolicitud.setPermiteAdelantar(datosSolicitud.getPermiteAdelantar());
+        // Moneda de solicitud
+        versionSolicitud.setMoneda(datosSolicitud.getMonedaImporteSolicitado());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de solicitud");
+        }
+    }
+
+    /**
+     * @param destinos
+     * @param versionSolicitud
+     */
+    public void construirInfoDestino(DestinosC destinos, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de destino");
+        }
+        // Destino.
+        String destino = destinos.getDestino();
+        destino = obtenerDescripcionClausulas(Constantes.COD_CLAUSULA_DESTINO, destino);
+        versionSolicitud.setDestino(destino);
+        // Subdestino.
+        String subdestino = destinos.getSubdestino();
+        subdestino = obtenerDescripcionClausulas(Constantes.COD_SUBDESTINO, subdestino);
+        versionSolicitud.setSubdestino(subdestino);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de destino");
+        }
+    }
+
+    /**
+     * @param subproducto
+     * @param versionSolicitud
+     */
+    public void construirInfoSubproducto(SubProductoC subproducto, ComparativaVersionSolicitudObj versionSolicitud) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Inicio: Construir información de subproducto");
+        }
+        // Código subproducto.
+        BigDecimal codigoSubproducto = new BigDecimal(subproducto.getIdSubproducto());
+        versionSolicitud.setCodigoSubproducto(codigoSubproducto);
+        // Descripción subproducto.
+        versionSolicitud.setDescripcionProducto(subproducto.getDescripcion());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Fin: Construir información de subproducto");
+        }
+    }
+
+    /**
+     * Recupera la descripción de una clave y de un valor sobre la tabla CG32TB01
+     * (Clausulas Restringuidas).
+     *
+     * @param clave
+     * @param valor
+     * @return
+     */
+    public static String obtenerDescripcionClausulas(String clave, String valor) {
+        String descripcion = Constantes.CTE_STRING_EMPTY;
+        ParametrosC param = GestionClausulasRestringuidas.obtenerClausulaGeneral(clave, valor.trim());
+        if (param != null) {
+            descripcion = param.getCG320030();
+        }
+        return descripcion;
+    }
+
+    /**
+     * Devuelve la descripción de un 'Tipo de interés'.
+     *
+     * @param tipoInteres
+     * @return
+     */
+    private String obtenerDescripcionTipoInteres(String tipoInteres) {
+        String descripcion = Constantes.CTE_STRING_EMPTY;
+        if (Constantes.CTE_STRING_COD_TRAMO_FIJO.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), FIJO_3142984).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_FIJO_PENALIZABLE.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), FIJO_CAMPA_AS_1121213115).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_VARIABLE.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), VARIABLE_1249586564).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_VARIABLE_BONIFICADO.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), VARIABLE_BONIFICABLE_1858709010).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_VARIABLE_PENALIZABLE.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), VARIABLE_PENALIZABLE_712625771).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_VARIABLE_DIFERENCIAL_BONIFICADO.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), VARIABLE_CAMPA_AS_1368594439).toString();
+        } else if (Constantes.CTE_STRING_COD_TRAMO_FIJO_REFERENCIADO.equals(tipoInteres)) {
+            descripcion = new Mensaje(ServicioNegocio.getContexto(), FIJO_REFERENCIADO_2130014933).toString();
+        }
+        return descripcion;
+    }
+
+    private static final String FIJO_3142984 = "FIJO_3142984";
+
+    private static final String VARIABLE_1249586564 = "VARIABLE_1249586564";
+
+    private static final String _0000_FIJO_348629637 = "_0000_FIJO_348629637";
+
+    private static final String FIJO_REFERENCIADO_2130014933 = "FIJO_REFERENCIADO_2130014933";
+
+    private static final String VARIABLE_BONIFICABLE_1858709010 = "VARIABLE_BONIFICABLE_1858709010";
+
+    private static final String _0001_FIJO_REFERENCIADO_128896253 = "_0001_FIJO_REFERENCIADO_128896253";
+
+    private static final String FIJO_CAMPA_AS_1121213115 = "FIJO_CAMPA_AS_1121213115";
+
+    private static final String VARIABLE_PENALIZABLE_712625771 = "VARIABLE_PENALIZABLE_712625771";
+
+    private static final String INTER_S_1958066822 = "INTER_S_1958066822";
+
+    private static final String VARIABLE_TRAMO_INICIAL_FIJO_519048334 = "VARIABLE_TRAMO_INICIAL_FIJO_519048334";
+
+    private static final String VARIABLE_CAMPA_AS_1368594439 = "VARIABLE_CAMPA_AS_1368594439";
+}

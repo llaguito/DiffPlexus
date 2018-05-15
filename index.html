@@ -1,18 +1,20 @@
-<!DOCTYPE html>
-<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <html>
 
 <head>
     <meta charset="utf-8">
     <title>Comparador</title>
-    <link rel="stylesheet" href="style.css" />
-    <script type="text/javascript" src="diff.js"></script>
-    <script type="text/javascript" src="archivo.js"></script>
-    <script type="text/javascript" src="general.js"></script>
+    <link rel="stylesheet" href="./css/style.css" />
+    <script type="text/javascript" src="./mapa_resources/diff.js"></script>
+    <script type="text/javascript" src="./mapa_resources/archivo.js"></script>
+    <script type="text/javascript" src="./mapa_resources/general.js"></script>
+    <script type="text/javascript" src="./mapa_resources/jquery-3.3.1.min.js"></script>
 </head>
 
 <body>
+
+    <iframe id="page1" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
+    <iframe id="page2" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
+
     <div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
         <div class="mdl-layout__drawer">
             <span class="mdl-layout-title">Ficheros</span>
@@ -32,7 +34,6 @@
             </table>
         </main>
     </div>
-
 </body>
 
 </html>

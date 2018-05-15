@@ -1,0 +1,1492 @@
+package es.caixagalicia.anpm.prestamos.raroc.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.parametro.ParametroC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.ProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.ProductoEng;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionParametro;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.linea_cuadro_raroc.LineaCuadroRarocC;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.linea_cuadro_raroc.LineaCuadroRarocEng;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.linea_cuadro_raroc.LineaCuadroRarocKey;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.solicitud_raroc.SolicitudRarocC;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.solicitud_raroc.SolicitudRarocEng;
+import es.caixagalicia.anpm.prestamos.raroc.persistencia.solicitud_raroc.SolicitudRarocKey;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.Anpmn424190CTX;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.Anpmn424CTX;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.ComisionAnpmVO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.InteresAnpmVO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.LineaCuadroPtmoVO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.ParametroCg32VO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.ReferenciaRgraVO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.SolicitudAnpmVO;
+import es.caixagalicia.anpm.prestamos.raroc.servicios.valueobject.SolicitudPtmoVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.gastosadic.GastosAdicionalesC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos.ContextoGenerarCuadroAmortizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ComprobacionesGeneracionCuadro;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.GenerarCuadroAmortizacionVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.contextosconversion.FromContextCreator;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.IRegistro;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.mainframe.ctgfacade.CtgFacade;
+import es.caixagalicia.ifrt.parametros.Configuracion;
+import es.caixagalicia.ifrt.util.Helper;
+
+public class SolicitudService {
+
+    // Campos del contexto de ENTRADA/SALIDA que son necesarios rellenar para enviarle al programa que calcula el cuadro de amortización
+    private static final String ID_PROGRAMA_AMORTIZACION = "ANPMR209";
+
+    private static final String ID_CTX_PROGRAMA = "ANPMN425";
+
+    private static final String CTX_COD_PRODUCTO = "ANPMN425010";
+
+    private static final String CTX_COD_SUBP = "ANPMN425020";
+
+    private static final String CTX_VERSION_SUBP = "ANPMN425030";
+
+    private static final String CTX_COLECTIVO = "ANPMN425040";
+
+    private static final String CTX_OFICINA_SOLICITUD = "ANPMN425050";
+
+    private static final String CTX_NUMERO_SOLICITUD = "ANPMN425060";
+
+    private static final String CTX_VERSION_SOLICITUD = "ANPMN425070";
+
+    private static final String CTX_NUC_SOLICITUD = "ANPMN425080";
+
+    private static final String CTX_DIGITO_SOLICITUD = "ANPMN425090";
+
+    private static final String CTX_OPCION = "ANPMN425100";
+
+    private static final String CTX_OPERACION = "ANPMN425110";
+
+    private static final String CTX_IMPORTE_SOLICITADO = "ANPMN425120";
+
+    private static final String CTX_MONEDA_IMPORTE_SOLICITADO = "ANPMN425130";
+
+    private static final String CTX_PLAZO_TOTAL = "ANPMN425140";
+
+    private static final String CTX_UNIDAD_PLAZO_TOTAL = "ANPMN425150";
+
+    private static final String CTX_FECHA_PREV_FORMALIZACION = "ANPMN425160";
+
+    private static final String CTX_TAE = "ANPMN425170";
+
+    private static final String CTX_CREAR_TABLA = "ANPMN425180";
+
+    private static final String CTX_TEST_APTITUD = "ANPMN425190";
+
+    private static final String CTX_CARENCIA_INTERMEDIA = "ANPMN425200";
+
+    private static final String CTX_IMPORTE_PROD_FINANCIAR = "ANPMN425210";
+
+    private static final String CTX_MONEDA_PROD_FINANCIAR = "ANPMN425220";
+
+    private static final String CTX_PLAZO_CARENCIA = "ANPMN425230";
+
+    private static final String CTX_UNIDAD_PLAZO_CARENCIA = "ANPMN425240";
+
+    private static final String CTX_INDICADOR_FECHA_PAGO = "ANPMN425250";
+
+    private static final String CTX_DIA_PAGO = "ANPMN425260";
+
+    private static final String CTX_MES_PAGO = "ANPMN425270";
+
+    private static final String CTX_INDICADOR_FECHA_LIQUIDACION = "ANPMN425280";
+
+    private static final String CTX_INDICADOR_USO_FESTIVOS = "ANPMN425290";
+
+    private static final String CTX_REG_ANPMN420 = "ANPMN425300";
+
+    private static final String CTX_REG_ANPMN421 = "ANPMN425400";
+
+    private static final String CTX_REG_ANPMN422 = "ANPMN425500";
+
+    private static final String CTX_REG_ANPMN423 = "ANPMN425600";
+
+    private static final String CTX_ESPECIALIDAD = "ANPMN425700";
+
+    private static final String CTX_GARANTIA_OFICINA = "ANPMN425705";
+
+    private static final String CTX_TIPO_EXPEDIENTE = "ANPMN425710";
+
+    private static final String CTX_FECHA_SCORING_DEFINITIVA = "ANPMN425715";
+
+    private static final String CTE_PLAZO_DIFERIMIENTO = "ANPMN425920";
+
+    private static final String CTE_TIPO_DIFERIMIENTO = "ANPMN425925";
+
+    private static final String CTX_NUMERO_CUOTAS = "ANPMN425740";
+
+    private static final String CTX_MATRIZ_PAGOS = "ANPMN425770";
+
+    private static final String CTX_IND_MAS_ELEMENTOS_MATRIZ = "ANPMN425895";
+
+    private static final String CTX_FECHA_REPOSIC_SI_RELLAMADA = "ANPMN425900";
+
+    private static final String CTX_SECTOR = "ANPMN425930";
+
+    private static final String CTX_DESTINO = "ANPMN425935";
+
+    private static final String CTX_MODALIDAD_DE_INTERES = "ANPMN425940";
+
+    private static final String CTX_IND_FINAN_COMIS_APER = "ANPMN425950";
+
+    private static final String CTX_IND_FINANCIAR_GASTOS_ESTUDIO = "ANPMN425960";
+
+    private static final String CTX_IND_DIA_SALTO = "ANPMN425970";
+
+    private static final String CTX_IND_IND_CALC_FIN_MES = "ANPMN425980";
+
+    /*Constantes para el parámetro de configuración ANPMCFG_LLAMADAMETODO_ALTAAUTOGENDOCS*/
+    public static final String CTE_APLICACION_ANPM = "ANPM";
+
+    public static final String CTE_GRUPO_CONFIG_LLAMADAMETODO = "LLAMADAMETODO";
+
+    public static final String CTE_PARAM_CONFIG_GUARDARHISTGENCUADRO = "GUARDARHISTGENCUADRO";
+
+    public static final String CTE_PARAM_CONFIG_GUARDARHISTGENCUADROCOLS = "GUARDARHISTGENCUADROCOLS";
+
+    public static final String CTE_PARAM_CONFIG_COMPRCUADROAMORT = "COMPRCUADROAMORT";
+
+    // Constante con la longitud del registro de amortización de pagos
+    private static final Integer LONGITUD_RGTRO_AMORT_PAGOS = Integer.valueOf(200);
+
+    // Definimos un campo necesario de dentro de la matriz
+    private static final String CTX_REG_MATRIZ_FECHA_PAGO = "ANPMN425772";
+
+    private Date fechaCarga;
+
+    public SolicitudService() {
+        fechaCarga = null;
+    }
+
+    public SolicitudRarocC buscarSolicitud(BigDecimal nucExpediente, BigDecimal numeroEjecucion, BigDecimal agrupacion, BigDecimal tipoExpediente, BigDecimal iteracion, BigDecimal modo, BigDecimal prescriptor) {
+        SolicitudRarocEng solicitudRarocEng = new SolicitudRarocEng();
+        LineaCuadroRarocEng lineaCuadroRarocEng = new LineaCuadroRarocEng();
+        FactoresActualizacionService factoresActualizacionService = new FactoresActualizacionService();
+        List<LineaCuadroRarocC> cuadroRarocC = new ArrayList<LineaCuadroRarocC>();
+        /*
+		BigDecimal incInteres = new BigDecimal(Configuracion.getInstance().getValor("ANPM", "RAROC", "INCREMENTO_INTERES"));
+		incInteres = incInteres.multiply(iteracion);
+		
+		BigDecimal incApertura = new BigDecimal(Configuracion.getInstance().getValor("ANPM", "RAROC", "INCREMENTO_APERTURA"));
+		incApertura = incApertura.multiply(iteracion);*/
+        BigDecimal incInteres = BigDecimal.ZERO;
+        BigDecimal incApertura = BigDecimal.ZERO;
+        if (BigDecimal.ZERO.compareTo(iteracion) != 0) {
+            incInteres = new BigDecimal(Configuracion.getInstance().getValor("ANPM", "RAROC_INCREMENTO", iteracion.toString()));
+            incInteres = incInteres.divide(new BigDecimal(100)).add(BigDecimal.ONE);
+            incApertura = incInteres;
+        }
+        boolean repreciar = (Configuracion.getInstance().getValor("ANPM", "RAROC", "REPRECIAR").equals("S"));
+        String paramGrabarLog = Configuracion.getInstance().getValor("ANPM", "RAROC", "GRABAR_LOG");
+        boolean grabarLog = "S".equals(paramGrabarLog);
+        if (null == modo) {
+            modo = new BigDecimal(Configuracion.getInstance().getValor("ANPM", "RAROC", "MODO"));
+        }
+        SolicitudRarocC solicitudRarocCero = solicitudRarocEng.findById(new SolicitudRarocKey(nucExpediente, numeroEjecucion, BigDecimal.ZERO));
+        SolicitudRarocC solicitudRarocC = null;
+        if (BigDecimal.ZERO.equals(modo) || BigDecimal.ZERO.equals(iteracion)) {
+            if (new BigDecimal(1).equals(agrupacion)) {
+                solicitudRarocC = buscarSolicitudPTMO(nucExpediente, numeroEjecucion, iteracion, incInteres, incApertura);
+            }
+            if (new BigDecimal(30).equals(agrupacion)) {
+                solicitudRarocC = buscarSolicitudANPM(nucExpediente, numeroEjecucion, iteracion, incInteres, incApertura, prescriptor);
+            }
+            solicitudRarocC.setId(new SolicitudRarocKey(nucExpediente, numeroEjecucion, iteracion));
+            solicitudRarocC.setAgrupacion(agrupacion);
+            solicitudRarocC.setTipoExpediente(tipoExpediente);
+            solicitudRarocC.setModo(modo);
+            if (BigDecimal.ZERO.compareTo(solicitudRarocC.getBonificacion()) != 0) {
+                BigDecimal bonificacionTeorica = BigDecimal.ZERO;
+                if (0 == new BigDecimal(11).compareTo(solicitudRarocC.getReferencia())) {
+                    bonificacionTeorica = solicitudRarocC.getDiferencial().subtract(solicitudRarocC.getInteresInicial());
+                } else {
+                    bonificacionTeorica = solicitudRarocC.getInteresInicialMaximo().subtract(solicitudRarocC.getInteresInicial());
+                }
+                if (bonificacionTeorica.compareTo(solicitudRarocC.getBonificacion()) > 0) {
+                    bonificacionTeorica = solicitudRarocC.getBonificacion();
+                }
+                if (BigDecimal.ZERO.compareTo(bonificacionTeorica) > 0) {
+                    bonificacionTeorica = BigDecimal.ZERO;
+                }
+                // BigDecimal diferencialBonificado = solicitudRarocC.getDiferencial().subtract(bonificacionTeorica);
+                // solicitudRarocC.setDiferencial (diferencialBonificado);
+                // BigDecimal interesBonificado = solicitudRarocC.getInteresInicial().subtract(solicitudRarocC.getBonificacion());
+                // solicitudRarocC.setInteresInicial(interesBonificado);
+                solicitudRarocC.setBonificacion(bonificacionTeorica);
+                if (BigDecimal.ZERO.compareTo(bonificacionTeorica) < 0) {
+                    aplicarBonificacion(solicitudRarocC, bonificacionTeorica);
+                }
+            }
+        } else {
+            solicitudRarocC = simularIncremento(nucExpediente, numeroEjecucion, iteracion, incInteres, incApertura, solicitudRarocCero);
+        }
+        if (new BigDecimal(2).compareTo(solicitudRarocC.getEstado()) != 0 && new BigDecimal(3).compareTo(solicitudRarocC.getEstado()) != 0 && new BigDecimal(7).compareTo(solicitudRarocC.getEstado()) != 0) {
+            ServicioNegocio.rollback(new Integer(13195), null, new String[] { solicitudRarocC.getEstado().toString() }, null);
+        }
+        if (null != solicitudRarocC) {
+            if (new BigDecimal(11).compareTo(solicitudRarocC.getReferencia()) == 0) {
+                solicitudRarocC.setMesesPeriodicidadRevisio(BigDecimal.ZERO);
+            } else {
+                if (repreciar && BigDecimal.ZERO.compareTo(solicitudRarocC.getReferencia()) != 0) {
+                    repreciarCuadro(solicitudRarocC);
+                }
+            }
+            if ("USD".equals(solicitudRarocC.getDivisa())) {
+                BigDecimal fixing = consultarFixing(solicitudRarocC.getDivisa(), ServicioNegocio.getContexto().getCodigoContable());
+                solicitudRarocC.setFixing(fixing);
+            }
+            solicitudRarocC.periodifica();
+            List actualizables = new ArrayList<Actualizable>();
+            actualizables.addAll(solicitudRarocC.getCuadroAmortizacion());
+            if (null == solicitudRarocCero || BigDecimal.ZERO.compareTo(iteracion) == 0) {
+                factoresActualizacionService.cargarFactores(actualizables, solicitudRarocC.getDivisa());
+            } else {
+                cargarFactores(actualizables, solicitudRarocCero.getCuadroAmortizacion());
+            }
+            cuadroRarocC.addAll(actualizables);
+            solicitudRarocC.setCuadroAmortizacion(cuadroRarocC);
+        }
+        if (grabarLog || BigDecimal.ONE.equals(modo) || BigDecimal.ZERO.equals(iteracion)) {
+            SolicitudRarocC solicitudRarocCD = solicitudRarocEng.buscarUltIteracion(nucExpediente, numeroEjecucion);
+            if (null != solicitudRarocCD) {
+                solicitudRarocCD.delete();
+                lineaCuadroRarocEng.borrarCuadro(nucExpediente, numeroEjecucion, solicitudRarocCD.getId().getIteracion());
+            }
+            if (BigDecimal.ZERO.compareTo(solicitudRarocC.getId().getIteracion()) == 0) {
+                solicitudRarocCD = solicitudRarocEng.findById(new SolicitudRarocKey(nucExpediente, numeroEjecucion, solicitudRarocC.getId().getIteracion()));
+                if (null != solicitudRarocCD) {
+                    solicitudRarocCD.delete();
+                    lineaCuadroRarocEng.borrarCuadro(nucExpediente, numeroEjecucion, solicitudRarocCD.getId().getIteracion());
+                }
+            }
+            solicitudRarocC.persist();
+            cuadroRarocC = solicitudRarocC.getCuadroAmortizacion();
+            int i = 0;
+            int batchSize = lineaCuadroRarocEng.getBatchSize();
+            for (LineaCuadroRarocC l : cuadroRarocC) {
+                lineaCuadroRarocEng.persist(l, false);
+                i++;
+                if ((i % batchSize) == 0) {
+                    lineaCuadroRarocEng.flush();
+                    lineaCuadroRarocEng.clear();
+                }
+            }
+            lineaCuadroRarocEng.flush();
+            lineaCuadroRarocEng.clear();
+        }
+        return solicitudRarocC;
+    }
+
+    public void cargarFactores(List<Actualizable> actualizable, List<LineaCuadroRarocC> cuadroRarocCCero) {
+        for (int i = 0; i < cuadroRarocCCero.size(); i++) {
+            actualizable.get(i).setFactorActualizacionN(cuadroRarocCCero.get(i).getFactorActualizacion());
+        }
+    }
+
+    public SolicitudRarocC buscarSolicitudPTMO(BigDecimal nucExpediente, BigDecimal numeroEjecucion, BigDecimal iteracion, BigDecimal incInteres, BigDecimal incApertura) {
+        SolicitudPtmoVO solicitudPtmoVO = new SolicitudPtmoVO();
+        SolicitudRarocEng solicitudRarocEng = new SolicitudRarocEng();
+        LineaCuadroRarocEng lineaCuadroRarocEng = new LineaCuadroRarocEng();
+        SolicitudRarocC solicitudRarocC = solicitudRarocEng.createNewObject();
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), Integer.valueOf(500), Integer.valueOf(27));
+        entrada.addCampo("OPCION", "N");
+        entrada.addCampo("NUC_EXPEDIENTE", nucExpediente);
+        entrada.addCampo("INC_INTERES", incInteres);
+        entrada.addCampo("INC_APERTURA", incApertura);
+        IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        if (null != salida && salida.length > 0) {
+            FromContextCreator fccre = new FromContextCreator(SolicitudPtmoVO.class);
+            fccre.loadObject(salida[0], solicitudPtmoVO);
+        }
+        solicitudRarocC.setCuentaContable(new BigDecimal(500));
+        solicitudRarocC.setPrincipal(solicitudPtmoVO.getPrincipal());
+        solicitudRarocC.setDivisa(Constantes.COD_MONEDA_DEFECTO);
+        solicitudRarocC.setCarencia(solicitudPtmoVO.getCarencia());
+        solicitudRarocC.setPlazo(solicitudPtmoVO.getPlazo());
+        solicitudRarocC.setComisionApertura(solicitudPtmoVO.getComisionApertura());
+        solicitudRarocC.setGastosEstudio(solicitudPtmoVO.getGastosEstudio());
+        solicitudRarocC.setComisionAmpliacion(solicitudPtmoVO.getComisionAmpliacion());
+        solicitudRarocC.setComisionSubrogacion(solicitudPtmoVO.getComisionSubrogacion());
+        solicitudRarocC.setComisionModificacion(solicitudPtmoVO.getComisionModificacion());
+        solicitudRarocC.setComisionPrescriptor(BigDecimal.ZERO);
+        solicitudRarocC.setInteresInicial(solicitudPtmoVO.getInteresActual());
+        solicitudRarocC.setDiferencial(solicitudPtmoVO.getInteresDiferencial());
+        solicitudRarocC.setTipoReferencia(solicitudPtmoVO.getInteresReferenciaCuadro());
+        solicitudRarocC.setReferencia(solicitudPtmoVO.getReferencia());
+        solicitudRarocC.setMesesInicial(solicitudPtmoVO.getMesesInteresInicial());
+        solicitudRarocC.setMesesPeriodicidadRevisio(solicitudPtmoVO.getPeriodicidadRevision());
+        solicitudRarocC.setGarantiaMayoritaria(solicitudPtmoVO.getGarantiaMayoritaria());
+        solicitudRarocC.setProducto(solicitudPtmoVO.getProducto());
+        solicitudRarocC.setSubProducto(solicitudPtmoVO.getSubProducto());
+        solicitudRarocC.setTarifa(solicitudPtmoVO.getTarifa());
+        solicitudRarocC.setConvenio(solicitudPtmoVO.getConvenio());
+        solicitudRarocC.setLineaConvenio(solicitudPtmoVO.getLineaConvenio());
+        solicitudRarocC.setEstado(solicitudPtmoVO.getEstado());
+        solicitudRarocC.setMesesPeriodicidadInteres(solicitudPtmoVO.getPeriodicidadInteres());
+        solicitudRarocC.setComisionAmortizacion(BigDecimal.ZERO);
+        if (new BigDecimal(11).compareTo(solicitudRarocC.getReferencia()) == 0) {
+            solicitudRarocC.setDiferencial(solicitudPtmoVO.getInteresMaximo());
+            solicitudRarocC.setTipoReferencia(BigDecimal.ZERO);
+        }
+        if (BigDecimal.ZERO.compareTo(solicitudPtmoVO.getInteresActual()) == 0) {
+            solicitudRarocC.setInteresCero("S");
+        } else {
+            solicitudRarocC.setInteresCero("N");
+        }
+        solicitudRarocC.setBonificacion(solicitudPtmoVO.getBonificacion());
+        solicitudRarocC.setInteresInicialMaximo(solicitudPtmoVO.getInteresInicialMaximo());
+        List<LineaCuadroPtmoVO> cuadroPtmoVO = solicitudPtmoVO.getCuadroAmortizacion();
+        List<LineaCuadroRarocC> cuadroRarocC = new ArrayList<LineaCuadroRarocC>();
+        if (null != cuadroPtmoVO) {
+            for (LineaCuadroPtmoVO l : cuadroPtmoVO) {
+                LineaCuadroRarocC lineaCuadroRarocC = lineaCuadroRarocEng.createNewObject();
+                lineaCuadroRarocC.setLineaCuadroPtmoVO(l);
+                lineaCuadroRarocC.setId(new LineaCuadroRarocKey(nucExpediente, numeroEjecucion, l.getFechaPago(), iteracion));
+                lineaCuadroRarocC.setReferencia(BigDecimal.ZERO);
+                cuadroRarocC.add(lineaCuadroRarocC);
+            }
+            solicitudRarocC.setCuadroAmortizacion(cuadroRarocC);
+        }
+        return solicitudRarocC;
+    }
+
+    public SolicitudRarocC buscarSolicitudANPM(BigDecimal nucExpediente, BigDecimal numeroEjecucion, BigDecimal iteracion, BigDecimal incInteres, BigDecimal incApertura, BigDecimal codigoPrescriptor) {
+        MathContext mc = new MathContext(7, RoundingMode.HALF_UP);
+        SolicitudAnpmVO solicitudAnpmVO = new SolicitudAnpmVO();
+        SolicitudRarocEng solicitudRarocEng = new SolicitudRarocEng();
+        final GestionDatosSolicitud gs = new GestionDatosSolicitud();
+        LineaCuadroRarocEng lineaCuadroRarocEng = new LineaCuadroRarocEng();
+        SolicitudRarocC solicitudRarocC = solicitudRarocEng.createNewObject();
+        DatosSolicitudC datosSolicitudC = gs.getUltimaVersion(nucExpediente);
+        if (null == datosSolicitudC) {
+            // Solicitud no existe
+            ServicioNegocio.rollback(12001, null, new String[] { nucExpediente.toString() }, null);
+        }
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), Integer.valueOf(507), Integer.valueOf(401));
+        entrada.addCampo("NUC", nucExpediente);
+        entrada.addCampo("IND_CUADRO_AMORT", "N");
+        IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        if (null != salida && salida.length > 0) {
+            FromContextCreator fccre = new FromContextCreator(SolicitudAnpmVO.class);
+            fccre.loadObject(salida[0], solicitudAnpmVO);
+        }
+        solicitudRarocC.setCuentaContable(new BigDecimal(507));
+        solicitudRarocC.setPrincipal(datosSolicitudC.getImporteTotal());
+        solicitudRarocC.setDivisa(datosSolicitudC.getMonedaImporteSolicitado());
+        solicitudRarocC.setCarencia(datosSolicitudC.getPlazoCarencia());
+        solicitudRarocC.setPlazo(datosSolicitudC.getPlazoTotal());
+        solicitudRarocC.setComisionAmpliacion(BigDecimal.ZERO);
+        BigDecimal comisionPrescriptor = calcularComisionPrescriptor(datosSolicitudC.getProducto(), datosSolicitudC.getSubproducto(), codigoPrescriptor, datosSolicitudC.getImporteTotal());
+        solicitudRarocC.setComisionPrescriptor(comisionPrescriptor);
+        solicitudRarocC.setTipoReferencia(datosSolicitudC.getBidImporte1());
+        solicitudRarocC.setProducto(datosSolicitudC.getProducto());
+        solicitudRarocC.setSubProducto(datosSolicitudC.getSubproducto());
+        solicitudRarocC.setTarifa(datosSolicitudC.getIdTarifa());
+        solicitudRarocC.setConvenio(BigDecimal.ZERO);
+        solicitudRarocC.setLineaConvenio(datosSolicitudC.getLineaColectivo());
+        solicitudRarocC.setEstado(datosSolicitudC.getEstadoSolicitud());
+        if (null != solicitudAnpmVO.getGarantiaMayoritaria()) {
+            solicitudRarocC.setGarantiaMayoritaria(solicitudAnpmVO.getGarantiaMayoritaria().toString());
+        }
+        if (BigDecimal.ZERO.compareTo(datosSolicitudC.getTipoGarantia()) == 0) {
+            ParametroCg32VO parametroCg32VO = new ParametroCg32VO();
+            entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), Integer.valueOf(100), Integer.valueOf(373));
+            entrada.addCampo(0, "C");
+            entrada.addCampo(1, "DGA");
+            entrada.addCampo(2, datosSolicitudC.getGarantiaContable().toString().concat("01"));
+            salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+            if (null != salida && salida.length > 0) {
+                FromContextCreator fccre = new FromContextCreator(ParametroCg32VO.class);
+                fccre.loadObject(salida[0], parametroCg32VO);
+            }
+            if (Helper.isNullOrEmpty(parametroCg32VO.getDescripcion4())) {
+                solicitudRarocC.setGarantiaMayoritaria("6099");
+            }
+        }
+        solicitudRarocC.setMesesInicial(BigDecimal.ZERO);
+        solicitudRarocC.setMesesPeriodicidadRevisio(BigDecimal.ZERO);
+        solicitudRarocC.setMesesPeriodicidadInteres(BigDecimal.ZERO);
+        solicitudRarocC.setInteresInicial(BigDecimal.ZERO);
+        solicitudRarocC.setInteresInicial(BigDecimal.ZERO);
+        solicitudRarocC.setDiferencial(BigDecimal.ZERO);
+        solicitudRarocC.setReferencia(BigDecimal.ZERO);
+        solicitudRarocC.setInteresCero("S");
+        Anpmn424CTX anpmn424CTX = new Anpmn424CTX();
+        salida = generarCuadro("2", datosSolicitudC.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitudC.getDatosSolicitudKey().getNumSolicitud(), datosSolicitudC.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitudC.getDatosSolicitudKey().getNucExpediente(), datosSolicitudC.getDigitoSolicitud(), "0", BigDecimal.ZERO, "N", "N", incInteres);
+        if (null != salida && salida.length > 0) {
+            FromContextCreator fccre = new FromContextCreator(Anpmn424CTX.class);
+            fccre.loadObject(salida[0], anpmn424CTX);
+        }
+        solicitudRarocC.setBonificacion(BigDecimal.ZERO);
+        solicitudRarocC.setTipoReferencia(anpmn424CTX.getPorcReferenciaActual());
+        for (InteresAnpmVO interes : solicitudAnpmVO.getIntereses()) {
+            if (BigDecimal.ZERO.compareTo(interes.getInteres()) != 0) {
+                solicitudRarocC.setInteresCero("N");
+            }
+            if (BigDecimal.ONE.equals(interes.getTramo())) {
+                solicitudRarocC.setMesesInicial(interes.getPlazo());
+                solicitudRarocC.setMesesPeriodicidadInteres(interes.getPeriodicidad());
+                if ("00".equals(interes.getTipo())) {
+                    if (1 == solicitudAnpmVO.getIntereses().size() && BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                        solicitudRarocC.setInteresInicial(interes.getInteres().multiply(incInteres));
+                    } else {
+                        solicitudRarocC.setInteresInicial(interes.getInteres());
+                    }
+                }
+                if ("02".equals(interes.getTipo())) {
+                    solicitudRarocC.setInteresInicial(interes.getDiferencial().add(solicitudRarocC.getTipoReferencia()));
+                }
+            }
+            if (new BigDecimal(2).equals(interes.getTramo())) {
+                if ("03".equals(interes.getTipo())) {
+                    BigDecimal bonificacion = consultarBonificacion(solicitudAnpmVO.getNucExpediente(), solicitudAnpmVO.getCodigoProducto(), solicitudAnpmVO.getCodigoSubProducto(), solicitudAnpmVO.getIdTarifa(), solicitudAnpmVO.getVersionGeneral());
+                    solicitudRarocC.setBonificacion(bonificacion);
+                }
+                if ("02".equals(interes.getTipo()) || "03".equals(interes.getTipo())) {
+                    solicitudRarocC.setReferencia(interes.getReferencia());
+                    solicitudRarocC.setMesesPeriodicidadRevisio(interes.getNumPeriodosRev());
+                    if ("03".equals(interes.getTipo()) && new BigDecimal("11").compareTo(interes.getReferencia()) == 0) {
+                        if (BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                            solicitudRarocC.setDiferencial(interes.getTecho().multiply(incInteres));
+                        } else {
+                            solicitudRarocC.setDiferencial(interes.getTecho());
+                        }
+                    } else {
+                        if (BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                            solicitudRarocC.setDiferencial(interes.getDiferencial().multiply(incInteres));
+                        } else {
+                            solicitudRarocC.setDiferencial(interes.getDiferencial());
+                        }
+                    }
+                }
+            }
+        }
+        if (BigDecimal.ZERO.compareTo(solicitudRarocC.getInteresInicial()) != 0 || BigDecimal.ZERO.compareTo(solicitudRarocC.getDiferencial()) != 0) {
+            solicitudRarocC.setInteresCero("N");
+        }
+        IDatosEntradaTx entrada048 = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), Integer.valueOf(507), Integer.valueOf(48));
+        entrada048.addCampo("Codigo_producto", datosSolicitudC.getProducto());
+        entrada048.addCampo("Codigo_subproducto", datosSolicitudC.getSubproducto());
+        entrada048.addCampo("Colectivo", datosSolicitudC.getLineaColectivo());
+        entrada048.addCampo("Version_general", datosSolicitudC.getVersionGeneral());
+        entrada048.addCampo("ID_TARIFA", datosSolicitudC.getIdTarifa());
+        entrada048.addCampo("PLAZO", datosSolicitudC.getPlazoTotal().toString());
+        entrada048.addCampo("ORIGEN", BigDecimal.ONE);
+        entrada048.addCampo("NUC", nucExpediente);
+        entrada048.addCampo("COD_COLECTIVO", datosSolicitudC.getIdColectivo());
+        entrada048.addCampo("IMPORTE", datosSolicitudC.getImporteTotal());
+        IContexto[] salida048 = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada048);
+        IContexto[] ctx014 = UtilidadesTramitacion.getContextos(salida048, "ANPMN014");
+        BigDecimal interesInicialMaximo = solicitudRarocC.getInteresInicial();
+        for (IContexto dat014 : ctx014) {
+            if (1 == dat014.getBigDecimal("ANPMN014060").intValue()) {
+                if (0 == BigDecimal.ZERO.compareTo(dat014.getBigDecimal("ANPMN014150"))) {
+                    interesInicialMaximo = dat014.getBigDecimal("ANPMN014170");
+                } else {
+                    interesInicialMaximo = dat014.getBigDecimal("ANPMN014150");
+                }
+            }
+        }
+        solicitudRarocC.setInteresInicialMaximo(interesInicialMaximo);
+        solicitudRarocC.setComisionApertura(BigDecimal.ZERO);
+        solicitudRarocC.setGastosEstudio(BigDecimal.ZERO);
+        solicitudRarocC.setComisionSubrogacion(BigDecimal.ZERO);
+        solicitudRarocC.setComisionModificacion(BigDecimal.ZERO);
+        for (ComisionAnpmVO comision : solicitudAnpmVO.getComisiones()) {
+            if (Constantes.TIPO_COMISION_APERTURA.equals(comision.getTipoComision())) {
+                if ("S".equals(solicitudRarocC.getInteresCero())) {
+                    if (BigDecimal.ZERO.compareTo(comision.getPorcentajeComision()) == 0 && BigDecimal.ZERO.compareTo(incApertura) != 0) {
+                        BigDecimal comisionApertura = comision.getImporteMinimo().divide(datosSolicitudC.getImporteTotal(), mc);
+                        comisionApertura = comisionApertura.multiply(new BigDecimal(100), mc);
+                        comision.setPorcentajeComision(comisionApertura);
+                    }
+                    comision.setPorcentajeComision(comision.getPorcentajeComision().multiply(incApertura));
+                }
+                solicitudRarocC.setComisionApertura(calcularComision(datosSolicitudC.getImporteTotal(), comision.getPorcentajeComision(), comision.getImporteMinimo()));
+            }
+            if (Constantes.TIPO_COMISION_ESTUDIO.equals(comision.getTipoComision())) {
+                solicitudRarocC.setGastosEstudio(calcularComision(datosSolicitudC.getImporteTotal(), comision.getPorcentajeComision(), comision.getImporteMinimo()));
+            }
+            if (Constantes.TIPO_COMISION_SUBROGACION_TERCERO.equals(comision.getTipoComision())) {
+                solicitudRarocC.setComisionSubrogacion(calcularComision(datosSolicitudC.getImporteTotal(), comision.getPorcentajeComision(), comision.getImporteMinimo()));
+            }
+            if (Constantes.TIPO_COMISION_MODIF_COND.equals(comision.getTipoComision())) {
+                solicitudRarocC.setComisionModificacion(calcularComision(datosSolicitudC.getImporteTotal(), comision.getPorcentajeComision(), comision.getImporteMinimo()));
+            }
+        }
+        solicitudRarocC.setComisionAmortizacion(BigDecimal.ZERO);
+        List<Anpmn424190CTX> cuadroAnpm = anpmn424CTX.getCuadroAmortizacion();
+        List<LineaCuadroRarocC> cuadroRarocC = new ArrayList<LineaCuadroRarocC>();
+        if (null != cuadroAnpm) {
+            LineaCuadroRarocC lineaCuadroRarocC = null;
+            for (Anpmn424190CTX l : cuadroAnpm) {
+                if (null != lineaCuadroRarocC && DateHelper.stringASqlDate(l.getFechaPago(), DateHelper.FORMATO_DD_MM_YYYY_GUION).equals(lineaCuadroRarocC.getId().getFechaPago())) {
+                    lineaCuadroRarocC.setImporteInteres(lineaCuadroRarocC.getImporteInteres().add(l.getInteres()));
+                    lineaCuadroRarocC.setImporteCapital(lineaCuadroRarocC.getImporteCapital().add(l.getCapital()));
+                    if (null != lineaCuadroRarocC.getCapitalPendiente()) {
+                        lineaCuadroRarocC.setCapitalPendienteAntes(lineaCuadroRarocC.getCapitalPendiente().add(lineaCuadroRarocC.getImporteCapital()));
+                    }
+                    lineaCuadroRarocC.setCuota(lineaCuadroRarocC.getCuota().add(l.getTotal()));
+                } else {
+                    lineaCuadroRarocC = lineaCuadroRarocEng.createNewObject();
+                    lineaCuadroRarocC.setImporteCapital(l.getCapital());
+                    lineaCuadroRarocC.setImporteInteres(l.getInteres());
+                    lineaCuadroRarocC.setCapitalPendienteAntes(l.getCapitalPendiente().add(l.getCapital()));
+                    lineaCuadroRarocC.setCapitalPendiente(l.getCapitalPendiente());
+                    lineaCuadroRarocC.setCuota(l.getTotal());
+                    lineaCuadroRarocC.setSubvenciones(BigDecimal.ZERO);
+                    lineaCuadroRarocC.setComisionesNoFinancieras(BigDecimal.ZERO);
+                    lineaCuadroRarocC.setId(new LineaCuadroRarocKey(nucExpediente, numeroEjecucion, DateHelper.stringASqlDate(l.getFechaPago(), DateHelper.FORMATO_DD_MM_YYYY_GUION), iteracion));
+                    lineaCuadroRarocC.setReferencia(BigDecimal.ZERO);
+                    cuadroRarocC.add(lineaCuadroRarocC);
+                }
+            }
+            solicitudRarocC.setCuadroAmortizacion(cuadroRarocC);
+        }
+        return (solicitudRarocC);
+    }
+
+    public SolicitudRarocC simularIncremento(BigDecimal nucExpediente, BigDecimal numeroEjecucion, BigDecimal iteracion, BigDecimal incInteres, BigDecimal incApertura, SolicitudRarocC solicitudRarocCCero) {
+        SolicitudRarocEng solicitudRarocEng = new SolicitudRarocEng();
+        LineaCuadroRarocEng lineaCuadroRarocEng = new LineaCuadroRarocEng();
+        SolicitudRarocC solicitudRarocC = solicitudRarocEng.createNewObject();
+        solicitudRarocC.setSolicitudRarocC(solicitudRarocCCero);
+        BigDecimal prcIntSolicitud = BigDecimal.ZERO;
+        BigDecimal prcIntSimular = BigDecimal.ZERO;
+        BigDecimal prcDifSolicitud = BigDecimal.ZERO;
+        BigDecimal prcDifSimular = BigDecimal.ZERO;
+        BigDecimal prcComisApertura = BigDecimal.ZERO;
+        BigDecimal impComisApertura = BigDecimal.ZERO;
+        MathContext mc = new MathContext(7, RoundingMode.HALF_UP);
+        if ("S".equals(solicitudRarocC.getInteresCero())) {
+            prcComisApertura = solicitudRarocC.getComisionApertura().divide(solicitudRarocC.getPrincipal(), mc);
+            impComisApertura = solicitudRarocC.getComisionApertura().divide(prcComisApertura, mc);
+            prcComisApertura = prcComisApertura.add(incApertura.divide(new BigDecimal(100), mc));
+            impComisApertura = impComisApertura.multiply(prcComisApertura, mc);
+            solicitudRarocC.setComisionApertura(impComisApertura);
+        } else {
+            if (BigDecimal.ZERO.compareTo(solicitudRarocC.getReferencia()) == 0) {
+                prcIntSolicitud = solicitudRarocCCero.getInteresInicial();
+                prcIntSimular = solicitudRarocCCero.getInteresInicial().add(incInteres);
+                solicitudRarocC.setInteresInicial(prcIntSimular);
+            } else {
+                prcDifSolicitud = solicitudRarocCCero.getDiferencial();
+                prcDifSimular = solicitudRarocCCero.getDiferencial().add(incInteres);
+                solicitudRarocC.setDiferencial(prcDifSimular);
+            }
+        }
+        List<LineaCuadroRarocC> cuadroRarocC = new ArrayList<LineaCuadroRarocC>();
+        int i = 0;
+        for (LineaCuadroRarocC l : solicitudRarocCCero.getCuadroAmortizacion()) {
+            i++;
+            LineaCuadroRarocC ln = lineaCuadroRarocEng.createNewObject();
+            ln.setLineaCuadroRarocC(l);
+            ln.getId().setIteracion(iteracion);
+            if (!"S".equals(solicitudRarocC.getInteresCero())) {
+                BigDecimal impIntereses = BigDecimal.ZERO;
+                if (BigDecimal.ZERO.compareTo(solicitudRarocC.getReferencia()) == 0) {
+                    impIntereses = ln.getImporteInteres().divide(prcIntSolicitud, mc);
+                    impIntereses = impIntereses.multiply(prcIntSimular, mc);
+                    impIntereses.setScale(2, RoundingMode.HALF_UP);
+                    ln.setImporteInteres(impIntereses);
+                } else {
+                    if (i > solicitudRarocC.getMesesInicial().divide(solicitudRarocC.getMesesPeriodicidadInteres()).intValue()) {
+                        impIntereses = ln.getImporteInteres().divide(prcDifSolicitud, mc);
+                        impIntereses = impIntereses.multiply(prcDifSimular, mc);
+                        impIntereses.setScale(2, RoundingMode.HALF_UP);
+                        ln.setImporteInteres(impIntereses);
+                    }
+                }
+            }
+            cuadroRarocC.add(ln);
+        }
+        solicitudRarocC.setCuadroAmortizacion(cuadroRarocC);
+        return solicitudRarocC;
+    }
+
+    public void aplicarBonificacion(SolicitudRarocC solicitudRarocC, BigDecimal bonificacionTeorica) {
+        MathContext mc = new MathContext(7, RoundingMode.HALF_UP);
+        BigDecimal meses = BigDecimal.ZERO;
+        BigDecimal referencia = null;
+        boolean recalcula = true;
+        List<LineaCuadroRarocC> cuadro = solicitudRarocC.getCuadroAmortizacion();
+        int i = 0;
+        BigDecimal cuotaTotal = BigDecimal.ZERO;
+        BigDecimal saldo = cuadro.get(0).getCapitalPendienteAntes();
+        BigDecimal saldoNoBonif = cuadro.get(0).getCapitalPendienteAntes();
+        for (LineaCuadroRarocC l : cuadro) {
+            saldoNoBonif = l.getCapitalPendienteAntes();
+            meses = meses.add(solicitudRarocC.getMesesPeriodicidadInteres());
+            if (meses.compareTo(solicitudRarocC.getMesesInicial()) > 0) {
+                BigDecimal interes = null;
+                if (new BigDecimal(1).compareTo(solicitudRarocC.getAgrupacion()) == 0) {
+                    if (new BigDecimal(11).compareTo(solicitudRarocC.getReferencia()) != 0) {
+                        interes = solicitudRarocC.getDiferencial().add(solicitudRarocC.getTipoReferencia());
+                    } else {
+                        interes = solicitudRarocC.getInteresInicial();
+                    }
+                } else {
+                    interes = solicitudRarocC.getDiferencial();
+                    if (new BigDecimal(11).compareTo(solicitudRarocC.getReferencia()) != 0) {
+                        interes = interes.add(solicitudRarocC.getTipoReferencia());
+                    }
+                }
+                BigDecimal cuotaInteres = l.getImporteInteres().divide(interes, mc);
+                interes = solicitudRarocC.getDiferencial().subtract(bonificacionTeorica);
+                if (new BigDecimal(11).compareTo(solicitudRarocC.getReferencia()) != 0) {
+                    interes = interes.add(solicitudRarocC.getTipoReferencia());
+                }
+                cuotaInteres = cuotaInteres.multiply(interes, mc);
+                cuotaInteres = cuotaInteres.setScale(2, RoundingMode.DOWN);
+                l.setImporteInteres(cuotaInteres);
+                if (recalcula) {
+                    cuotaTotal = calcularEntrega(saldo, solicitudRarocC.getMesesPeriodicidadInteres(), interes, new BigDecimal(cuadro.subList(i, cuadro.size()).size()));
+                    cuotaTotal = cuotaTotal.setScale(2, RoundingMode.HALF_UP);
+                    recalcula = false;
+                }
+                l.setCuota(cuotaTotal);
+                BigDecimal cuotaCapital = l.getCuota().subtract(l.getImporteInteres());
+                if (cuotaCapital.compareTo(saldo) > 0) {
+                    cuotaCapital = saldo;
+                }
+                l.setImporteCapital(cuotaCapital);
+                l.setCapitalPendienteAntes(saldo);
+                l.setCapitalPendiente(l.getCapitalPendienteAntes().subtract(l.getImporteCapital()));
+            }
+            saldo = saldo.subtract(l.getImporteCapital());
+            i++;
+        }
+        solicitudRarocC.setDiferencial(solicitudRarocC.getDiferencial().subtract(bonificacionTeorica));
+    }
+
+    public BigDecimal calcularComision(BigDecimal base, BigDecimal porcentaje, BigDecimal minimo) {
+        MathContext mc = new MathContext(7, RoundingMode.HALF_UP);
+        BigDecimal importeComision = BigDecimal.ZERO;
+        importeComision = base.divide(new BigDecimal(100), mc);
+        importeComision = importeComision.multiply(porcentaje);
+        if (importeComision.compareTo(minimo) < 0) {
+            importeComision = minimo;
+        }
+        importeComision = importeComision.setScale(2, RoundingMode.HALF_UP);
+        return importeComision;
+    }
+
+    public IContexto[] generarCuadro(String bigOrigen, BigDecimal bigOficinaSolicitud, BigDecimal bigNumeroSolicitud, BigDecimal bigVersionSolicitud, BigDecimal bigNucSolicitud, BigDecimal bigDigitoSolicitud, String strOpcionSolicitud, BigDecimal bigOperacionSolicitud, String strTae, String strCrearTabla, BigDecimal incInteres) {
+        BigDecimal error = BigDecimal.ZERO;
+        IContexto contextoSalida = null;
+        IContexto[] salida = new IContexto[1];
+        BigDecimal plazoSolic = null;
+        BigDecimal idConcepto = null;
+        BigDecimal numPeriodosGasto = null;
+        BigDecimal idSimulacion = null;
+        // Definimos el objeto que tendrá todos los valores necesarios para enviarle los datos al PL1
+        GenerarCuadroAmortizacionVO generarCuadroAmortizacionVO = new GenerarCuadroAmortizacionVO();
+        BigDecimal periodosARestar = null;
+        final List<ParametroC> listaParamPeriodosRestar = GestionParametro.obtenerParametros(null, "GASTOSADIC");
+        if (bigOrigen.equals("2")) {
+            // Validamos la obligatoriedad de los datos para este caso
+            if (!compruebaObligatoriedadSolicitud(bigOficinaSolicitud, bigNumeroSolicitud, bigVersionSolicitud, bigNucSolicitud, bigDigitoSolicitud, strOpcionSolicitud, bigOperacionSolicitud, strTae, strCrearTabla)) {
+                // Rellenamos el contexto de SALIDA con el error 1 y nos vamos
+                error = BigDecimal.ONE;
+                contextoSalida = ContextoGenerarCuadroAmortizacion.rellenarContextoGenerarCuadroAmortizacion(error, null, null, null);
+                salida[0] = contextoSalida;
+                return salida;
+            }
+            // Seteamos al objeto los propios dato que recibimos  que también son necesarios para enviárselos al PL1
+            generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().setOficinaSolicitud(bigOficinaSolicitud);
+            generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().setNumSolicitud(bigNumeroSolicitud);
+            generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().setVersionSolicitud(bigVersionSolicitud);
+            generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().setNucExpediente(bigNucSolicitud);
+            generarCuadroAmortizacionVO.getDatosSolicitudC().setDigitoSolicitud(bigDigitoSolicitud);
+            generarCuadroAmortizacionVO.setOpcion(strOpcionSolicitud);
+            generarCuadroAmortizacionVO.setOperacion(bigOperacionSolicitud);
+            generarCuadroAmortizacionVO.setStrTae(strTae);
+            generarCuadroAmortizacionVO.setStrCrearTabla(strCrearTabla);
+            // Llamamos al servicio de negocio ANPM_150 para recuperar los datos de la solicitud
+            final Integer CTE_CC_OBTENER_DATOS_VG = new Integer(507);
+            final Integer CTE_CO_OBTENER_DATOS_VG = new Integer(150);
+            IDatosEntradaTx datosEntradaSN = null;
+            IContexto[] arrayContextos = new IContexto[] {};
+            datosEntradaSN = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), CTE_CC_OBTENER_DATOS_VG, CTE_CO_OBTENER_DATOS_VG);
+            datosEntradaSN.addCampo(0, bigOficinaSolicitud);
+            datosEntradaSN.addCampo(1, bigNumeroSolicitud);
+            datosEntradaSN.addCampo(2, bigVersionSolicitud);
+            datosEntradaSN.addCampo(3, bigNucSolicitud);
+            datosEntradaSN.addCampo(4, "S");
+            arrayContextos = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaSN);
+            if ((null != arrayContextos) && (0 < arrayContextos.length)) {
+                for (int i = 0; i < arrayContextos.length; i++) {
+                    // ---------------------------------> RECORREMOS EL CONTEXTO DATOS DE LA SOLICITUD DE UN PRÉSTAMO  <--------------------------------------
+                    if (arrayContextos[i].getNombre().equalsIgnoreCase("ANPMN050")) {
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setProducto(arrayContextos[i].getBigDecimal("ANPMN050080"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setSubproducto(arrayContextos[i].getBigDecimal("ANPMN050090"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setVersionGeneral(arrayContextos[i].getBigDecimal("ANPMN050100"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setLineaColectivo(arrayContextos[i].getBigDecimal("ANPMN050110"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setImporteSolicitado(arrayContextos[i].getBigDecimal("ANPMN050580"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setMonedaImporteSolicitado(arrayContextos[i].getString("ANPMN050590"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setPlazoTotal(arrayContextos[i].getBigDecimal("ANPMN050710"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setUnidadPlazo(arrayContextos[i].getString("ANPMN050730"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setTipoDiferimiento(arrayContextos[i].getBigDecimal("ANPMN050790"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setPlazoDiferimiento(arrayContextos[i].getBigDecimal("ANPMN050670"));
+                        // Convertimos la fecha string al tipo correspondiente del objeto solicitud
+                        java.util.Date fechaCompletaPreformalizacion = DateUtils.parseDate(arrayContextos[i].getString("ANPMN050920"), "dd-MM-yyyy");
+                        Date fechaPreformalizacion = DateUtils.toSQLDate(fechaCompletaPreformalizacion);
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setFechaFormalizacion(fechaPreformalizacion);
+                        java.util.Date fechaCompletaSolicitud = DateUtils.parseDate(arrayContextos[i].getString("ANPMN050915"), "dd-MM-yyyy");
+                        Date fechaSolicitud = DateUtils.toSQLDate(fechaCompletaSolicitud);
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setFechaSolicitud(fechaSolicitud);
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setGarantiaContable(arrayContextos[i].getBigDecimal("ANPMN050230"));
+                        /*
+						 * Para calcular la carencia intermedia lo calculamos en función de los campos:
+						 * Tipo carencia capital durante amortización
+						 * Tipo carencia interés durante amortización
+						 * Si ambos valen cero -> Carencia intermedia vale "N"
+						 * Si ambos valen distinto de cero -> Carencia intermedia vale "S" 
+						 */
+                        BigDecimal tipoCarenciaCapitalDuranteAmortizacion = arrayContextos[i].getBigDecimal("ANPMN050820");
+                        BigDecimal tipoCarenciaInteresDuranteAmortizacion = arrayContextos[i].getBigDecimal("ANPMN050830");
+                        if ((null != tipoCarenciaCapitalDuranteAmortizacion && tipoCarenciaCapitalDuranteAmortizacion.compareTo(BigDecimal.ZERO) == 0) && (null != tipoCarenciaInteresDuranteAmortizacion && tipoCarenciaInteresDuranteAmortizacion.compareTo(BigDecimal.ZERO) == 0)) {
+                            generarCuadroAmortizacionVO.setStrCarenciaIntermedia("N");
+                        } else if ((null != tipoCarenciaCapitalDuranteAmortizacion && tipoCarenciaCapitalDuranteAmortizacion.compareTo(BigDecimal.ZERO) != 0) && (null != tipoCarenciaInteresDuranteAmortizacion && tipoCarenciaInteresDuranteAmortizacion.compareTo(BigDecimal.ZERO) != 0)) {
+                            generarCuadroAmortizacionVO.setStrCarenciaIntermedia("S");
+                        }
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setImporteProductosFinanciar(arrayContextos[i].getBigDecimal("ANPMN050610"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setMonedaProductosFinanciar(arrayContextos[i].getString("ANPMN050620"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setPlazoCarencia(arrayContextos[i].getBigDecimal("ANPMN050650"));
+                        // La unidad del plazo de carencia es la misma que la del plazo total
+                        generarCuadroAmortizacionVO.setStrUnidadPlazoCarencia(generarCuadroAmortizacionVO.getDatosSolicitudC().getUnidadPlazo());
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setFechaDePago(arrayContextos[i].getBigDecimal("ANPMN050870"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setDiaDeterminadoPago(arrayContextos[i].getBigDecimal("ANPMN050905"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setMesDeterminadoPago(arrayContextos[i].getBigDecimal("ANPMN050910"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setFechaLiquidacion(arrayContextos[i].getBigDecimal("ANPMN050880"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setDiaAplicar(arrayContextos[i].getBigDecimal("ANPMN050450"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setEspecialidad(arrayContextos[i].getString("ANPMN050120"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setGarantiaOficina(arrayContextos[i].getBigDecimal("ANPMN050230"));
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setTipoExpediente(arrayContextos[i].getBigDecimal("ANPMN050270"));
+                        // Convertimos la fecha string al tipo correspondiente del objeto solicitud
+                        java.util.Date fechaCompleta = DateUtils.parseDate(arrayContextos[i].getString("ANPMN050977"), "dd-MM-yyyy");
+                        Date fecha = DateUtils.toSQLDate(fechaCompleta);
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().setDateFechaScoringDefinitivo(fecha);
+                    }
+                    // ------------------------------->  RECORREMOS EL CONTEXTO DATOS DE LAS CONDICIONES DE CAPITAL DE UNA SOLICITUD   <-----------------------------
+                    if (arrayContextos[i].getNombre().equalsIgnoreCase("ANPMN051")) {
+                        CondicionCapitalEng daoCondCapital = null;
+                        CondicionCapitalC condicionCapitalC = null;
+                        daoCondCapital = new CondicionCapitalEng();
+                        condicionCapitalC = daoCondCapital.createNewObject();
+                        condicionCapitalC.inicializar();
+                        // *** ORDEN *** ( parte de la clave )
+                        condicionCapitalC.getCondicionesCapitalKey().setIntOrdenDelTramo(arrayContextos[i].getBigDecimal("ANPMN051040").intValue());
+                        // *** PLAZO CAPITAL ***
+                        condicionCapitalC.setIntPlazo(arrayContextos[i].getBigDecimal("ANPMN051060").intValue());
+                        // *** PLAZO MÁXIMO CUOTA BLINDADA ***
+                        condicionCapitalC.setIntPlazoMaximoCuotaBlindada(arrayContextos[i].getBigDecimal("ANPMN051080").intValue());
+                        // *** MODALIDAD DE AMORTIZACIÓN ***
+                        condicionCapitalC.setIntModalidadDeAmortizacion(arrayContextos[i].getBigDecimal("ANPMN051090").intValue());
+                        // *** RAZÓN DE PROGRESIÓN ***
+                        condicionCapitalC.setIntRazonProgresion(arrayContextos[i].getBigDecimal("ANPMN051110"));
+                        // *** PAGO APLAZADO ***
+                        condicionCapitalC.setIntImportePagoAplazado(arrayContextos[i].getBigDecimal("ANPMN051130"));
+                        // *** PORCENTAJE PAGO APLAZADO ***
+                        condicionCapitalC.setIntPorcentajePagoAplazado(arrayContextos[i].getBigDecimal("ANPMN051140"));
+                        // *** NÚMERO PERIODOS PERIODICIDAD ***
+                        condicionCapitalC.setIntPeriodicidadNumPeriodo(arrayContextos[i].getBigDecimal("ANPMN051150").intValue());
+                        // *** UNIDAD PERIODOS PERIODICIDAD ***
+                        condicionCapitalC.setStrPeriodicidadUnidadPeriodo(arrayContextos[i].getString("ANPMN051160"));
+                        // *** TIPO PERÍODO PERIODICIDAD ***
+                        condicionCapitalC.setIntPeriodicidadTipoPeriodo(arrayContextos[i].getBigDecimal("ANPMN051170").intValue());
+                        // *** PAGO ÚNICO VENCIMIENTO FINAL ***
+                        condicionCapitalC.setStrPagoUnicoVencimientoFinal(arrayContextos[i].getString("ANPMN051180"));
+                        // *** PERIODO MÍNIMO LIQUIDACIÓN ***
+                        condicionCapitalC.setIntIndPeriodoMinimoLiquidacion(arrayContextos[i].getBigDecimal("ANPMN051190").intValue());
+                        // *** NUM PERIODO MÍNIMO LIQUIDACIÓN ***
+                        condicionCapitalC.setIntNumPeriodoMinimoLiquidacion(arrayContextos[i].getBigDecimal("ANPMN051200").intValue());
+                        // *** UNIDAD PERIODO MÍNIMO LIQUIDACION ***
+                        condicionCapitalC.setStrUnidadPeriodoMinimoLiquidacion(arrayContextos[i].getString("ANPMN051210"));
+                        // Establecemos la relación con la solicitud
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().addCondicionCapital(condicionCapitalC);
+                        condicionCapitalC.getCondicionesCapitalKey().setSolicitud(generarCuadroAmortizacionVO.getDatosSolicitudC());
+                    }
+                    // ----------------------------------> RECORREMOS EL CONTEXTO DATOS DE LAS CONDICIONES DE INTERÉS DE LA SOLICITUD  <-----------------------------------
+                    if (arrayContextos[i].getNombre().equalsIgnoreCase("ANPMN052")) {
+                        CondicionesInteresEng condicionesInteresDao = new CondicionesInteresEng();
+                        CondicionesInteresC condicionesInteresC = condicionesInteresDao.createNewObject();
+                        condicionesInteresC.inicializar();
+                        condicionesInteresC.getCondicionesInteresKey().setIntOrdenDelTramo(arrayContextos[i].getBigDecimal("ANPMN052040").intValue());
+                        condicionesInteresC.getCondicionesInteresKey().setIntTipoCondicion(arrayContextos[i].getBigDecimal("ANPMN052050").intValue());
+                        condicionesInteresC.getCondicionesInteresKey().setIntPrioridad(arrayContextos[i].getBigDecimal("ANPMN052050").intValue());
+                        condicionesInteresC.setStrTipoDeInteres(arrayContextos[i].getString("ANPMN052080"));
+                        condicionesInteresC.setIntGestionCampanas(arrayContextos[i].getBigDecimal("ANPMN052090").intValue());
+                        condicionesInteresC.setStrValoracionIVI(arrayContextos[i].getString("ANPMN052100"));
+                        condicionesInteresC.setIntPlazo(arrayContextos[i].getBigDecimal("ANPMN052110").intValue());
+                        condicionesInteresC.setIntInteres(arrayContextos[i].getBigDecimal("ANPMN052130"));
+                        condicionesInteresC.setIntTipoReferencia(arrayContextos[i].getBigDecimal("ANPMN052160").intValue());
+                        condicionesInteresC.setIntDif(arrayContextos[i].getBigDecimal("ANPMN052270"));
+                        condicionesInteresC.setIntDifMinimoMaximo(arrayContextos[i].getBigDecimal("ANPMN052290"));
+                        condicionesInteresC.setIntDifBonificado(arrayContextos[i].getBigDecimal("ANPMN052310"));
+                        condicionesInteresC.setIntPorDemoraSobreCapital(arrayContextos[i].getBigDecimal("ANPMN052340"));
+                        condicionesInteresC.setIntPorDemoraSobreInteres(arrayContextos[i].getBigDecimal("ANPMN052360"));
+                        condicionesInteresC.setIntNumPeriodosRevision(arrayContextos[i].getBigDecimal("ANPMN052380").intValue());
+                        condicionesInteresC.setStrUnidadPeriodosRevision(arrayContextos[i].getString("ANPMN052400"));
+                        condicionesInteresC.setIntTipoPeriodosRevision(arrayContextos[i].getBigDecimal("ANPMN052410").intValue());
+                        condicionesInteresC.setIntPeriodoMinimoRevision(arrayContextos[i].getBigDecimal("ANPMN052420").intValue());
+                        condicionesInteresC.setIntPeriodicidadNumPeriodo(arrayContextos[i].getBigDecimal("ANPMN052430").intValue());
+                        condicionesInteresC.setStrPeriodicidadUnidadPeriodo(arrayContextos[i].getString("ANPMN052440"));
+                        condicionesInteresC.setIntPeriodicidadTipoPeriodo(arrayContextos[i].getBigDecimal("ANPMN052450").intValue());
+                        condicionesInteresC.setStrPagoUnicoVencimientoFinal(arrayContextos[i].getString("ANPMN052460"));
+                        condicionesInteresC.setIntIndPeriodoMinimoLiquidacion(arrayContextos[i].getBigDecimal("ANPMN052470").intValue());
+                        condicionesInteresC.setIntNumPeriodoMinLiquidacion(arrayContextos[i].getBigDecimal("ANPMN052480").intValue());
+                        condicionesInteresC.setStrUnidadPeriodoMinLiquidacion(arrayContextos[i].getString("ANPMN052490"));
+                        condicionesInteresC.setIntForzarFinTramoFechaPago(arrayContextos[i].getBigDecimal("ANPMN052500").intValue());
+                        condicionesInteresC.setIntCoincidenciaPlazoRevisionConFechaPago(arrayContextos[i].getBigDecimal("ANPMN052510").intValue());
+                        condicionesInteresC.setIntAplicaSueloInteresInicial(arrayContextos[i].getBigDecimal("ANPMN052520").intValue());
+                        condicionesInteresC.setIntSueloInteresInicial(arrayContextos[i].getBigDecimal("ANPMN052530"));
+                        condicionesInteresC.setIntSuelo(arrayContextos[i].getBigDecimal("ANPMN052550"));
+                        condicionesInteresC.setIntTecho(arrayContextos[i].getBigDecimal("ANPMN052570"));
+                        // Establecemos la relación con la solicitud
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().addCondicionInteres(condicionesInteresC);
+                        condicionesInteresC.getCondicionesInteresKey().setSolicitud(generarCuadroAmortizacionVO.getDatosSolicitudC());
+                    }
+                    // --------------------------------->  RECORREMOS EL CONTEXTO DATOS DE LAS COMISIONES DE LA SOLICITUD  <---------------------------------------------
+                    if (arrayContextos[i].getNombre().equalsIgnoreCase("ANPMN053")) {
+                        ComisionEng daoComision = new ComisionEng();
+                        ComisionC comisionC = daoComision.createNewObject();
+                        comisionC.inicializar();
+                        comisionC.getComisionesKey().setStrTipoComision(arrayContextos[i].getString("ANPMN053040"));
+                        comisionC.getComisionesKey().setIntOrden(arrayContextos[i].getBigDecimal("ANPMN053050").intValue());
+                        comisionC.setBidPorcentajeComision(arrayContextos[i].getBigDecimal("ANPMN053070"));
+                        comisionC.setBidImporteMinimo(arrayContextos[i].getBigDecimal("ANPMN053090"));
+                        // Establecemos la relación con la solicitud
+                        generarCuadroAmortizacionVO.getDatosSolicitudC().addComision(comisionC);
+                        comisionC.setSolicitud(generarCuadroAmortizacionVO.getDatosSolicitudC());
+                    }
+                // --------------------------------->  FIN DEL CONTEXTO DATOS DE LAS COMISIONES DE LA SOLICITUD  <----------------------------------------------------
+                }
+            // Fin de for que recorre los contextos
+            }
+        // Fin del if si hay contextos
+        } else {
+            // La opción introducida no es ni 0, ni 1 ni dos
+            // Si hubo error con la opción introducida de entrada rellenamos el contexto de SALIDA con el error 3 y nos vamos
+            error = new BigDecimal(3);
+            contextoSalida = ContextoGenerarCuadroAmortizacion.rellenarContextoGenerarCuadroAmortizacion(error, null, null, null);
+            salida[0] = contextoSalida;
+            return salida;
+        }
+        // ************************************************************************************************************************************
+        // **************************** PROCEDEMOS AL RELLENADO DEL CONTEXTO DE E/S CON LOS DATOS NECESARIOS PARA EL PL1 **********************
+        // Para cualquiera de las opciones el objeto "GenerarCuadroAmortizacionVO" tiene los datos necesarios para el PL1
+        IContexto contextoSalidaCompleta = null;
+        boolean bHayMasElementos = true;
+        String strHayMasElementos = Constantes.CTE_STRING_BLANK;
+        String strUltimaFechaItemPago = Constantes.CTE_STRING_EMPTY;
+        Integer iNnmPagosTotal = Integer.valueOf(0);
+        IContexto ctxtoPrograma = null;
+        do {
+            ctxtoPrograma = ContextoFactory.getInstance().getContexto(ID_CTX_PROGRAMA);
+            // Reservo memoria para la matriz de pagos
+            reservarMemoriaRegistro(ctxtoPrograma, CTX_MATRIZ_PAGOS, LONGITUD_RGTRO_AMORT_PAGOS);
+            // Seteamos los datos de entrada	al programa PL1
+            ctxtoPrograma.put(CTX_COD_PRODUCTO, generarCuadroAmortizacionVO.getDatosSolicitudC().getProducto());
+            ctxtoPrograma.put(CTX_COD_SUBP, generarCuadroAmortizacionVO.getDatosSolicitudC().getSubproducto());
+            ctxtoPrograma.put(CTX_VERSION_SUBP, generarCuadroAmortizacionVO.getDatosSolicitudC().getVersionGeneral());
+            ctxtoPrograma.put(CTX_COLECTIVO, generarCuadroAmortizacionVO.getDatosSolicitudC().getLineaColectivo());
+            ctxtoPrograma.put(CTX_OFICINA_SOLICITUD, generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().getOficinaSolicitud());
+            ctxtoPrograma.put(CTX_NUMERO_SOLICITUD, generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().getNumSolicitud());
+            ctxtoPrograma.put(CTX_VERSION_SOLICITUD, generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().getVersionSolicitud());
+            ctxtoPrograma.put(CTX_NUC_SOLICITUD, generarCuadroAmortizacionVO.getDatosSolicitudC().getDatosSolicitudKey().getNucExpediente());
+            ctxtoPrograma.put(CTX_DIGITO_SOLICITUD, generarCuadroAmortizacionVO.getDatosSolicitudC().getDigitoSolicitud());
+            ctxtoPrograma.put(CTX_OPCION, generarCuadroAmortizacionVO.getOpcion());
+            ctxtoPrograma.put(CTX_OPERACION, generarCuadroAmortizacionVO.getOperacion());
+            ctxtoPrograma.put(CTX_IMPORTE_SOLICITADO, generarCuadroAmortizacionVO.getDatosSolicitudC().getImporteSolicitado());
+            ctxtoPrograma.put(CTX_MONEDA_IMPORTE_SOLICITADO, generarCuadroAmortizacionVO.getDatosSolicitudC().getMonedaImporteSolicitado());
+            ctxtoPrograma.put(CTX_PLAZO_TOTAL, generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoTotal());
+            // 
+            ctxtoPrograma.put(CTX_UNIDAD_PLAZO_TOTAL, generarCuadroAmortizacionVO.getDatosSolicitudC().getUnidadPlazo());
+            // ctxtoPrograma.put(CTX_FECHA_PREV_FORMALIZACION, generarCuadroAmortizacionVO.getDatosSolicitudC().getFechaFormalizacion().toString());
+            ctxtoPrograma.put(CTX_FECHA_PREV_FORMALIZACION, "");
+            ctxtoPrograma.put(CTX_TAE, generarCuadroAmortizacionVO.getStrTae());
+            ctxtoPrograma.put(CTX_CREAR_TABLA, generarCuadroAmortizacionVO.getStrCrearTabla());
+            ctxtoPrograma.put(CTX_TEST_APTITUD, generarCuadroAmortizacionVO.getStrTestAptitud());
+            ctxtoPrograma.put(CTX_CARENCIA_INTERMEDIA, generarCuadroAmortizacionVO.getStrCarenciaIntermedia());
+            ctxtoPrograma.put(CTX_IMPORTE_PROD_FINANCIAR, generarCuadroAmortizacionVO.getDatosSolicitudC().getImporteProductosFinanciar());
+            ctxtoPrograma.put(CTX_MONEDA_PROD_FINANCIAR, generarCuadroAmortizacionVO.getDatosSolicitudC().getMonedaProductosFinanciar());
+            ctxtoPrograma.put(CTX_PLAZO_CARENCIA, generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoCarencia());
+            ctxtoPrograma.put(CTX_UNIDAD_PLAZO_CARENCIA, generarCuadroAmortizacionVO.getStrUnidadPlazoCarencia());
+            ctxtoPrograma.put(CTX_INDICADOR_FECHA_PAGO, generarCuadroAmortizacionVO.getDatosSolicitudC().getFechaDePago());
+            ctxtoPrograma.put(CTX_DIA_PAGO, generarCuadroAmortizacionVO.getDatosSolicitudC().getDiaDeterminadoPago());
+            ctxtoPrograma.put(CTX_MES_PAGO, generarCuadroAmortizacionVO.getDatosSolicitudC().getMesDeterminadoPago());
+            ctxtoPrograma.put(CTX_INDICADOR_FECHA_LIQUIDACION, generarCuadroAmortizacionVO.getDatosSolicitudC().getFechaLiquidacion());
+            ctxtoPrograma.put(CTX_INDICADOR_USO_FESTIVOS, generarCuadroAmortizacionVO.getDatosSolicitudC().getConsideraFestivos());
+            ctxtoPrograma.put(CTX_ESPECIALIDAD, generarCuadroAmortizacionVO.getDatosSolicitudC().getEspecialidad());
+            ctxtoPrograma.put(CTX_GARANTIA_OFICINA, generarCuadroAmortizacionVO.getDatosSolicitudC().getGarantiaOficina());
+            ctxtoPrograma.put(CTX_TIPO_EXPEDIENTE, generarCuadroAmortizacionVO.getDatosSolicitudC().getTipoExpediente());
+            ctxtoPrograma.put(CTX_FECHA_SCORING_DEFINITIVA, generarCuadroAmortizacionVO.getDatosSolicitudC().getDateFechaScoringDefinitivo().toString());
+            /*20150909 Alta automática Multicrédito Web: si el subproducto/solicitud tiene diferimiento, el plazo de diferimiento será 
+			 * igual al plazo de carencia.
+			 * 	ANPMN425920 (Plazo diferimiento) = ANPMN425230 (Plazo de carencia)
+				ANPMN425925 = ANPMN002210.
+			 */
+            if (0 != BigDecimal.ZERO.compareTo(generarCuadroAmortizacionVO.getDatosSolicitudC().getTipoDiferimiento())) {
+                ctxtoPrograma.put(CTE_PLAZO_DIFERIMIENTO, generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoCarencia());
+            } else {
+                ctxtoPrograma.put(CTE_PLAZO_DIFERIMIENTO, generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoDiferimiento());
+            }
+            ctxtoPrograma.put(CTE_TIPO_DIFERIMIENTO, generarCuadroAmortizacionVO.getDatosSolicitudC().getTipoDiferimiento());
+            ctxtoPrograma.put(CTX_SECTOR, generarCuadroAmortizacionVO.getDatosSolicitudC().getSector());
+            // ctxtoPrograma.put(CTX_DESTINO, generarCuadroAmortizacionVO.getDestinoSolicitud());
+            if (!UtilidadesTramitacion.isBlankOrNull(generarCuadroAmortizacionVO.getDestinoSolicitud())) {
+                ctxtoPrograma.put(CTX_DESTINO, new BigDecimal(generarCuadroAmortizacionVO.getDestinoSolicitud()));
+            } else {
+                ctxtoPrograma.put(CTX_DESTINO, BigDecimal.ZERO);
+            }
+            ctxtoPrograma.put(CTX_MODALIDAD_DE_INTERES, generarCuadroAmortizacionVO.getDatosSolicitudC().getMdi());
+            // Metemos los datos de capital, intereses, comisiones y gastos adicionales en los registros. Estos datos los tenemos guardados
+            // en el objeto datos solicitud de nuestro objeto VO generarCuadroAmortizacionVO
+            // 1 - ************************** Iteramos las condiciones de capital y SETEAMOS EL CAMPO REGISTRO CTX_REG_ANPMN420 ********************
+            // =========================================================================================================================================
+            // 2016-06-28: por un cambio en la versión del compilador de PLI, la rutina espera que
+            // lleguen exactamente 10 elementos => si no los tenemos generamos los
+            // necesarios con los datos en blanco y el #orden = 999 para poder
+            // diferenciarlos en el host
+            // =========================================================================================================================================
+            final int REGISTROS_CAPITAL = 10;
+            // Integer tamanoCondCapital = generarCuadroAmortizacionVO.getDatosSolicitudC().getCondicionesCapital().size();
+            IRegistro[] regsCapital = new IRegistro[REGISTROS_CAPITAL];
+            Iterator<CondicionCapitalC> itCapital = generarCuadroAmortizacionVO.getDatosSolicitudC().getCondicionesCapital().iterator();
+            int i = 0;
+            while (itCapital.hasNext()) {
+                CondicionCapitalC estaCondicionCapitalC = itCapital.next();
+                regsCapital[i] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN420);
+                regsCapital[i].put("ANPMN425301", new BigDecimal(estaCondicionCapitalC.getCondicionesCapitalKey().getIntOrdenDelTramo()));
+                // Sólo entra un registro de capital, sobreescribimos el plazon con PLAZO TOTAL - PLAZO DE CARENCIA ( ambos datos de entrada )
+                // regsCapital[i].put("ANPMN425302", new BigDecimal(estaCondicionCapitalC.getIntPlazo()));
+                regsCapital[i].put("ANPMN425302", generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoTotal().subtract(generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoCarencia()));
+                regsCapital[i].put("ANPMN425303", new BigDecimal(estaCondicionCapitalC.getIntModalidadDeAmortizacion()));
+                regsCapital[i].put("ANPMN425304", estaCondicionCapitalC.getIntRazonProgresion());
+                regsCapital[i].put("ANPMN425305", estaCondicionCapitalC.getStrPagoUnicoVencimientoFinal());
+                regsCapital[i].put("ANPMN425306", new BigDecimal(estaCondicionCapitalC.getIntPeriodicidadNumPeriodo()));
+                regsCapital[i].put("ANPMN425307", estaCondicionCapitalC.getStrPeriodicidadUnidadPeriodo());
+                regsCapital[i].put("ANPMN425308", new BigDecimal(estaCondicionCapitalC.getIntPeriodicidadTipoPeriodo()));
+                regsCapital[i].put("ANPMN425309", new BigDecimal(estaCondicionCapitalC.getIntIndPeriodoMinimoLiquidacion()));
+                regsCapital[i].put("ANPMN425310", new BigDecimal(estaCondicionCapitalC.getIntNumPeriodoMinimoLiquidacion()));
+                regsCapital[i].put("ANPMN425311", estaCondicionCapitalC.getStrUnidadPeriodoMinimoLiquidacion());
+                regsCapital[i].put("ANPMN425312", estaCondicionCapitalC.getIntImportePagoAplazado());
+                regsCapital[i].put("ANPMN425313", estaCondicionCapitalC.getIntPorcentajeAplazado().setScale(2));
+                regsCapital[i].put("ANPMN425314", new BigDecimal(estaCondicionCapitalC.getIntPlazoMaximoCuotaBlindada()));
+                i++;
+            }
+            // Rellenamos hasta el número máximo que espera PLI
+            for (int j = i; j < REGISTROS_CAPITAL; j++) {
+                regsCapital[j] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN420);
+                regsCapital[j].put("ANPMN425301", new BigDecimal(999));
+                regsCapital[j].put("ANPMN425302", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425303", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425304", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425305", "");
+                regsCapital[j].put("ANPMN425306", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425307", "");
+                regsCapital[j].put("ANPMN425308", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425309", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425310", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425311", "");
+                regsCapital[j].put("ANPMN425312", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425313", BigDecimal.ZERO);
+                regsCapital[j].put("ANPMN425314", BigDecimal.ZERO);
+            }
+            ctxtoPrograma.put(CTX_REG_ANPMN420, regsCapital);
+            // ******* ****************************Fin iteración condiciones de capital *******************************************************
+            // 2 - ************************ Iteramos las condiciones de interés y SETEAMOS EL CAMPO REGISTRO	CTX_REG_ANPMN421 ******************
+            // Para el casol de la solicitud no puedo crear un registro con el tamaño inicial, ya que el sustitutivo que tenemos de la
+            // solictitud no se lo tenemos que pasar al PL1, POR LO TANTO tengo que saber si las condiciones de interés vienen con sustituvo
+            // para definir el registro de dicho tamañanp
+            // Definimos un flag contador para calcular los interes que sí se deben pasar
+            // =========================================================================================================================================
+            // 2016-06-28: por un cambio en la versión del compilador de PLI, la rutina espera que
+            // lleguen exactamente 10 elementos => si no los tenemos generamos los
+            // necesarios con los datos en blanco y el #orden = 999 para poder
+            // diferenciarlos en el host
+            // =========================================================================================================================================
+            final int REGISTROS_INTERES = 10;
+            Iterator<CondicionesInteresC> itInteres = generarCuadroAmortizacionVO.getDatosSolicitudC().getCondicionesInteres().iterator();
+            int contadorDeInteres = 0;
+            while (itInteres.hasNext()) {
+                CondicionesInteresC estaCondicionInteresC = itInteres.next();
+                if (!estaCondicionInteresC.getCondicionesInteresKey().getIntTipoCondicion().equals(1)) {
+                    contadorDeInteres++;
+                }
+            }
+            // IRegistro[] regsInteres = new IRegistro[contadorDeInteres];
+            IRegistro[] regsInteres = new IRegistro[REGISTROS_INTERES];
+            itInteres = generarCuadroAmortizacionVO.getDatosSolicitudC().getCondicionesInteres().iterator();
+            i = 0;
+            while (itInteres.hasNext()) {
+                CondicionesInteresC estaCondicionInteresC = itInteres.next();
+                if (bigOrigen.equals("0") || bigOrigen.equals("1") || (bigOrigen.equals("2") && !estaCondicionInteresC.getCondicionesInteresKey().getIntTipoCondicion().equals(1))) {
+                    regsInteres[i] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN421);
+                    regsInteres[i].put("ANPMN425401", new BigDecimal(estaCondicionInteresC.getCondicionesInteresKey().getIntOrdenDelTramo()));
+                    regsInteres[i].put("ANPMN425402", new BigDecimal(estaCondicionInteresC.getCondicionesInteresKey().getIntTipoCondicion()));
+                    regsInteres[i].put("ANPMN425403", new BigDecimal(estaCondicionInteresC.getCondicionesInteresKey().getIntPrioridad()));
+                    regsInteres[i].put("ANPMN425404", new BigDecimal(estaCondicionInteresC.getIntOrdenAplicacion()));
+                    regsInteres[i].put("ANPMN425405", estaCondicionInteresC.getStrTipoDeInteres());
+                    regsInteres[i].put("ANPMN425406", estaCondicionInteresC.getStrValoracionIVI());
+                    regsInteres[i].put("ANPMN425407", new BigDecimal(estaCondicionInteresC.getIntGestionCampanas()));
+                    regsInteres[i].put("ANPMN425408", new BigDecimal(estaCondicionInteresC.getIntPlazo()));
+                    if ("00".equals(estaCondicionInteresC.getStrTipoDeInteres()) && 1 == contadorDeInteres && BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                        regsInteres[i].put("ANPMN425409", estaCondicionInteresC.getIntInteres().multiply(incInteres));
+                    } else {
+                        regsInteres[i].put("ANPMN425409", estaCondicionInteresC.getIntInteres());
+                    }
+                    regsInteres[i].put("ANPMN425410", new BigDecimal(estaCondicionInteresC.getIntTipoReferencia()));
+                    if (("02".equals(estaCondicionInteresC.getStrTipoDeInteres()) || ("03".equals(estaCondicionInteresC.getStrTipoDeInteres()) && !new Integer(11).equals(estaCondicionInteresC.getIntTipoReferencia()))) && estaCondicionInteresC.getCondicionesInteresKey().getIntOrdenDelTramo() > 1 && BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                        regsInteres[i].put("ANPMN425411", estaCondicionInteresC.getIntDif().multiply(incInteres));
+                    } else {
+                        regsInteres[i].put("ANPMN425411", estaCondicionInteresC.getIntDif());
+                    }
+                    regsInteres[i].put("ANPMN425414", estaCondicionInteresC.getIntPorDemoraSobreCapital());
+                    regsInteres[i].put("ANPMN425415", estaCondicionInteresC.getIntPorDemoraSobreInteres());
+                    regsInteres[i].put("ANPMN425416", new BigDecimal(estaCondicionInteresC.getIntNumPeriodosRevision()));
+                    regsInteres[i].put("ANPMN425417", estaCondicionInteresC.getStrUnidadPeriodosRevision());
+                    regsInteres[i].put("ANPMN425418", new BigDecimal(estaCondicionInteresC.getIntTipoPeriodosRevision()));
+                    regsInteres[i].put("ANPMN425419", estaCondicionInteresC.getStrPagoUnicoVencimientoFinal());
+                    regsInteres[i].put("ANPMN425420", new BigDecimal(estaCondicionInteresC.getIntPeriodicidadNumPeriodo()));
+                    regsInteres[i].put("ANPMN425421", estaCondicionInteresC.getStrPeriodicidadUnidadPeriodo());
+                    regsInteres[i].put("ANPMN425422", new BigDecimal(estaCondicionInteresC.getIntPeriodicidadTipoPeriodo()));
+                    regsInteres[i].put("ANPMN425423", new BigDecimal(estaCondicionInteresC.getIntAplicaSueloInteresInicial()));
+                    regsInteres[i].put("ANPMN425424", estaCondicionInteresC.getIntSueloInteresInicial());
+                    regsInteres[i].put("ANPMN425425", estaCondicionInteresC.getIntSuelo());
+                    if ("03".equals(estaCondicionInteresC.getStrTipoDeInteres()) && new Integer(11).equals(estaCondicionInteresC.getIntTipoReferencia()) && estaCondicionInteresC.getCondicionesInteresKey().getIntOrdenDelTramo() > 1 && BigDecimal.ZERO.compareTo(incInteres) != 0) {
+                        regsInteres[i].put("ANPMN425426", estaCondicionInteresC.getIntTecho().multiply(incInteres));
+                    } else {
+                        regsInteres[i].put("ANPMN425426", estaCondicionInteresC.getIntTecho());
+                    }
+                    regsInteres[i].put("ANPMN425427", new BigDecimal(estaCondicionInteresC.getIntForzarFinTramoFechaPago()));
+                    regsInteres[i].put("ANPMN425428", new BigDecimal(estaCondicionInteresC.getIntCoincidenciaPlazoRevisionConFechaPago()));
+                    regsInteres[i].put("ANPMN425429", new BigDecimal(estaCondicionInteresC.getIntIndPeriodoMinimoLiquidacion()));
+                    regsInteres[i].put("ANPMN425430", new BigDecimal(estaCondicionInteresC.getIntNumPeriodoMinLiquidacion()));
+                    regsInteres[i].put("ANPMN425431", estaCondicionInteresC.getStrUnidadPeriodoMinLiquidacion());
+                    regsInteres[i].put("ANPMN425432", new BigDecimal(estaCondicionInteresC.getIntPeriodoMinimoRevision()));
+                    i++;
+                }
+            }
+            // Rellenamos hasta el número máximo que espera PLI
+            for (int j = i; j < REGISTROS_INTERES; j++) {
+                regsInteres[j] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN421);
+                regsInteres[j].put("ANPMN425401", new BigDecimal(999));
+                regsInteres[j].put("ANPMN425402", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425403", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425404", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425405", "");
+                regsInteres[j].put("ANPMN425406", "");
+                regsInteres[j].put("ANPMN425407", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425408", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425409", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425410", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425411", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425412", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425413", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425414", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425415", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425416", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425417", "");
+                regsInteres[j].put("ANPMN425418", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425419", "");
+                regsInteres[j].put("ANPMN425420", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425421", "");
+                regsInteres[j].put("ANPMN425422", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425423", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425424", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425425", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425426", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425427", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425428", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425429", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425430", BigDecimal.ZERO);
+                regsInteres[j].put("ANPMN425431", "");
+                regsInteres[j].put("ANPMN425432", BigDecimal.ZERO);
+            }
+            ctxtoPrograma.put(CTX_REG_ANPMN421, regsInteres);
+            // ************************************ Fin iteración condiciones de interés *************************************************
+            // 3 -************************ Iteramos las comisiones y SETEAMOS EL CAMPO REGISTRO	CTX_REG_ANPMN422 ******************************
+            // =========================================================================================================================================
+            // 2016-06-28: por un cambio en la versión del compilador de PLI, la rutina espera que
+            // lleguen exactamente 10 elementos => si no los tenemos generamos los
+            // necesarios con los datos en blanco y el #orden = 999 para poder
+            // diferenciarlos en el host
+            // =========================================================================================================================================
+            String strIndFinanComisAper = Constantes.NO;
+            final int REGISTROS_COMISIONES = 20;
+            // Integer tamanoComisiones = generarCuadroAmortizacionVO.getDatosSolicitudC().getComisiones().size();
+            IRegistro[] regsComisiones = new IRegistro[REGISTROS_COMISIONES];
+            Iterator<ComisionC> itComisiones = generarCuadroAmortizacionVO.getDatosSolicitudC().getComisiones().iterator();
+            i = 0;
+            while (itComisiones.hasNext()) {
+                ComisionC estaComisionC = itComisiones.next();
+                regsComisiones[i] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN422);
+                regsComisiones[i].put("ANPMN425501", estaComisionC.getComisionesKey().getStrTipoComision());
+                regsComisiones[i].put("ANPMN425502", new BigDecimal(estaComisionC.getComisionesKey().getIntOrden()));
+                regsComisiones[i].put("ANPMN425503", estaComisionC.getBidPorcentajeComision());
+                regsComisiones[i].put("ANPMN425504", estaComisionC.getBidImporteMinimo());
+                if ("003".equals(estaComisionC.getComisionesKey().getStrTipoComision())) {
+                    if (BigDecimal.ONE.compareTo(estaComisionC.getBidIndCapitalizacionComDisponibilidad()) == 0) {
+                        strIndFinanComisAper = Constantes.SI;
+                    }
+                }
+                i++;
+            }
+            // Rellenamos hasta el número máximo que espera PLI
+            for (int j = i; j < REGISTROS_COMISIONES; j++) {
+                regsComisiones[j] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN422);
+                regsComisiones[j].put("ANPMN425501", "");
+                regsComisiones[j].put("ANPMN425502", new BigDecimal(99));
+                regsComisiones[j].put("ANPMN425503", BigDecimal.ZERO);
+                regsComisiones[j].put("ANPMN425504", BigDecimal.ZERO);
+            }
+            ctxtoPrograma.put(CTX_REG_ANPMN422, regsComisiones);
+            ctxtoPrograma.put(CTX_IND_FINAN_COMIS_APER, strIndFinanComisAper);
+            ctxtoPrograma.put(CTX_IND_FINANCIAR_GASTOS_ESTUDIO, Constantes.CTE_STR_N);
+            ctxtoPrograma.put(CTX_IND_DIA_SALTO, BigDecimal.ZERO);
+            // ************************************ Fin iteración comisiones *******************************************************************
+            // 4- ************************ Iteramos los gastos adicionales y SETEAMOS EL CAMPO REGISTRO	CTX_REG_ANPMN423 ****************************
+            // =========================================================================================================================================
+            // 2016-06-28: por un cambio en la versión del compilador de PLI, la rutina espera que
+            // lleguen exactamente 10 elementos => si no los tenemos generamos los
+            // necesarios con los datos en blanco y el concepto = '999' para poder
+            // diferenciarlos en el host
+            // =========================================================================================================================================
+            final int REGISTROS_GASTOS = 20;
+            plazoSolic = generarCuadroAmortizacionVO.getDatosSolicitudC().getPlazoTotal();
+            // Integer tamanoGastosAdicionales= generarCuadroAmortizacionVO.getLstGastosAdicionales().size();
+            IRegistro[] regsGastosAdicionales = new IRegistro[REGISTROS_GASTOS];
+            Iterator<GastosAdicionalesC> itGastosAdicionales = generarCuadroAmortizacionVO.getLstGastosAdicionales().iterator();
+            i = 0;
+            while (itGastosAdicionales.hasNext()) {
+                GastosAdicionalesC esteGastosAdicionalesC = itGastosAdicionales.next();
+                regsGastosAdicionales[i] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN423);
+                idConcepto = esteGastosAdicionalesC.getId().getIdConcepto();
+                regsGastosAdicionales[i].put("ANPMN425601", idConcepto.toString());
+                /* En el caso del seguro de la hipoteca, id concept = 6, el importe calculado (campo CPSIN001100)
+				 * nos va a llegar el importe de toda la vida del prestamo, en el numero de periodos viene el número de meses de tal 
+				 * forma que si es 12 quiere decir que ese pago se hace de forma anual. 
+				 * Necesitamos saber cuántos años dura el préstamo, luego dividir el importe del seguro vivienda 
+				 * entre el número de años de vida del préstamo, así sabremos lo que paga el usuario por el seguro de vivienda al año. */
+                BigDecimal importeCalculado = esteGastosAdicionalesC.getImporte();
+                BigDecimal importeGuardar = null;
+                /*20151009 Calculamos el importe del gasto adicional que enviamos en la matriz de gastos adicionales al ANPMR209*/
+                numPeriodosGasto = esteGastosAdicionalesC.getNumPeriodicidad();
+                /*Buscamos el número de períodos a restar de este gasto adicional*/
+                periodosARestar = UtilidadesTramitacion.consultaNumeroPeriodosRestar(listaParamPeriodosRestar, idConcepto);
+                importeGuardar = UtilidadesTramitacion.calcularImporteGastoAdicional(importeCalculado, idConcepto, plazoSolic, numPeriodosGasto, periodosARestar);
+                regsGastosAdicionales[i].put("ANPMN425602", importeGuardar);
+                regsGastosAdicionales[i].put("ANPMN425603", numPeriodosGasto);
+                if (null != esteGastosAdicionalesC.getUnidadPeriodicidad())
+                    regsGastosAdicionales[i].put("ANPMN425604", esteGastosAdicionalesC.getUnidadPeriodicidad());
+                else
+                    regsGastosAdicionales[i].put("ANPMN425604", "M");
+                regsGastosAdicionales[i].put("ANPMN425605", esteGastosAdicionalesC.getPorcentajeActualizacion());
+                i++;
+            }
+            // Rellenamos hasta el número máximo que espera PLI
+            for (int j = i; j < REGISTROS_GASTOS; j++) {
+                regsGastosAdicionales[j] = ContextoFactory.getInstance().getRegistro(ctxtoPrograma, CTX_REG_ANPMN423);
+                regsGastosAdicionales[j].put("ANPMN425601", "999");
+                regsGastosAdicionales[j].put("ANPMN425602", BigDecimal.ZERO);
+                regsGastosAdicionales[j].put("ANPMN425603", BigDecimal.ZERO);
+                regsGastosAdicionales[j].put("ANPMN425604", "");
+                regsGastosAdicionales[j].put("ANPMN425605", BigDecimal.ZERO);
+            }
+            ctxtoPrograma.put(CTX_REG_ANPMN423, regsGastosAdicionales);
+            // ************************************ Fin iteración gastos adicionales *******************************************************************
+            ctxtoPrograma.put(CTX_IND_MAS_ELEMENTOS_MATRIZ, strHayMasElementos);
+            ctxtoPrograma.put(CTX_FECHA_REPOSIC_SI_RELLAMADA, strUltimaFechaItemPago);
+            // Recuperar producto catalogo AN01TB01
+            final GestionDatosSolicitud gs = new GestionDatosSolicitud();
+            DatosSolicitudC datosSolicitudC = gs.getUltimaVersion(bigNucSolicitud);
+            final BigDecimal producto = datosSolicitudC.getProducto();
+            final ProductoEng productoDao = new ProductoEng();
+            final ProductoC productoC = productoDao.obtenerProductoUtimaVersion(producto.intValue(), false, true);
+            // Indicador fin mes
+            BigDecimal indCalcFinMes = BigDecimal.ZERO;
+            if (null != productoC) {
+                Integer intCalcFinMes = productoC.getIndCalculoFinDeMes();
+                if (null != intCalcFinMes) {
+                    indCalcFinMes = new BigDecimal(intCalcFinMes);
+                    if (intCalcFinMes == 1) {
+                        indCalcFinMes = new BigDecimal(2);
+                    }
+                }
+            }
+            ctxtoPrograma.put(CTX_IND_IND_CALC_FIN_MES, indCalcFinMes);
+            CtgFacade ctg = new CtgFacade();
+            IContexto[] aContextoPrograma = ctg.invocarProgramaCics(ctxtoPrograma, ID_PROGRAMA_AMORTIZACION);
+            /**
+             * Llamar a la comprobacion de la tae
+             */
+            if (!UtilidadesTramitacion.isBlankOrNull(generarCuadroAmortizacionVO.getBonifIntVbleBonificable())) {
+                IContexto salidaPrograma = aContextoPrograma[0];
+                // Si este valor es distinto de zero aplica la tae bonificada
+                if (0 != BigDecimal.ZERO.compareTo(generarCuadroAmortizacionVO.getBonifIntVbleBonificable())) {
+                    ComprobacionesGeneracionCuadro.comprobarTaeTin(salidaPrograma.getBigDecimal("ANPMN425805"), salidaPrograma.getBigDecimal("ANPMN425815"), idSimulacion);
+                } else {
+                    ComprobacionesGeneracionCuadro.comprobarTaeTin(salidaPrograma.getBigDecimal("ANPMN425800"), salidaPrograma.getBigDecimal("ANPMN425815"), idSimulacion);
+                }
+            }
+            if (contextoSalidaCompleta == null) {
+                contextoSalidaCompleta = aContextoPrograma[0];
+                // iNnmPagosTotal = aContextoPrograma[0].getBigDecimal(CTX_NUMERO_CUOTAS).intValue();
+                // iNnmPagosTotal =  aContextoPrograma[0].getRegistro(CTX_MATRIZ_PAGOS).length;
+                iNnmPagosTotal = LONGITUD_RGTRO_AMORT_PAGOS;
+            } else {
+                List<IRegistro> lstTotalRegistrosPagos = new ArrayList<IRegistro>(0);
+                lstTotalRegistrosPagos.addAll(Arrays.asList(contextoSalidaCompleta.getRegistro(CTX_MATRIZ_PAGOS)));
+                IRegistro[] aRegistrosPagosParcial = aContextoPrograma[0].getRegistro(CTX_MATRIZ_PAGOS);
+                // int iNumParcialPagos = aContextoPrograma[0].getBigDecimal(CTX_NUMERO_CUOTAS).intValue();
+                // int iNumParcialPagos = aContextoPrograma[0].getRegistro(CTX_MATRIZ_PAGOS).length;
+                int iNumParcialPagos = LONGITUD_RGTRO_AMORT_PAGOS;
+                if (LONGITUD_RGTRO_AMORT_PAGOS == iNumParcialPagos) {
+                    lstTotalRegistrosPagos.addAll(Arrays.asList(aRegistrosPagosParcial));
+                } else {
+                    IRegistro[] aNuevosRegistroPagos = new IRegistro[iNumParcialPagos];
+                    System.arraycopy(aRegistrosPagosParcial, 0, aNuevosRegistroPagos, 0, iNumParcialPagos);
+                    lstTotalRegistrosPagos.addAll(Arrays.asList(aNuevosRegistroPagos));
+                }
+                contextoSalidaCompleta.put(CTX_MATRIZ_PAGOS, lstTotalRegistrosPagos.toArray(new IRegistro[0]));
+                iNnmPagosTotal += iNumParcialPagos;
+            }
+            strHayMasElementos = aContextoPrograma[0].getString(CTX_IND_MAS_ELEMENTOS_MATRIZ);
+            bHayMasElementos = strHayMasElementos.equalsIgnoreCase(Constantes.CTE_LETRA_S);
+            if (bHayMasElementos) {
+                strUltimaFechaItemPago = contextoSalidaCompleta.getRegistro(CTX_MATRIZ_PAGOS)[iNnmPagosTotal - 1].getString(CTX_REG_MATRIZ_FECHA_PAGO);
+            }
+        } while (bHayMasElementos);
+        contextoSalidaCompleta.put(CTX_NUMERO_CUOTAS, new BigDecimal(iNnmPagosTotal));
+        // Rellenamos el contexto de salida anpmn424 para devolver el control al módulo llamante
+        contextoSalida = ContextoGenerarCuadroAmortizacion.rellenarContextoGenerarCuadroAmortizacion(error, contextoSalidaCompleta, generarCuadroAmortizacionVO, null);
+        salida[0] = contextoSalida;
+        return salida;
+    }
+
+    // Fin execute
+    /**
+     * Reserva memoria en el contexto para el registro que se pasa como parámetro
+     * @param contexto Contexto donde reservar memoria
+     * @param strCtxtoIdRegistro Id del registro a crear
+     * @param iRegistrosSize Número de registros a crear
+     */
+    private void reservarMemoriaRegistro(IContexto contexto, String strCtxtoIdRegistro, int iRegistrosSize) {
+        List<IRegistro> lstRegistros = new ArrayList<IRegistro>(iRegistrosSize);
+        for (int i = 0; i < iRegistrosSize; i++) {
+            lstRegistros.add(ContextoFactory.getInstance().getRegistro(contexto, strCtxtoIdRegistro));
+        }
+        contexto.put(strCtxtoIdRegistro, lstRegistros.toArray(new IRegistro[0]));
+    }
+
+    /**
+     * Método que comprueba que todos los datos de entrada son distintos de null,
+     * es decir, en la entrada han introducido algún valor
+     *
+     * @param bigOficinaSolicitud
+     * @param bigNumeroSolicitud
+     * @param bigVersionSolicitud
+     * @param bigNucSolicitud
+     * @param bigDigitoSolicitud
+     * @param strOpcionSolicitud
+     * @param bigOperacionSolicitud
+     * @return
+     */
+    public boolean compruebaObligatoriedadSolicitud(BigDecimal bigOficinaSolicitud, BigDecimal bigNumeroSolicitud, BigDecimal bigVersionSolicitud, BigDecimal bigNucSolicitud, BigDecimal bigDigitoSolicitud, String strOpcionSolicitud, BigDecimal bigOperacionSolicitud, String strTae, String strCrearTabla) {
+        if (null != bigOficinaSolicitud && null != bigNumeroSolicitud && null != bigVersionSolicitud && null != bigNucSolicitud && null != bigDigitoSolicitud && null != strOpcionSolicitud && null != bigOperacionSolicitud && null != strTae && null != strCrearTabla) {
+            return true;
+        } else
+            return false;
+    }
+
+    public BigDecimal consultarFixing(String divisaOrigen, String divisaDestino) {
+        // Invocamos al servicio que nos da el tipo de cambio
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 340, 302);
+        // Tipo de operacion
+        entrada.addCampo(0, "A");
+        // Aplicacion
+        entrada.addCampo(1, "ITAL");
+        // Acceso
+        entrada.addCampo(2, "MIGUELON");
+        // Divisa compra
+        entrada.addCampo(3, divisaOrigen);
+        // Divisa venta
+        entrada.addCampo(5, divisaDestino);
+        // Importe divisa compra
+        entrada.addCampo(7, new BigDecimal("100000000000"));
+        // entrada.addCampo(8, new BigDecimal("100000000000"));    // Importe divisa venta
+        // Tipo de cambio
+        entrada.addCampo(10, new BigDecimal("-3"));
+        IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        BigDecimal fixing = salida[0].getBigDecimal("IT006C050");
+        return fixing;
+    }
+
+    public void repreciarCuadro(SolicitudRarocC solicitudRarocC) {
+        MathContext mc = new MathContext(7, RoundingMode.HALF_UP);
+        BigDecimal meses = BigDecimal.ZERO;
+        BigDecimal referencia = null;
+        boolean revisando = false;
+        boolean recalcula = false;
+        List<LineaCuadroRarocC> cuadro = solicitudRarocC.getCuadroAmortizacion();
+        int i = 0;
+        BigDecimal cuotaTotal = BigDecimal.ZERO;
+        BigDecimal saldo = cuadro.get(0).getCapitalPendienteAntes();
+        for (LineaCuadroRarocC l : cuadro) {
+            meses = meses.add(solicitudRarocC.getMesesPeriodicidadInteres());
+            if (null != referencia) {
+                BigDecimal interes = solicitudRarocC.getDiferencial().add(solicitudRarocC.getTipoReferencia());
+                BigDecimal cuotaInteres = l.getImporteInteres().divide(interes, mc);
+                interes = solicitudRarocC.getDiferencial().add(referencia);
+                cuotaInteres = cuotaInteres.multiply(interes, mc);
+                cuotaInteres = cuotaInteres.setScale(2, RoundingMode.HALF_UP);
+                l.setImporteInteres(cuotaInteres);
+                l.setReferencia(referencia);
+                if (recalcula) {
+                    cuotaTotal = calcularEntrega(saldo, solicitudRarocC.getMesesPeriodicidadInteres(), interes, new BigDecimal(cuadro.subList(i, cuadro.size()).size()));
+                    cuotaTotal = cuotaTotal.setScale(2, RoundingMode.HALF_UP);
+                    recalcula = false;
+                }
+                l.setCuota(cuotaTotal);
+                BigDecimal cuotaCapital = l.getCuota().subtract(l.getImporteInteres());
+                if (cuotaCapital.compareTo(saldo) > 0) {
+                    cuotaCapital = saldo;
+                }
+                l.setImporteCapital(cuotaCapital);
+                l.setCapitalPendienteAntes(saldo);
+                l.setCapitalPendiente(l.getCapitalPendienteAntes().subtract(l.getImporteCapital()));
+            }
+            if ((meses.compareTo(solicitudRarocC.getMesesInicial()) >= 0 && !revisando) || (meses.remainder(solicitudRarocC.getMesesPeriodicidadRevisio()) == BigDecimal.ZERO && revisando)) {
+                referencia = consultarReferencia(BigDecimal.ONE, solicitudRarocC.getDivisa(), solicitudRarocC.getMesesPeriodicidadRevisio(), meses);
+                revisando = true;
+                recalcula = true;
+            }
+            saldo = saldo.subtract(l.getImporteCapital());
+            i++;
+        }
+    }
+
+    public BigDecimal consultarReferencia(BigDecimal tipo, String divisa, BigDecimal plazo, BigDecimal meses) {
+        BigDecimal referencia = null;
+        ReferenciaRgraVO referenciaRgraVO = new ReferenciaRgraVO();
+        IDatosEntradaTx entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 409, 113);
+        entrada.addCampo("TIPO", tipo);
+        entrada.addCampo("DIVISA", divisa);
+        entrada.addCampo("A_PLAZO", plazo);
+        entrada.addCampo("X_MESES", meses);
+        if (null != fechaCarga) {
+            entrada.addCampo("FECHA_CARGA", DateHelper.dateToString(fechaCarga, DateHelper.FORMATO_DB2_DATE));
+        }
+        IContexto[] salida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+        if (null != salida && salida.length > 0) {
+            FromContextCreator fccre = new FromContextCreator(SolicitudAnpmVO.class);
+            fccre.loadObject(salida[0], referenciaRgraVO);
+            fechaCarga = DateHelper.stringASqlDate(salida[0].getString("RGRAN013010"), DateHelper.FORMATO_DB2_DATE);
+            referencia = salida[0].getBigDecimal("RGRAN013040");
+        }
+        return referencia;
+    }
+
+    public BigDecimal calcularComisionPrescriptor(BigDecimal producto, BigDecimal subproducto, BigDecimal codigoPrescriptor, BigDecimal importeSolicitud) {
+        BigDecimal comisionPrescriptor = BigDecimal.ZERO;
+        if (null != codigoPrescriptor) {
+            BigDecimal codigoIdealista = new BigDecimal(Configuracion.getInstance().getValor("ANPM", "PRESCRIPTOR", "IDEALISTA"));
+            if (codigoIdealista.compareTo(codigoPrescriptor) == 0) {
+                comisionPrescriptor = importeSolicitud.multiply(new BigDecimal("0.5"));
+                comisionPrescriptor = comisionPrescriptor.divide(new BigDecimal("100"));
+            }
+        }
+        comisionPrescriptor = comisionPrescriptor.setScale(2, RoundingMode.HALF_UP);
+        /*
+		RelacionProductoPrescriptorEng relacionProductoPrescriptorEng = new RelacionProductoPrescriptorEng();
+		
+		RelacionProductoPrescriptorC relacionProductoPrescriptorC = 
+				relacionProductoPrescriptorEng.findById(
+						new RelacionProductoPrescriptorKey(producto, subproducto, codigoPrescriptor));
+		
+		if (null != relacionProductoPrescriptorC)
+		{
+			comisionPrescriptor = importeSolicitud.multiply(new BigDecimal("0.5"));
+			comisionPrescriptor = comisionPrescriptor.divide(new BigDecimal("100"));
+		}
+		*/
+        return comisionPrescriptor;
+    }
+
+    public BigDecimal calcularEntrega(BigDecimal saldo, BigDecimal mesesVencimiento, BigDecimal porcInteres, BigDecimal numVencimientos) {
+        BigDecimal pmm270w01 = BigDecimal.ZERO;
+        BigDecimal pmm270w02 = BigDecimal.ZERO;
+        MathContext mathContextPrecision17 = new MathContext(17, RoundingMode.HALF_UP);
+        pmm270w01 = porcInteres.multiply(mesesVencimiento, mathContextPrecision17);
+        pmm270w01 = pmm270w01.divide(IConstantesSolicitud.CTE_BID_1200, mathContextPrecision17);
+        /*
+	   IF (1+PMM270W01) = 0 THEN ;                                                  
+	   ELSE DO;                                                                     
+	*/
+        if (0 != BigDecimal.ZERO.compareTo(BigDecimal.ONE.add(pmm270w01, mathContextPrecision17))) {
+            /* CALCULO DE LA ENTREGA CONSTANTE*/
+            // PMM270W02 = PMM270PRP*PMM270W01*((1+PMM270W01)**PMM270NP);
+            pmm270w02 = saldo.multiply(pmm270w01, mathContextPrecision17).multiply(BigDecimal.ONE.add(pmm270w01, mathContextPrecision17).pow(numVencimientos.intValue()), mathContextPrecision17);
+            if (0 != BigDecimal.ZERO.compareTo((BigDecimal.ONE.add(pmm270w01, mathContextPrecision17).pow(numVencimientos.intValue())).subtract(BigDecimal.ONE))) {
+                // PMM270W02 = PMM270W02/(((1+PMM270W01)**PMM270NP)-1);
+                pmm270w02 = pmm270w02.divide((BigDecimal.ONE.add(pmm270w01, mathContextPrecision17).pow(numVencimientos.intValue())).subtract(BigDecimal.ONE), mathContextPrecision17);
+            }
+        }
+        return pmm270w02;
+    }
+
+    public BigDecimal consultarBonificacion(BigDecimal nucExpediente, BigDecimal codigoProducto, BigDecimal codigoSubProducto, BigDecimal idTarifa, BigDecimal versionGeneral) {
+        IContexto ctxEntrada = null;
+        IContexto[] resultado = null;
+        BigDecimal bonificacion = BigDecimal.ZERO;
+        /*Creamos el contexto de entrada a la include.*/
+        ctxEntrada = ContextoFactory.getInstance().getContexto("ANPMN431");
+        ctxEntrada.put("ANPMN431010", nucExpediente);
+        ctxEntrada.put("ANPMN431020", codigoProducto);
+        ctxEntrada.put("ANPMN431120", codigoSubProducto);
+        ctxEntrada.put("ANPMN431130", idTarifa);
+        // 2016-03-07 - Anhadir version general
+        ctxEntrada.put("ANPMN431150", versionGeneral);
+        /**
+         * Reservamos memoria para el registro que nos viene de garantias
+         */
+        UtilidadesComun.reservarMemoriaRegistro(ctxEntrada, "ANPMN431140", 10);
+        CtgFacade ctg = new CtgFacade();
+        resultado = ctg.invocarProgramaCics(ctxEntrada, "ANPMR210");
+        if (UtilidadesTramitacion.isBlankOrNull(resultado)) {
+            ServicioNegocio.rollback(CodigosError.CTE_ERROR_NO_EXISTEN_MAXIMA_BONIF, null, new String[] { nucExpediente.toString(), codigoProducto.toString() }, null);
+        }
+        bonificacion = resultado[0].getBigDecimal("ANPMN431030");
+        return bonificacion;
+    }
+}

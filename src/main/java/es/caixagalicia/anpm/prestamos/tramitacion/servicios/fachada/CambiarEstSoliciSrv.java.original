@@ -1,0 +1,133 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+
+import es.caixagalicia.anpm.prestamos.sindicados.SindicadosC;
+import es.caixagalicia.anpm.prestamos.sindicados.servicios.aplicacion.GestionSindicados;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * 
+ * Servicio que cambia el estado de la solicitud a estado formalizado
+ * 
+ * @author V361749
+ * CC: 	570
+ * CO: ANPM_294
+ * CTX: ANPMN294
+ * TRX: ANT5
+ */
+public class CambiarEstSoliciSrv extends ServicioNegocio
+{
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		BigDecimal CTE_ESTADO_SOLICITUD = new BigDecimal(6);
+		final String CTE_RESULTADO_OK = "Se ha cambiado el estado de la solicitud a formalizado";
+		final String CTE_RESULTADO_KO = "No se ha podido cambiar el estado de la solicitud a formalizado";
+		final String CTE_UNO = "1";
+		final String CTE_DOS = "2";
+		boolean estado = false;
+		
+		// Set diario Electrónico
+		contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+		
+		// Datos de entrada
+		BigDecimal nuc = datosEntrada.getDecimal("NUC");
+		BigDecimal agente = datosEntrada.getDecimal("AGENTE");
+		String tipoAgente = datosEntrada.getString("TIPO_AGENTE");
+		BigDecimal oficinaContable = datosEntrada.getDecimal("OFICINA_CTBLE");
+		BigDecimal oficinaSolicitud = null;
+		
+		if (!UtilidadesTramitacion.isBlankOrNull(nuc)) // si el nuc viene informado
+		{
+			GestionDatosSolicitud gds = new GestionDatosSolicitud();
+			DatosSolicitudC datosSolicitud = gds.getUltimaVersionCompleta(nuc);	// se recupera la versión completa
+		
+			if ((null != datosSolicitud) && (datosSolicitud.getDatosSolicitudKey().getNucExpediente().equals(nuc))) // si el nuc existe en la tabla 25
+			{
+			  oficinaSolicitud = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(); // obtenemos la oficina para poder recuperar luego a la tabla 38
+			  datosSolicitud.setEstadoSolicitud(CTE_ESTADO_SOLICITUD); //cambiamos en la tabla 25 el campo 2500520 a estado 6 (Formalizado)
+			  datosSolicitud.setOficinaContable(oficinaContable);//20160126 Se setea el valor de entrada a la tabla 25
+			  estado = true;
+			}
+			else // si el nuc no es válido, lanzamos un roollback
+			{
+				ServicioNegocio.rollback(
+											CodigosError.CTE_ERROR_NUC_NO_VALIDO,
+											null,
+											new String[] {nuc.toString()},
+											null
+										 );
+			}
+		}
+		else // si el nuc no es válido, lanzamos un roollback
+		{
+			ServicioNegocio.rollback(
+										CodigosError.CTE_ERROR_NUC_ERRONEO,
+										null,
+										null,
+										null
+									);
+		}
+			
+		if (!UtilidadesTramitacion.isBlankOrNull(agente) && 
+				!UtilidadesTramitacion.isBlankOrNull(tipoAgente) && estado) // 20151218: Se comprueba que el agente viene informado y que se recupero una solicitud correcta
+		{
+			GestionSindicados gs = new GestionSindicados();
+			SindicadosC sindicados = gs.obtenerSindicados(oficinaSolicitud, nuc);
+			
+			if (null != sindicados)
+			{
+				sindicados.setBidAgente(agente); // seteamos en el campo AN380130 el valor del agente que nos proporcionan como dato de entrada
+			    
+				if (CTE_UNO.equals(tipoAgente) || CTE_DOS.equals(tipoAgente))
+				{
+					sindicados.setTipoAgente(tipoAgente); // 20160115: seteamos el campo AN380190 el valor del tipo de agente que nos proporcionan como dato de entrada
+				}
+				else
+				{
+					ServicioNegocio.rollback(
+											CodigosError.CTE_ERROR_TIPO_AGENTE,  // el tipo de agente debe ser 1 o 2
+											null,
+											null,
+											null
+										 );
+				}
+			}
+			else 
+			{
+				ServicioNegocio.rollback(
+											CodigosError.CTE_ERROR_NUC_NO_VALIDO,  // este nuc no tiene una fila en el AN38TB01
+											null,
+											new String []  {nuc.toString()},
+											null
+										 );
+			}
+		}
+		
+		IContexto[] salida = new IContexto[1];
+		salida[0] = ContextoFactory.getInstance().getContexto("ANPMN294");
+		
+		if (estado)
+		{ // si se ha ejecutado todo el código de forma correcta devolveríamos un 0 y la descripción 
+			salida[0].put("ANPMN294010", BigDecimal.ZERO);
+			salida[0].put("ANPMN294020", CTE_RESULTADO_OK);
+		}
+		else 
+		{ // si algo ha salido mal -> devolvemos el código de error (1) y la descripción
+			salida[0].put("ANPMN294010", BigDecimal.ONE);
+			salida[0].put("ANPMN294020", CTE_RESULTADO_KO);
+		}
+		
+		return salida;
+	}
+}

@@ -23,6 +23,52 @@ Evento(window, 'load', Inicio);
 
 function Inicio() {
     ListarArchivos();
+
+    setTimeout(function() {
+        lee("es/caixagalicia/anpm/prestamos/catalogo/servicios/fachada/BusquedaProductoSrv.java", function(original, modificado) {
+            alert("Fichero cargado.");
+            alert(original);
+            alert(modificado);
+        });
+    }, 1000);
+}
+
+
+function getAllFiles() {}
+
+function lee(fichero, observador) {
+    var original = null;
+    var original_loaded = false;
+    var destino = null;
+    var destino_loaded = false;
+
+    leeFichero("./src/main/java/" + fichero + ".original", 'page1', function(content) {
+        original = content;
+        original_loaded = true;
+        if (destino_loaded) {
+            observador(original, destino);
+        }
+    });
+    leeFichero("./src/main/java/" + fichero + ".new", 'page2', function(content) {
+        destino = content;
+        destino_loaded = true;
+        if (original_loaded) {
+            observador(original, destino);
+        }
+    });
+}
+
+function leeFichero(fichero, inname, callback) {
+    var iframe = document.getElementById(inname);
+    iframe.src = fichero;
+    setTimeout(function() {
+        try {
+            callback(iframe.contentWindow.document.body.innerText);
+        } catch (fail) {
+            console.log(fail);
+            alert("Su navegador no permite acceder al contenido local. Pruebe a usar iexplorer");
+        }
+    }, 250);
 }
 
 function ListarArchivos() {

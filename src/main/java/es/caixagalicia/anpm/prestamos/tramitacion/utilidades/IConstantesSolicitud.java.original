@@ -1,0 +1,287 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.utilidades;
+
+import java.math.BigDecimal;
+
+import org.apache.commons.lang.StringUtils;
+
+/**
+ * Interfaz que contiene constantes necesarias en el servicio ConsultaDatosSolitudSrv y
+ * clases relacionadas.
+ * @author V360144
+ *
+ */
+public interface IConstantesSolicitud
+{
+	public final static String CTE_ENT_ANPM_266_OFICINA_SOLIC = "OFICINA_SOLICITUD";
+	public final static String CTE_ENT_ANPM_266_NUM_SOLIC = "NUMERO_SOLICITUD";
+	public final static String CTE_ENT_ANPM_266_VERSION_SOLIC = "VERSION_SOLICITUD";
+	public final static String CTE_ENT_ANPM_266_DIGITO_SOLIC = "DIGITO_SOLICITUD";
+	public final static String CTE_ENT_ANPM_266_IND_TAE = "INDICADOR_TAE";
+	public final static String CTE_ENT_ANPM_266_PANTALLA_ORIGEN = "PANTALLA_ORIGEN";
+	public final static String CTE_ENT_ANPM_266_SERVICIO_ORIGEN = "SERVICIO_ORIGEN";
+	public final static String CTE_ENT_ANPM_266_NUC_EXP = "NUC_EXPEDIENTE";	
+	
+	
+	public final static Integer CTE_SN_CC_CONSULTA_CLIENTES_NUC = new Integer(555); //FCLI
+	public final static Integer CTE_SN_CO_CONSULTA_CLIENTES_NUC = new Integer(722);
+	
+	public final static Integer CTE_SN_CC_DATOS_GENERALES_CLIENTE = new Integer(555); //FCLI
+	public final static Integer CTE_SN_CO_DATOS_GENERALES_CLIENTE = new Integer(834);
+	
+	/*Cuenta contable, código de operación campos de entrada y de salida del servicio ANPM_075*/
+	public final static Integer CTE_SN_BUSQ_PARAM_CC = new Integer(507); //ANPM
+	public final static Integer CTE_SN_BUSQ_PARAM_CO = new Integer(75);
+	
+	public final static String CTE_SN_BUSQ_PARAM_ENT_NOMBRE = "NOMBRE_PARAMETRO";
+	public final static String CTE_SN_BUSQ_PARAM_ENT_AGRUP = "AGRUPACION_PARAMETRO";
+	public final static String CTE_SN_BUSQ_PARAM_SAL_VALOR = "ANPMN031050";
+	
+	/*Cuenta contable, código de operación campos de entrada y de salida del servicio ANPM_403*/
+	public final static Integer CTE_SN_CALC_CUOTA_SCO_CC = new Integer(507); //ANPM
+	public final static Integer CTE_SN_CALC_CUOTA_SCO_CO = new Integer(403);
+	
+	public final static String CTE_SN_CALC_CUOTA_SCO_ENT_IMPORTE = "IMP_SOLIC_CONTRAVALOR";
+	public final static String CTE_SN_CALC_CUOTA_SCO_ENT_INTERES_INICIAL = "INTERES_INICIAL";
+	public final static String CTE_SN_CALC_CUOTA_SCO_ENT_PLAZO = "PLAZO";
+	public final static String CTE_SN_CALC_CUOTA_SCO_ENT_REFERENCIAL = "REFERENCIAL";
+	public final static String CTE_SN_CALC_CUOTA_SCO_ENT_DIFERENCIAL = "DIFERENCIAL";
+	public final static String CTE_SN_CALC_CUOTA_SCO_COD_PROD = "COD_PRODUCTO";
+	public final static String CTE_SN_CALC_CUOTA_SCO_COD_SUBPROD = "COD_SUBPRODUCTO";
+	public final static String CTE_SN_CALC_CUOTA_SCO_NUC_EXPEDIENTE = "NUC_EXPEDIENTE";
+	public final static String CTE_SN_CALC_CUOTA_SCO_SAL_CUOTA_SCO = "ANPMN305010";
+	
+	/*Constantes para el parámetro de configuración ANPMCFG_ENTIDAD_COD */
+	public final static String CTE_APLICACION_COD_ENT_ACT = "ANPM";
+	public final static String CTE_GRUPO_CONFIG_COD_ENT_ACT = "ENTIDAD";
+	public final static String CTE_PARAM_CONFIG_COD_ENT_ACT = "COD";
+	
+	
+	/*Constantes para el parámetro de configuración ANPMCFG_LLAMADAMETODO_USOLOG*/
+	public final static String CTE_APLICACION_LOG_ACTIVO = "ANPM";
+	public final static String CTE_GRUPO_CONFIG_LOG_ACTIVO = "LLAMADAMETODO";
+	public final static String CTE_PARAM_CONFIG_LOG_ACTIVO = "USOLOG";
+	
+	// Constantes para la agrupacion de parametros BORRAR_CACHE
+	public final static String CTE_APLICACION				= "ANPM";
+	public static final String CTE_AGRUP_BORRAR_CACHE 		= "DELCACHE";
+	public static final String CTE_PARAM_BORRAR_CACHE_FLAG 	= "FLAG";
+	
+	public final static String CTE_TIPO_PREST_HIPOT_DIVISA = "D";
+	public final static String CTE_TIPO_PREST_HIPOT_EUR = StringUtils.EMPTY;
+	public final static String CTE_TIPO_PREST_SINDICADO = "Y";
+	public final static String CTE_TIPO_PRESTAMO_APLAZOS_SUB = "S";
+	
+	
+	
+	public final static String CTE_DIVISA_EUR = "EUR";
+	public final static String CTE_IND_ERROR_OK = "0";
+	public final static String CTE_IND_ERROR_NK = "1";
+	public final static String CTE_CODIGO_ERROR_DATOS_SOLIC_NO_EXISTE = 			"001";
+	public final static String CTE_CODIGO_ERROR_PRODUCTO_NO_EXISTE = 				"002";
+	public final static String CTE_CODIGO_ERROR_TIPO_PREST_NO_VALIDO = 				"003";
+	public final static String CTE_CODIGO_ERROR_PARAMETROS_NO_EXISTE = 				"004";
+	public final static String CTE_CODIGO_ERROR_CONDICION_CAPITAL_NO_EXISTE = 		"005";
+	public final static String CTE_CODIGO_ERROR_PERIODICIDAD_NO_ES_VALIDA = 		"006";
+	public final static String CTE_CODIGO_ERROR_TIPO_PERIODICIDAD_NO_EXISTE = 		"007";
+	public final static String CTE_CODIGO_ERROR_TIPO_PERIODICIDAD_NO_ES_VALIDO = 	"008";
+	public final static String CTE_CODIGO_ERROR_CONDICIONES_INTERES_NO_EXISTE = 	"009";
+	public final static String CTE_CODIGO_ERROR_UNIDAD_PERIODICIDAD_NO_EXISTE = 	"010";
+	public final static String CTE_CODIGO_ERROR_UNIDAD_PERIODICIDAD_NO_ES_VALIDA = 	"011";
+	public final static String CTE_CODIGO_ERROR_COMISION_NO_EXISTE = 				"012";
+	public final static String CTE_CODIGO_ERROR_NUMERO_PERIODOS_NO_EXISTE = 		"013";
+	public final static String CTE_CODIGO_ERROR_TIPO_PERIODOS_NO_EXISTE = 			"014";
+	public final static String CTE_CODIGO_ERROR_DESTINO_NO_EXISTE = 				"015";
+	public final static String CTE_CODIGO_ERROR_INTERES_INICIAL_CERO = 				"016";
+	public final static String CTE_CODIGO_ERROR_DESTINO_PRINCIPAL_NO_EXISTE = 		"017";
+	public final static String CTE_CODIGO_ERROR_COND_INTERESES_NO_EXISTE = 			"018";
+	public final static String CTE_CODIGO_ERROR_UNIDAD_PERIODOS_REVISION_NO_VALIDA ="019";
+	public final static String CTE_CODIGO_ERROR_COND_INTERESES_FIJOS_NO_EXISTEN = 	"020";
+	public final static String CTE_CODIGO_ERROR_DATOS_ADELANTOS_NO_EXISTEN = 		"021";
+	public final static String CTE_CODIGO_ERROR_DATOS_ADELANTOS_INCORRECTOS = 		"022";
+	
+	public final static String CTE_TEXTO_ERROR_DATOS_SOLIC_NO_EXISTE = "El datos solicitud no existe";
+	public final static String CTE_TEXTO_ERROR_PRODUCTO_NO_EXISTE = "El producto no existe";
+	public final static String CTE_TEXTO_ERROR_PARAMETROS_NO_EXISTE = "El parámetro no existe";
+	public final static String CTE_TEXTO_ERROR_UNIDAD_PERIODICIDAD_NO_EXISTE = "La unidad de periodicidad no existe.";
+	public final static String CTE_TEXTO_ERROR_NUMERO_PERIODOS_NO_EXISTE = "El número de períodos no existe";
+	public final static String CTE_TEXTO_ERROR_TIPO_PERIODOS_NO_EXISTE = "El tipo de períodos no existe";
+	public final static String CTE_TEXTO_ERROR_INTERES_INICIAL_CERO = "El interés inicial es cero.";
+	public final static String CTE_TEXTO_ERROR_TIPO_PRESTAMOS_NO_VALIDO = "El tipo de préstamo no es válido.";
+	public final static String CTE_TEXTO_ERROR_UNIDAD_PERIODOS_REVISION_NO_VALIDA = "Unidad número periodos revisión debería ser meses (M).";
+		
+	public final static String MONEDA_EURO = "EUR";
+	public final static String CLAVE_ENTIDAD_ETCHEVARRIA = "3399";
+	public final static String COD_APLICACION_4_LETRAS = "ANPM";
+	public final static String CTE_S = "S";
+	public final static String CTE_N = "N";
+	public final static BigDecimal CTE_TIPO_CAMBIO_COMPRA = new BigDecimal(-1);
+	public final static BigDecimal CTE_TIPO_CAMBIO_VENTA = new BigDecimal(-2);
+	public final static BigDecimal CTE_TIPO_CAMBIO_FIXING = new BigDecimal(-3);
+	
+	public final static BigDecimal CTE_EXPED_NO_ESTA_EN_GARANTIA = BigDecimal.ZERO;
+	public final static BigDecimal CTE_EXPED_ESTA_EN_GARANTIA = BigDecimal.ONE;
+	
+	public final static String CTE_CLAVE_PARAMETRO_GAR = "GAR";
+	public final static String CTE_CLAVE_PARAMETRO_GMR = "GMR";
+	public final static String CTE_CLAVE_PARAMETRO_MDA = "MDA";
+	public final static String CTE_CLAVE_PARAMETRO_IPC = "IPC";
+	public final static String CTE_CLAVE_PARAMETRO_IBN = "IBN";
+	public final static String CTE_CLAVE_PARAMETRO_DET = "DET";
+	public final static String CTE_CLAVE_PARAMETRO_CDT = "CDT";
+	
+	public final static int CTE_INT_0 = 0;
+	public final static int CTE_INT_1 = 1;
+	public final static int CTE_INT_2 = 2;
+	public final static int CTE_INT_3 = 3;
+	public final static int CTE_INT_4 = 4;
+	public final static int CTE_INT_6 = 6;
+	public final static int CTE_INT_7 = 7;
+	public final static int CTE_INT_12 = 12;
+	public final static int CTE_INT_20 = 20;
+	public final static int CTE_INT_60 = 60;
+	public final static char CTE_CHAR_0 = '0';
+	public final static String CTE_STR_00 = "00";
+	public final static String CTE_STR_99 = "99";
+	public final static String CTE_STR_0 = "0";
+	public final static String CTE_STR_1 = "1";
+
+	public final static String CTE_STR_00FP = "00FP";
+	
+	public final static int CTE_TAM_INICIAL_ARRAYS = 1;
+	
+	public final static String CTE_STR_C = "C";
+	public final static String CTE_STR_F = "F";
+	public final static String CTE_STR_H = "H";
+	public final static String CTE_STR_N = "N";
+	public final static String CTE_STR_O = "O";
+	public final static String CTE_STR_P = "P";
+	public final static String CTE_STR_S = "S";
+	public final static String CTE_STR_V = "V";
+
+	
+	
+	public final static String CTE_UNIDAD_MESES = "M";
+	public final static String CTE_UNIDAD_ANOS = "A";
+	public final static String CTE_UNIDAD_DIAS = "D";
+	
+	public final static String CTE_PERIODICIDAD_MENSUAL = "M";
+	public final static String CTE_PERIODICIDAD_TRIMESTRAL = "T";
+	public final static String CTE_PERIODICIDAD_SEMESTRAL = "S";
+	public final static String CTE_PERIODICIDAD_ANUAL = "1";
+	public final static String CTE_PERIODICIDAD_BIANUAL = "2";
+	public final static String CTE_PERIODICIDAD_TRIANUAL = "3";
+	public final static String CTE_PERIODICIDAD_DIARIO = "D";
+	
+	public final static Integer CTE_TIPO_CONDICION_INTERES_INTERES = new Integer(0);
+	public final static Integer CTE_TIPO_CONDICION_INTERES_SUSTITUTIVO = new Integer(1);
+	public final static Integer CTE_TIPO_CONDICION_INTERES_OPTATIVO = new Integer(2);
+	
+	public final static BigDecimal CTE_INTERES_CERCANO_A_CERO = new BigDecimal(0.01);
+	
+	public final static Integer CTE_CC_OBTENER_CUADRO_AMORT = new Integer(507); //ANPM
+	public final static Integer CTE_CO_OBTENER_CUADRO_AMORT = new Integer(266);
+	
+	public final static String CTE_CTX_OBTENER_CUADRO_AMORT_INTERES_INICIAL = "ANPMN075390";
+	public final static String CTE_CTX_OBTENER_CUADRO_AMORT_MATRIZ_VCTOS = "ANPMN075140";
+	public final static String CTE_CTX_OBTENER_CUADRO_AMORT_FECHA_PAGO = "ANPMN075142";
+	public final static String CTE_CTX_OBTENER_CUADRO_AMORT_FECHA_PRIMERA_REV_INT = "ANPMN075400";
+	
+	public final static BigDecimal CTE_BID_2 = new BigDecimal(2);
+	public final static BigDecimal CTE_BID_12 = new BigDecimal(12);
+	public final static BigDecimal CTE_BID_30 = new BigDecimal(30);
+	public final static BigDecimal CTE_BID_1200 = new BigDecimal(1200);
+	
+	public final static Integer CTE_ORDEN_TRAMO_1 = new Integer(1);
+	
+	public final static String CTE_TIPO_COMISION_GASTOS_ESTUDIO = 			"005";
+	public final static String CTE_TIPO_COMISION_GASTOS_APERTURA = 			"003";
+	public final static String CTE_TIPO_COMISION_MODIF_CONTRACT_GARANT = 	"007";
+	public final static String CTE_TIPO_COMISION_RECLAM_DEUDA_VENC = 		"008";
+	public final static String CTE_TIPO_COMISION_CANCEL = 					"004";
+	public final static String CTE_TIPO_COMISION_SOBRE_ADELANTOS = 			"001";
+	public final static String CTE_TIPO_COMISION_ADELANTO_GT_TOPE_SALDO = 	"002";
+	public final static String CTE_TIPO_COMISION_COMERCIO = 				"012";
+	
+	public final static String CTE_FECHA_NULA_YYYY_MM_DD_GUION = "0001-01-01";
+	
+	public final static Integer CTE_TIPO_CONDICION_INTERES = new Integer(0);
+	public final static Integer CTE_TIPO_CONDICION_SUSTITUTIVO = new Integer(1);
+
+	/*Valores posibles de tipo de interes, AN270080*/
+	public final static String CTE_TIPO_INTERES_FIJO = 						"00";
+	public final static String CTE_TIPO_INTERES_FIJO_PENALIZABLE = 			"01";
+	public final static String CTE_TIPO_INTERES_VARIABLE = 					"02";
+	public final static String CTE_TIPO_INTERES_VARIABLE_BONIFICABLE = 		"03";
+	public final static String CTE_TIPO_INTERES_VARIABLE_PENALIZABLE = 		"04";
+	public final static String CTE_TIPO_INTERES_VARIABLE_CON_DIFER_BONIF = 	"05";
+	public final static String CTE_TIPO_INTERES_FIJO_REFERENCIADO = 		"06";
+	
+	/*Nombres de parámetros de la tabla de parámetros generales de la aplicación ANPM (AN82, ParametroC)*/
+	public final static String CTE_PARAMETRO_AGRUPACION_GENERAL = "GENERAL";
+	public final static String CTE_PARAMETRO_NOMBRE_ESTRES_CUOTA_SCORING = "ESTRES_CUO";
+	public final static String CTE_PARAMETRO_NOMBRE_CODIGO_ENTIDAD_EVO = "CO_ENT_EVO";
+	public final static String CTE_PARAMETRO_NOMBRE_CODIGO_ENTIDAD_ABANCA = "CO_ENT_ABA";
+	public final static String CTE_PARAMETRO_NOMBRE_CODIGO_ENTIDAD_ASF = "CO_ENT_ASF";
+	
+	/*Valores posibles de AN270590: Sobre qué aplica suelo:*/
+	public final static int CTE_SOBRE_QUE_APLICA_SUELO_SOBRE_INTERES = 0;
+	public final static int CTE_SOBRE_QUE_APLICA_SUELO_SOBRE_TIPO_REF = 1;
+	
+	/*Valores posibles de AN250420: permite adelantar:*/
+	public final static int CTE_PERMITE_ADELANTAR_NO = 0;
+	public final static int CTE_PERMITE_ADELANTAR_SI = 1;
+	public final static int CTE_PERMITE_ADELANTAR_SI_CON_CONDICION = 2;
+	
+	/*Valores posibles de AN250430: permite cancelar:*/
+	public final static int CTE_PERMITE_CANCELAR_NO = 0;
+	public final static int CTE_PERMITE_CANCELAR_SI = 1;
+	public final static int CTE_PERMITE_CANCELAR_SI_CON_CONDICION = 2;
+	
+	
+	public final static BigDecimal CTE_TIPO_ADELANTO_NO_ADELANTO_NI_CANCEL = new BigDecimal(9);
+	public final static BigDecimal CTE_TIPO_ADELANTO_NO_ADELANTO = new BigDecimal(8);
+	
+	/*Valores posibles del código de periodicidad interés.*/
+	public final static String CTE_COD_PERIODICIDAD_FP = "FP";
+	public final static String CTE_COD_PERIODICIDAD_MV = "MV";
+	public final static String CTE_COD_PERIODICIDAD_TV = "TV";
+	public final static String CTE_COD_PERIODICIDAD_SV = "SV";
+	public final static String CTE_COD_PERIODICIDAD_1V = "1V";
+	
+	public final static String CTE_COD_PERIODICIDAD_MN = "MN";
+	public final static String CTE_COD_PERIODICIDAD_TN = "TN";
+	public final static String CTE_COD_PERIODICIDAD_SN = "SN";
+	public final static String CTE_COD_PERIODICIDAD_1N = "1N";
+	
+	/*Valores posibles de "tipo imputación adelanto", AN290040:*/
+	public final static int CTE_TIPO_IMPUTACION_ADELANTO_RECALCULO = 0;
+	public final static int CTE_TIPO_IMPUTACION_ADELANTO_ULT_CUOTAS = 1;
+	public final static int CTE_TIPO_IMPUTACION_ADELANTO_PROX_VCTOS = 2;
+	
+	/*Valores posibles de "fechas adelanto", AN290080*/
+	public final static int CTE_FECHAS_ADELANTO_LIBRES = 0;
+	public final static int CTE_FECHAS_ADELANTO_ORDINARIAS_DE_PAGO = 1;
+	
+	/*Valores posibles de FC01C018E*/
+	public final static String CTE_RELACION_CAIXA_ES_EMPLEADO = "1";
+	
+	/*EDIT 20140424: Ahora los estados datosSolicitudC se obtienen de la tabla de parametros,
+	 *  CG32, CG320020 = 'ESO' y son estos:
+	 *  EDIT 20140528: Añado copia de estas constantes en IConstantesSolicitud, módulo
+	 *  consultarsolicitud, para evitar dentro de lo posible las llamadas a constantes/métodos de otros módulos.*/
+	public static final int CTE_DATOS_SOLIC_ESTADO_PEND_CUMPLIM = 		0;
+	public static final int CTE_DATOS_SOLIC_ESTADO_ANULADO = 			1;
+	public static final int CTE_DATOS_SOLIC_ESTADO_PEND_CONCESION = 	2;
+	public static final int CTE_DATOS_SOLIC_ESTADO_CONCEDIDO = 			3; //este es igual que en AN40
+	public static final int CTE_DATOS_SOLIC_ESTADO_DENEGADO = 			4;
+	public static final int CTE_DATOS_SOLIC_ESTADO_RENUNCIA_CLIENTE = 	5;
+	public static final int CTE_DATOS_SOLIC_ESTADO_FORMALIZADO = 		6; //este es igual que en AN40
+	public static final int CTE_DATOS_SOLIC_ESTADO_PEND_DATOS = 		7;
+	public static final int CTE_DATOS_SOLIC_ESTADO_CANCELADO = 			8;
+	public static final int CTE_DATOS_SOLIC_ESTADO_SOLIC_ANULADA = 		9;
+	public static final int CTE_DATOS_SOLIC_ESTADO_RENOVAC_CORTO = 		'R'; //ASCII??
+	public static final int CTE_DATOS_SOLIC_ESTADO_PREST_EN_LITIGIO = 	10;
+	
+	
+}

@@ -1,0 +1,2394 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosEng;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosKey;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.parametro.ParametroEng;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.ProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.ProductoEng;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoEng;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos.SolicitudPmosVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ClaveTipoReferenciaVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextosconversion.FromContextCreator;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+
+/**
+ * Clase que contiene métodos de apoyo para la comprobación y el rellenado de
+ * los datos solicitud en el value object datosSolitudVO, utilizados directamente
+ * en el servicio y en las clases de obtención de datos solicitud ConsultaDatosSolicitudSrv.
+ * 
+ * @author V360144
+ *
+ */
+public class GestionConsultaDatosSolicitud
+{
+
+	private final static int CTE_SN_OBTENER_TIPO_REF_CC = 500; //PTMO
+	private final static int CTE_SN_OBTENER_TIPO_REF_CO = 130;
+	
+	private final static int CTE_SN_OBTENER_TIPO_REF_CC_DIVISA = 507; //ANPM
+	private final static int CTE_SN_OBTENER_TIPO_REF_CO_DIVISA = 505;
+	
+	private final static String CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_DIVISA = "DIVISA";
+	private final static String CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_GARANTIA = "GARANTIA";
+	private final static String CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_FECHA = "FECHA";
+	private final static String CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_PLAZO_MAXIMO_MESES = "PLAZO_MAXIMO_MESES";
+	private final static String CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_IMPORTE_MAXIMO = "IMPORTE_MAXIMO";
+	
+	private final static String CTE_SN_SN_OBTENER_TIPO_REF_ENTRADA_TIPO = "TIPO";
+	private final static String CTE_SN_SN_OBTENER_TIPO_REF_ENTRADA_PLAZO = "PLAZO";
+	private final static String CTE_SN_OBTENER_TIPO_REF_IND_BUS_FECHA = "IND_BUSQ_FECHA";
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	
+	private final static String CTE_CONTEXTO_VG = 				"ANPMN008";
+	private final static String CTE_CONTEXTO_VG_FECHA_INICIO = 	"ANPMN008040";
+	private final static String CTE_CONTEXTO_VG_FECHA_FIN = 	"ANPMN008060";
+	private final static String CTE_CONTEXTO_VG_VERSION_GENERAL = "ANPMN008010";
+
+	public static DatosSolicitudVO validacionesPrevias(BigDecimal nuc)
+	{
+		DatosSolicitudVO datosSolicitudVO = null;
+		/*Este método comprueba que exista el datosSolicitud y si existe se añade al datosSolicitudVO.
+		 * Si no existe se establece datosSolicitud.indicadorError a NK. */
+		datosSolicitudVO = obtenerDatosSolicitud(nuc);
+		if (! IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError()))
+		{
+			return datosSolicitudVO;
+		}
+		/*Este método comprueba que el tipo del préstamo sea válido.
+		 * Si no lo es se establece datosSolicitud.indicadorError a NK. */
+		datosSolicitudVO = validarTipoPrestamo(datosSolicitudVO);
+		if (! IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError()))
+		{
+			return datosSolicitudVO;
+		}
+		/*Este método comprueba que exista el producto y si existe se añade al datosSolicitudVO.
+		 * Si no existe se establece datosSolicitud.indicadorError a NK. */
+		datosSolicitudVO = GestionConsultaDatosSolicitud.obtenerProducto(datosSolicitudVO);
+		if (! IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError()))
+		{
+			return datosSolicitudVO;
+		}
+		
+		return datosSolicitudVO;
+	}
+	
+	private static DatosSolicitudVO validarTipoPrestamo(DatosSolicitudVO datosSolicitudVO)
+	{
+		DatosSolicitudC datosSolicitud = null;
+		String especialidad = null;
+		StringBuilder textoErrorStb = null;
+		
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		especialidad = UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getEspecialidad());
+		
+		if ((! IConstantesSolicitud.CTE_TIPO_PREST_SINDICADO.equals(especialidad)) &&
+			(! IConstantesSolicitud.CTE_TIPO_PREST_HIPOT_EUR.equals(especialidad)) &&
+			(! IConstantesSolicitud.CTE_TIPO_PREST_HIPOT_DIVISA.equals(especialidad)) &&
+			(! IConstantesSolicitud.CTE_TIPO_PRESTAMO_APLAZOS_SUB.equals(especialidad)))
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_TIPO_PREST_NO_VALIDO);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append(IConstantesSolicitud.CTE_TEXTO_ERROR_TIPO_PRESTAMOS_NO_VALIDO);
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+		}
+		return datosSolicitudVO;
+	}
+	
+	
+	/**
+	 * Comprueba que el datosSolicitudC asociado a la oficina y nuc exista.
+	 * Si existe se guarda como atributo de datosSolicitudVO y se devuelve.
+	 * @param datosSolicitudVO
+	 * @param oficina
+	 * @param nuc
+	 * @return datosSolicitudVO
+	 */
+	public static DatosSolicitudVO obtenerDatosSolicitud(BigDecimal nuc)
+	{
+		DatosSolicitudVO datosSolicitudVO = new DatosSolicitudVO();
+		DatosSolicitudEng datosSolicitudDao = new DatosSolicitudEng();
+		DatosSolicitudC datosSolicitud = null;
+		StringBuilder textoErrorStb = null;
+		
+		datosSolicitud = datosSolicitudDao.obtenerDatosSolicitudParaScoring(nuc);
+		if (null == datosSolicitud)
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_DATOS_SOLIC_NO_EXISTE);
+			
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			
+			textoErrorStb = textoErrorStb.append("La solicitud asociada con el NUC ");
+			textoErrorStb = textoErrorStb.append(nuc.toString());
+			textoErrorStb = textoErrorStb.append(" no existe.");
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		if (null != datosSolicitud)
+		{
+			datosSolicitudVO.setDatosSolicitud(datosSolicitud);
+		}
+		return datosSolicitudVO;
+	}
+	
+	/**
+	 * Comprueba que el producto asociado al datosSolicitudC de datosSolicitudVO exista.
+	 * Si existe se guarda como atributo de datosSolicitudVO y se devuelve.
+	 * @param datosSolicitudVO
+	 * @param oficina
+	 * @param nuc
+	 * @return datosSolicitudVO
+	 */
+	public static DatosSolicitudVO obtenerProducto(DatosSolicitudVO datosSolicitudVO)
+	{
+		DatosSolicitudC datosSolicitud = null;
+		ProductoEng productoDao = new ProductoEng();
+		ProductoC producto = null;
+		BigDecimal codigoProducto = null;
+		StringBuilder textoErrorStb = null;
+		
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		codigoProducto = datosSolicitud.getProducto();
+		producto = productoDao.obtenerUltimaVersionProductoPorCodigo(
+				UtilidadesTramitacion.comprobarDatoNull(codigoProducto));
+		
+		if (null != producto)
+		{
+			datosSolicitudVO.setDatosSolicitud(datosSolicitud);
+			datosSolicitudVO.setProducto(producto);
+		}
+		else
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_PRODUCTO_NO_EXISTE);
+			
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			
+			textoErrorStb = textoErrorStb.append("El producto asociado a la oficina ");
+			textoErrorStb = textoErrorStb.append(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud().toString());
+			textoErrorStb = textoErrorStb.append(" y NUC ");
+			textoErrorStb = textoErrorStb.append(datosSolicitud.getDatosSolicitudKey().getNucExpediente().toString());
+			textoErrorStb = textoErrorStb.append(" no existe.");
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+		}
+		return datosSolicitudVO;
+	}
+
+	public static DatosSolicitudVO obtenerDatosSolicitudVOComun(
+		DatosSolicitudVO datosSolicitudVO)
+	{
+		DatosSolicitudC datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		ProductoC producto = datosSolicitudVO.getProducto();
+		
+		if ((null != datosSolicitud) && (null != producto))
+		{
+			DatosSolicitudKey datosSolicitudKey = datosSolicitud.getDatosSolicitudKey();
+			
+			datosSolicitudVO.setDivisaEntidad(UtilidadesTramitacion.obtenerMonedaEntidad());
+			
+			/*ANPMM008*/
+/*
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_OK);
+			datosSolicitudVO.setCodigoError(StringUtils.EMPTY);
+			datosSolicitudVO.setTextoError(StringUtils.EMPTY);
+			datosSolicitudVO.setTexto(StringUtils.EMPTY);
+*/
+			
+			datosSolicitudVO.setCodigoEntidad(datosSolicitud.getEntidad());
+			datosSolicitudVO.setOficina(datosSolicitudKey.getOficinaSolicitud());
+			datosSolicitudVO.setNumeroSolicitud(datosSolicitudKey.getNumSolicitud());
+			datosSolicitudVO.setNuc(datosSolicitudKey.getNucExpediente());
+			datosSolicitudVO.setVersionSolicitud(datosSolicitudKey.getVersionSolicitud());
+			datosSolicitudVO.setTipoExpediente(datosSolicitud.getTipoExpediente());
+			
+			/*EDIT 20140516: Campo novo*/
+			datosSolicitudVO.setCentroContable(datosSolicitud.getOficinaContable());
+			
+			datosSolicitudVO.setModalidad(datosSolicitud.getProducto());
+			datosSolicitudVO.setCanal(datosSolicitud.getCanal());
+			datosSolicitudVO.setUsuarioCRM(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getUsuarioCRM()));
+			datosSolicitudVO.setPlazoTotal(datosSolicitud.getPlazoTotal());
+			datosSolicitudVO.setUnidadPlazo(datosSolicitud.getUnidadPlazo());
+			
+			/*20141015 
+			 * 
+				ANPMD1010325 = AN250650; /* CARENCIA DE CAPITAL
+			 * 
+			 * */
+			datosSolicitudVO.setCarenciaCapital(datosSolicitud.getPlazoCarencia());
+			
+			//ANPMD1010650 = AN250670;  /* CARENCIA DE INTERESES */
+			datosSolicitudVO.setCarenciaIntereses(datosSolicitud.getPlazoDiferimiento());
+			
+			datosSolicitudVO.setTipoCarenciaCapital(datosSolicitud.getTipoCarenciaCapitalDuranteAmortiz());
+			datosSolicitudVO.setTipoCarenciaInteres(datosSolicitud.getTipoCarenciaInteresDuranteAmortiz());
+			
+			if (0 == BigDecimal.ZERO.compareTo(datosSolicitud.getTipoCarenciaCapitalDuranteAmortiz()) && 
+				0 == BigDecimal.ZERO.compareTo(datosSolicitud.getTipoCarenciaInteresDuranteAmortiz()))
+			{
+				datosSolicitudVO.setIndTieneCarenciaIntermedia(Constantes.CTE_STR_N);
+			}
+			else
+			{
+				datosSolicitudVO.setIndTieneCarenciaIntermedia(Constantes.CTE_STR_S);
+			}
+			
+			datosSolicitudVO.setUnidadCarencia(datosSolicitud.getUnidadPlazo());
+			datosSolicitudVO.setMinutaCentralizada(datosSolicitud.getMinutaCentralizada());
+			/*BEGIN ANPMX101*/
+			//ANPMD1010420 = AN250210; /* RIESGO - SOLIDARIO/MANCOMUNADO */
+			datosSolicitudVO.setTipoRiesgo(datosSolicitud.getClaseRiesgo());
+			
+			datosSolicitudVO = obtenerGarantias(datosSolicitudVO, datosSolicitud);
+			
+			//ANPMD1010630 = AN260090;     /*  MODALIDAD AMORTIZACION  */
+			//Ya se hace en obtenerCondicionCapital
+			
+			/*END ANPMX101*/
+			datosSolicitudVO = obtenerImportesComunes(datosSolicitudVO);
+			
+			datosSolicitudVO = obtenerClavePrestamo(datosSolicitudVO);
+			/*ANPMD008060 = AN010030;       DESCRIPCION DE LA MODALIDAD */
+			datosSolicitudVO.setDescrModalidad(UtilidadesTramitacion.comprobarDatoNull(producto.getDescripcion()));
+			
+			
+			datosSolicitudVO = obtenerFechas(datosSolicitudVO);
+			
+			//datosSolicitudVO = obtenerDatosSolicitudVO_ANPMX101(datosSolicitudVO);
+
+			/*BEGIN ANPMX101*/
+			/*BEGIN EDIT 20140904 V360144 PROVISIONAL, CUANDO EL PRODUCTO ES 5808:1 o 5808:3 -> LTV = S else LTV = N*/
+			/*20150720 Se corrige, ahora no se hace esta comprobación del subproducto, directamente miramos 
+			 * lo que hay en la columna AN251510. Si hay 0: S, si hay 1: N, else: ''.*/
+/*
+			if ((0 == Constantes.CTE_COD_PROD_HIP_VAR_BONIF.compareTo(datosSolicitud.getProducto())) &&
+				((0 == BigDecimal.ONE.compareTo(datosSolicitud.getSubproducto())) ||  
+				(0 == Constantes.CTE_BIG_DECIMAL_TRES.compareTo(datosSolicitud.getSubproducto()))))
+			{
+				datosSolicitudVO.setIndHipotConSeguroExcesoLtv(IConstantesSolicitud.CTE_STR_S);
+			}
+			else
+			{
+				datosSolicitudVO.setIndHipotConSeguroExcesoLtv(IConstantesSolicitud.CTE_STR_N);
+			}
+*/
+			if (Constantes.CTE_STR_0.equals(datosSolicitud.getComprobacionLTV()))
+			{
+				datosSolicitudVO.setIndHipotConSeguroExcesoLtv(IConstantesSolicitud.CTE_STR_N);
+			}
+			else if (Constantes.CTE_STR_1.equals(datosSolicitud.getComprobacionLTV()))
+			{
+				datosSolicitudVO.setIndHipotConSeguroExcesoLtv(IConstantesSolicitud.CTE_STR_S);
+			}
+			else
+			{
+				datosSolicitudVO.setIndHipotConSeguroExcesoLtv(StringUtils.EMPTY);
+			}
+			
+			
+			datosSolicitudVO.setNumeroSolicitud(datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+			datosSolicitudVO.setVersionSolicitud(datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+			datosSolicitudVO.setDivisionPrestamo(datosSolicitud.getDivision());
+			datosSolicitudVO.setSubDivisionPrestamo(datosSolicitud.getSubDivision());
+			datosSolicitudVO.setDigitoPrestamo(datosSolicitud.getDigitoSolicitud());
+			datosSolicitudVO.setCodigoSubProducto(datosSolicitud.getSubproducto());
+			datosSolicitudVO.setVersionGeneral(datosSolicitud.getVersionGeneral());
+			datosSolicitudVO.setGarantiaContable(datosSolicitud.getGarantiaOficina());
+			datosSolicitudVO.setDivisionGarantiaContable(new BigDecimal(1)); //probablemente se necesite con un 0 delante: 01.
+			
+			datosSolicitudVO.setCodigoCnae(datosSolicitud.getCnae());
+			
+			datosSolicitudVO.setIndHipotecaVivienda(datosSolicitud.getHipotecaVivienda());
+			datosSolicitudVO.setOrdenImputacionPagos(datosSolicitud.getOrdenImputacionPagos());
+			datosSolicitudVO.setTipoDiferimiento(datosSolicitud.getTipoDiferimiento());
+			datosSolicitudVO.setPorcentajeDiferimientoInteresPagado(datosSolicitud.getDiferInteresPagado());
+		
+			/*
+			  cuotaPactada: En ANPMX101:
+			  ANPMD1010974 = AN250810;  //DIFERIMIENTO CUOTA PACTADA
+			  
+			  En ANPMD008:
+			  ANPMD008110 = AN250810;      //CUOTA PACTADA
+			  
+			  Por lo tanto la cuota pactada ANPMD008110 no es cuota pactada, es
+			  diferimiento cuota pactada, le cambio en nombre en DatosSolicitudVO.
+			  Ya se establece previamente, en el método obtenerDatosSolicitudVOComun(..)
+			 */
+			
+			if (! StringUtils.isBlank(datosSolicitud.getEspecialidad()))
+			{
+				datosSolicitudVO.setIndPrestamoConvenio(IConstantesSolicitud.CTE_STR_S);
+			}
+			else
+			{
+				datosSolicitudVO.setIndPrestamoConvenio(IConstantesSolicitud.CTE_STR_N);
+			}
+
+			datosSolicitudVO = obtenerInformacionCliente(datosSolicitudVO);
+			
+			/*ANPMD1010150 = AN250190;   /* SECTOR DEL PRESTAMO*/
+			datosSolicitudVO.setTipoPersona(datosSolicitud.getSector());
+
+		
+			//ANPMD1010170 =  AN250520;    /* ESTADO SOLICITUD */
+			datosSolicitudVO.setEstadoSolicitud(datosSolicitud.getEstadoSolicitud());
+			
+			switch (datosSolicitud.getEstadoSolicitud().intValue())
+			{
+				case IConstantesSolicitud.CTE_DATOS_SOLIC_ESTADO_FORMALIZADO:
+				{
+					datosSolicitudVO.setIndEstadoSolicitud(IConstantesSolicitud.CTE_STR_P);
+					break;
+				}
+				case IConstantesSolicitud.CTE_DATOS_SOLIC_ESTADO_PEND_CONCESION:
+				case IConstantesSolicitud.CTE_DATOS_SOLIC_ESTADO_CONCEDIDO:
+				case IConstantesSolicitud.CTE_DATOS_SOLIC_ESTADO_PEND_DATOS:
+				{
+					datosSolicitudVO.setIndEstadoSolicitud(IConstantesSolicitud.CTE_STR_S);
+					break;
+				}
+				default:
+				{
+					datosSolicitudVO.setIndEstadoSolicitud(IConstantesSolicitud.CTE_STR_C);
+					break;
+				}
+			}
+
+		/*END ANPMX101*/
+		}
+		return datosSolicitudVO;
+	}
+	
+	public static DatosSolicitudVO obtenerImportesComunes(DatosSolicitudVO datosSolicitudVO)
+	{
+		BigDecimal contravalor = null;
+		DatosSolicitudC datosSolicitud = null;
+		
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		
+		if (null != datosSolicitud)
+		{
+			/*BEGIN IMPORTES*/
+			
+			//ANPMD1010430 = AN250640; /* MONEDA                         */
+			/*BEGIN ANPMX101*/
+			/*         ANPMD1010310 = AN250630; /* IMPORTE TOTAL */
+			datosSolicitudVO.setImporteTotalDivisa(datosSolicitud.getImporteTotal());
+			datosSolicitudVO.setDivisaImporteTotal(datosSolicitud.getMonedaImporteTotal());
+			contravalor = UtilidadesTramitacion.calcularContravalor(
+				datosSolicitudVO.getDivisaImporteTotal(),
+				datosSolicitudVO.getImporteTotalDivisa(),
+				datosSolicitudVO.getDivisaEntidad());
+			datosSolicitudVO.setImporteTotalContravalor(contravalor);
+			/*END ANPMX101*/
+			
+
+		}
+		return datosSolicitudVO;
+	}
+
+	private static DatosSolicitudVO obtenerGarantias(
+		DatosSolicitudVO datosSolicitudVO, DatosSolicitudC datosSolicitud)
+	{
+		ParametrosEng parametrosDao = new ParametrosEng();
+		ParametrosC parametros = null;
+		ParametrosKey parametrosKey = null;
+		String codigoEnTabla = null; //para consultar ParametrosC, CG32TB01
+		//String garantiaMayoritariaRiesgo = null;
+		
+         /*******************************************************/              
+         /* ATENCION!!! ESTO HABRA QUE MODIFICARLO CUANDO SE    */              
+         /* TENGA EN CUENTA EL TEMA DE GARANTIAS                */              
+         /*******************************************************/              
+		if (IConstantesSolicitud.CTE_INT_20 > datosSolicitud.getGarantiaContable().intValue())
+		{
+			//THEN ANPMD1010440 = 'H'; /* GARANTIA HIPOTECARIA */
+			datosSolicitudVO.setTipoGarantiaMayoritaria(IConstantesSolicitud.CTE_STR_H);
+		}
+		else
+		{
+			if (IConstantesSolicitud.CTE_INT_60 <= datosSolicitud.getGarantiaContable().intValue())
+			{
+				//THEN ANPMD1010440 = 'P'; /* GARANTIA PERSONAL */
+				datosSolicitudVO.setTipoGarantiaMayoritaria(IConstantesSolicitud.CTE_STR_P);
+			}
+			else
+			{
+				//ELSE ANPMD1010440 = 'O'; /* OTRAS REALES    */
+				datosSolicitudVO.setTipoGarantiaMayoritaria(IConstantesSolicitud.CTE_STR_O);
+			}
+		}
+		//ANPMD1010580 = AN250230;   /* GARANTIA OFICINA */
+		/*EDIT 20140516*/
+		//datosSolicitudVO.setGarantiaMayoritariaRiesgo(datosSolicitud.getGarantiaOficina());
+		/*
+		garantiaMayoritariaRiesgo = StringUtils.leftPad(
+			datosSolicitud.getGarantiaGMR().toString(),
+			IConstantesSolicitud.CTE_INT_2,
+			IConstantesSolicitud.CTE_CHAR_0);
+		*/
+		datosSolicitudVO.setGarantiaMayoritariaRiesgo(
+			new BigDecimal(datosSolicitud.getGarantiaGMR().toString().concat(IConstantesSolicitud.CTE_STR_99)));
+		datosSolicitudVO.setGarantiaGMR(
+			new BigDecimal(datosSolicitud.getGarantiaGMR().toString().concat(IConstantesSolicitud.CTE_STR_99)));
+		/*FIN EDIT 20140516*/
+		
+		
+		//ANPMD1010600 = ANPMD1010440;
+		datosSolicitudVO.setTipoGarantiaSeguro(datosSolicitudVO.getTipoGarantiaMayoritaria());
+		
+		/*
+		 tipoGarantia: En ANPMX101:
+		 	ANPMD1010590 = AN250220;
+		 En ANPMM008:
+		 ANPMD008102 = AN250220;
+		 */
+		datosSolicitudVO.setTipoGarantia(datosSolicitud.getTipoGarantia());
+		datosSolicitudVO.setGarantiaOficina(datosSolicitud.getGarantiaOficina());
+		datosSolicitudVO.setNivelGarantiaOficina(datosSolicitud.getNivelGarantiaOficina());
+		if (IConstantesSolicitud.CTE_EXPED_NO_ESTA_EN_GARANTIA.equals(datosSolicitudVO.getTipoGarantia()))
+		{
+			
+			parametrosKey = new ParametrosKey();
+			parametrosKey.setClave(IConstantesSolicitud.CTE_CLAVE_PARAMETRO_GAR);
+			codigoEnTabla = StringUtils.leftPad(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getGarantiaOficina()).toString(),
+				IConstantesSolicitud.CTE_INT_4,
+				IConstantesSolicitud.CTE_CHAR_0
+			);
+			parametrosKey.setCodTabla(codigoEnTabla);
+			parametros = parametrosDao.findById(parametrosKey);
+			
+			if (null == parametros)
+			{
+				if (IConstantesSolicitud.CTE_TIPO_PREST_SINDICADO.equals(datosSolicitud.getEspecialidad()))
+				{
+					datosSolicitudVO.setDescrGarantiaOficina(StringUtils.EMPTY);
+				}
+				else
+				{
+					datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(
+						datosSolicitudVO, IConstantesSolicitud.CTE_CLAVE_PARAMETRO_GAR, codigoEnTabla);
+					return datosSolicitudVO;
+				}
+			}
+			else
+			{
+				datosSolicitudVO.setDescrGarantiaOficina(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()));
+			}
+		}
+		else if (IConstantesSolicitud.CTE_EXPED_ESTA_EN_GARANTIA.equals(datosSolicitud.getTipoGarantia()))
+		{
+			//garantiaGMR = AN250260 || '99'
+			//garantiaGMR = garantia contable || '99'
+			/*EDIT 20140516*/
+			/*
+			datosSolicitudVO.setGarantiaGMR(new BigDecimal(
+				datosSolicitud.getGarantiaContable().toString().concat(IConstantesSolicitud.CTE_STR_99)));
+				*/
+			/*FIN EDIT 20140516*/
+			
+			datosSolicitudVO.setGarantiaContable(datosSolicitud.getGarantiaContable());
+			
+			parametrosKey = new ParametrosKey();
+			parametrosKey.setClave(IConstantesSolicitud.CTE_CLAVE_PARAMETRO_GMR);
+			codigoEnTabla = StringUtils.leftPad(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getGarantiaOficina()).toString(),
+				IConstantesSolicitud.CTE_INT_2,
+				IConstantesSolicitud.CTE_CHAR_0
+			).concat(IConstantesSolicitud.CTE_STR_99);
+			
+			parametrosKey.setCodTabla(codigoEnTabla);
+			parametros = parametrosDao.findById(parametrosKey);
+			
+			if (null == parametros)
+			{
+				datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(
+					datosSolicitudVO, parametrosKey.getClave(), parametrosKey.getCodTabla());
+				return datosSolicitudVO;
+			}
+			//datosSolicitudVO.setDescrGarantiaContable(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()));
+			datosSolicitudVO.setDescrGarantiaOficina(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()));
+			datosSolicitudVO.setGarantiaOficina(datosSolicitud.getGarantiaGMR());
+		}
+		
+		return datosSolicitudVO;
+	}
+	
+	private static DatosSolicitudVO obtenerClavePrestamo(DatosSolicitudVO datosSolicitudVO)
+	{
+		/*
+	    AUX_AN250020=AN250020;                                                      
+	    ANPMD008040=CG@LTRIM(AN250010)||'-'||CG@LTRIM(AUX_AN250020)||'-'||          
+                CG@LTRIM(AN250050);                                             
+		 * */
+		
+		StringBuilder clavePrestamoStb = null;
+		
+		DatosSolicitudC datosSolicitud = null;
+		DatosSolicitudKey datosSolicitudKey = null;
+
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		datosSolicitudKey = datosSolicitud.getDatosSolicitudKey();
+		
+		clavePrestamoStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+		clavePrestamoStb = clavePrestamoStb.append(UtilidadesTramitacion.comprobarDatoNull(
+				datosSolicitudKey.getOficinaSolicitud()).toString().trim());
+		
+		clavePrestamoStb = clavePrestamoStb.append("-");
+		clavePrestamoStb = clavePrestamoStb.append(UtilidadesTramitacion.comprobarDatoNull(
+				datosSolicitudKey.getNumSolicitud()).toString());
+		clavePrestamoStb = clavePrestamoStb.append("-");
+		clavePrestamoStb = clavePrestamoStb.append(UtilidadesTramitacion.comprobarDatoNull(
+				datosSolicitud.getDigitoSolicitud()).toString());
+		
+		datosSolicitudVO.setClavePrestamo(clavePrestamoStb.toString());
+		
+		return datosSolicitudVO;
+	}
+	
+	private static DatosSolicitudVO obtenerFechas(DatosSolicitudVO datosSolicitudVO)
+	{
+		String fechaPrevistaFirmaStr = null;
+		Date fechaPrevistaFirma = null;
+		DateHelper dateHelper = DateHelper.getInstance();
+		
+		DatosSolicitudC datosSolicitud = null;
+		
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		
+		/*BEGIN FECHAS*/
+		datosSolicitudVO.setFechaFormalizacion(datosSolicitud.getFechaFormalizacion());
+		
+		/*BEGIN ANPMX101*/
+		fechaPrevistaFirmaStr = DateHelper.sqlDateToString(
+			datosSolicitud.getFechaValorFirma(),
+			DateHelper.FORMATO_YYYY_MM_DD_GUION);
+		
+		if (! IConstantesSolicitud.CTE_FECHA_NULA_YYYY_MM_DD_GUION.equals(fechaPrevistaFirmaStr))
+		{
+			fechaPrevistaFirma = datosSolicitud.getFechaValorFirma();
+		}
+		else
+		{
+			/*Obtenemos la fecha de hoy.*/
+			
+			fechaPrevistaFirma = DateUtils.toSQLDate(dateHelper.askTimeFromDB2(ServicioNegocio.getContexto().getEntidad()));
+			//fechaPrevistaFirma = new Date(dateHelper.askTimeFromDB2(ServicioNegocio.getContexto().getEntidad()).getTime());
+		}
+		datosSolicitudVO.setFechaPrevistaFirma(fechaPrevistaFirma);
+		/*ANPMX101*/
+		
+		datosSolicitudVO.setFechaSolicitud(datosSolicitud.getFechaSolicitud());
+		
+		/*END FECHAS*/
+		
+		return datosSolicitudVO;
+	}
+	
+	private static DatosSolicitudVO obtenerInformacionCliente(DatosSolicitudVO datosSolicitudVO)
+	{
+		IDatosEntradaTx datosEntradaSNConsultaClientesNuc = null;
+		IContexto[] resultadoSNConsultaClientesNuc = null;
+		
+		IDatosEntradaTx datosEntradaSNDatosGeneralesCliente = null;
+		IContexto[] resultadoSNDatosGeneralesCliente = null;
+		
+		DatosSolicitudC datosSolicitud = null;
+		BigDecimal nuc = null;
+		BigDecimal claveCliente = null;
+		List<BigDecimal> claveTitulares = null;
+		
+		String indRelacionEntidad = null;
+		String indEsEmpleado = null;
+		
+		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+		datosEntradaSNConsultaClientesNuc = ServicioNegocio.getPrograma(
+			ServicioNegocio.getContexto(),
+			IConstantesSolicitud.CTE_SN_CC_CONSULTA_CLIENTES_NUC,
+			IConstantesSolicitud.CTE_SN_CO_CONSULTA_CLIENTES_NUC);
+		
+		nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+		datosEntradaSNConsultaClientesNuc.addCampo("NUC", nuc);
+		datosEntradaSNConsultaClientesNuc.addCampo("RELACION", Constantes.CTE_STR_01);
+		
+		
+		resultadoSNConsultaClientesNuc = ServicioNegocio.invocarServicio(
+			ServicioNegocio.getContexto(), datosEntradaSNConsultaClientesNuc);
+		
+		if (! UtilidadesTramitacion.isBlankOrNull(resultadoSNConsultaClientesNuc))
+		{
+			// Obtenemos la clave del cliente (primer titular)
+			claveCliente = resultadoSNConsultaClientesNuc[0].getBigDecimal("FC722C0040");
+			
+			// 2016-10-03 - Obtenemos la clave de los titulares para llamar al metodo 
+			//              de comprobacion de carterizado por banca privada o premium.
+			claveTitulares = new ArrayList<BigDecimal>();
+			for (IContexto cliente : resultadoSNConsultaClientesNuc)
+			{
+				if (cliente.getString("FC722C0020").equals(Constantes.CTE_STR_01))
+				{
+					// Si el cliente es titular, se anhade la clave a la lista de titulares
+					claveTitulares.add(cliente.getBigDecimal("FC722C0040"));
+				}
+			}
+			
+			if (null != claveCliente)
+			{
+				
+				datosEntradaSNDatosGeneralesCliente = ServicioNegocio.getPrograma(
+					ServicioNegocio.getContexto(),
+					IConstantesSolicitud.CTE_SN_CC_DATOS_GENERALES_CLIENTE,
+					IConstantesSolicitud.CTE_SN_CO_DATOS_GENERALES_CLIENTE);
+				
+				datosEntradaSNDatosGeneralesCliente.addCampo("claveCliente", claveCliente);
+				
+				resultadoSNDatosGeneralesCliente = ServicioNegocio.invocarServicio(
+					ServicioNegocio.getContexto(), datosEntradaSNDatosGeneralesCliente);
+				
+				if (! UtilidadesTramitacion.isBlankOrNull(resultadoSNDatosGeneralesCliente))
+				{
+					indRelacionEntidad = resultadoSNDatosGeneralesCliente[0].getString("FC01C018E");
+					
+					/*Comprobamos si el cliente es empleado de ABANCA*/
+					if (IConstantesSolicitud.CTE_RELACION_CAIXA_ES_EMPLEADO.equals(indRelacionEntidad))
+					{
+						indEsEmpleado = IConstantesSolicitud.CTE_STR_S;
+					}
+					else
+					{
+						indEsEmpleado = IConstantesSolicitud.CTE_STR_N;
+					}
+				}
+				
+				
+				
+				/*EDIT 20141001 CAMPO NUEVO IND. CLIENTE CARTERIZADO B. PRIVADA O B. PREMIUM (S/N)*/
+				/*Si el producto es 5808 subproducto 3:
+				 * 
+				 * Se llama al SN YINT_035 (CC 888)
+				 * 
+				 * Despues al SN YINT_013, buscar equivalente en el contexto que devuelva a la columna
+				 *   YI020050
+				 *   El cliente está carterizado dentro de b.privada o b. premium si el campo del contexto
+				 *   equivalente a YI020050 comienza por "SP" 
+				 * 
+				indClienteCartBPrivadaOBPremium
+				 * 
+				 * EDIT 20141113: Se va a llamar siempre.
+				if ((0 == Constantes.CTE_COD_PROD_HIP_VAR_BONIF.compareTo(datosSolicitud.getProducto())) &&
+					(0 == Constantes.CTE_BID_TRES.compareTo(datosSolicitud.getSubproducto())))
+				{
+				}
+				*/
+				
+				// 2016-10-03 - Realizar compronacion de carterizado utilizando todos los
+				// titulares del prestamo, no solo el primer titular.
+				//datosSolicitudVO.setIndClienteCartBPrivadaOBPremium(
+				//	Utilidades.obtenerIndClienteCartBPrivadaOBPremium(claveCliente));
+				datosSolicitudVO.setIndClienteCartBPrivadaOBPremium(
+						Utilidades.obtenerIndClienteCartBPrivadaOBPremium(claveTitulares));
+			}
+			
+		}
+		
+		datosSolicitudVO.setIndPrestamoEmpleado(indEsEmpleado);
+		
+/*
+Iván: " Hola, 
+Aquí lo que haremos será invocar a la FCLI_722 esto nos va a devolver la clave del cliente.
+Una vez la tenemos invocamos al servicio de negocio:
+http://xintnlb/rpos215/Documentacion.J2EE_ServiciosNegocioConsultaCliente%20clave%20555-834.ashx
+Este servicio de negocio nos va devolver un contexto que incluye el indicador 
+FC01C018E 	CHAR	1	-	Reservado
+Este indicador nos dirá si es empleado o no. Creo que esto sería lo correcto a no ser que me indiquen lo contrario.
+Un saludo. "
+RESUMINDO: FCLI_722 && FCLI_834
+*/
+
+		return datosSolicitudVO;
+	}
+	public static String obtenerPeriodicidad(
+		String periodicidadUnidadPeriodo,
+		int periodicidadNumPeriodos)
+	{
+		String periodicidad = null;
+		
+		if (IConstantesSolicitud.CTE_UNIDAD_MESES.equals(periodicidadUnidadPeriodo))
+		{
+			switch (periodicidadNumPeriodos)
+			{
+				case IConstantesSolicitud.CTE_INT_1:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_MENSUAL;
+					break;
+				}
+				case IConstantesSolicitud.CTE_INT_3:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_TRIMESTRAL;
+					break;
+				}
+				case IConstantesSolicitud.CTE_INT_6:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_SEMESTRAL;
+					break;
+				}
+				case IConstantesSolicitud.CTE_INT_12:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_ANUAL;
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
+		}
+		else if (IConstantesSolicitud.CTE_UNIDAD_ANOS.equals(periodicidadUnidadPeriodo))
+		{
+			switch (periodicidadNumPeriodos)
+			{
+				case IConstantesSolicitud.CTE_INT_1:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_ANUAL;
+					break;
+				}
+				case IConstantesSolicitud.CTE_INT_2:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_BIANUAL;
+					break;
+				}
+				case IConstantesSolicitud.CTE_INT_3:
+				{
+					periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_TRIANUAL;
+					break;
+				}
+				default:
+				{
+					break;
+				}
+			}
+			
+		}
+		else if (IConstantesSolicitud.CTE_UNIDAD_DIAS.equals(periodicidadUnidadPeriodo))
+		{
+			periodicidad = IConstantesSolicitud.CTE_PERIODICIDAD_DIARIO;
+		}
+		
+		return periodicidad;
+	}
+	
+
+	public static String obtenerTipoPeriodo(int tipoPeriodo)
+	{
+		String tipoPeriodoStr = null;
+		switch(tipoPeriodo)
+		{
+			case IConstantesSolicitud.CTE_INT_1:
+			{
+				tipoPeriodoStr = IConstantesSolicitud.CTE_STR_V;
+				break;
+			}
+			case IConstantesSolicitud.CTE_INT_2:
+			{
+				tipoPeriodoStr = IConstantesSolicitud.CTE_STR_N;
+				break;
+			}
+			case IConstantesSolicitud.CTE_INT_0:
+			{
+				tipoPeriodoStr = IConstantesSolicitud.CTE_STR_0;
+				break;
+			}
+			default:
+			{
+				break;
+			}
+		}
+		return tipoPeriodoStr;
+	}
+	
+	public static DatosSolicitudVO verificarPeriodicidad(DatosSolicitudVO datosSolicitudVO, 
+		String unidadPeriodicidad, Integer numeroPeriodos, Integer tipoPeriodo)
+	{
+		StringBuilder textoErrorStb = null;
+		
+		if (StringUtils.isBlank(unidadPeriodicidad))
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_UNIDAD_PERIODICIDAD_NO_EXISTE);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append(IConstantesSolicitud.CTE_TEXTO_ERROR_UNIDAD_PERIODICIDAD_NO_EXISTE);
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		else if (null == numeroPeriodos)
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_NUMERO_PERIODOS_NO_EXISTE);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append(IConstantesSolicitud.CTE_TEXTO_ERROR_NUMERO_PERIODOS_NO_EXISTE);
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		else if (null == tipoPeriodo)
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_TIPO_PERIODOS_NO_EXISTE);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append(IConstantesSolicitud.CTE_TEXTO_ERROR_TIPO_PERIODOS_NO_EXISTE);
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		else if	(!((IConstantesSolicitud.CTE_UNIDAD_MESES.equals(unidadPeriodicidad) &&
+				  ((IConstantesSolicitud.CTE_INT_1 == numeroPeriodos.intValue()) ||
+				   (IConstantesSolicitud.CTE_INT_3 == numeroPeriodos.intValue()) ||
+				   (IConstantesSolicitud.CTE_INT_6 == numeroPeriodos.intValue()) ||
+				   (IConstantesSolicitud.CTE_INT_12 == numeroPeriodos.intValue()))) ||
+				 (IConstantesSolicitud.CTE_UNIDAD_MESES.equals(unidadPeriodicidad) &&
+				  ((IConstantesSolicitud.CTE_INT_1 == numeroPeriodos.intValue()) ||
+				   (IConstantesSolicitud.CTE_INT_2 == numeroPeriodos.intValue()) ||
+				   (IConstantesSolicitud.CTE_INT_3 == numeroPeriodos.intValue()))) ||
+				 (IConstantesSolicitud.CTE_UNIDAD_DIAS.equals(unidadPeriodicidad))))
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_PERIODICIDAD_NO_ES_VALIDA);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append("La periodicidad con unidad de periodicidad");
+			textoErrorStb = textoErrorStb.append(unidadPeriodicidad);
+			textoErrorStb = textoErrorStb.append(" y número de periodos ");
+			textoErrorStb = textoErrorStb.append(numeroPeriodos.toString());
+			textoErrorStb = textoErrorStb.append(" no es válida.");
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		else if (!(IConstantesSolicitud.CTE_INT_1 == tipoPeriodo.intValue() ||
+				 IConstantesSolicitud.CTE_INT_2 ==  tipoPeriodo.intValue() ||
+				 IConstantesSolicitud.CTE_INT_0 == tipoPeriodo.intValue()))
+		{
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_TIPO_PERIODICIDAD_NO_ES_VALIDO);
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			textoErrorStb = textoErrorStb.append("El tipo de período ");
+			textoErrorStb = textoErrorStb.append(tipoPeriodo);
+			textoErrorStb = textoErrorStb.append(" no es válido.");
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			return datosSolicitudVO;
+		}
+		return datosSolicitudVO;
+	}
+
+	
+	public static String obtenerCodigoEnTabla(
+		String unidadPeriodicidad, Integer numeroPeriodos, Integer tipoPeriodo)
+	{
+		String codigoEnTabla = null;
+		String periodicidad = null; //(M)ensual, (T)rimestral, ... Tercer carácter del código en tabla.
+		String tipoPeriodoStr = null; //V(encido), N(atural), 0. Cuarto carácter del código en tabla.
+		
+		if ((! StringUtils.isBlank(unidadPeriodicidad)) &&
+			(null != numeroPeriodos) &&
+			(null != tipoPeriodo))
+		{
+		
+			periodicidad = obtenerPeriodicidad(unidadPeriodicidad, numeroPeriodos.intValue());
+			if (! StringUtils.isBlank(periodicidad))
+			{
+				tipoPeriodoStr = obtenerTipoPeriodo(tipoPeriodo.intValue());
+				if (! StringUtils.isBlank(tipoPeriodoStr))
+				{
+					codigoEnTabla = IConstantesSolicitud.CTE_STR_00.concat(periodicidad).concat(tipoPeriodoStr);
+				}
+			}
+		}
+		
+		return codigoEnTabla;
+	}
+	
+	public static BigDecimal obtenerMesesPeriodoInicial(Date fechaSolicitud, Date fechaPrimerCambioInteres)
+	{
+/*
+	P=((ANO_FI-ANO_FS)*12)-12+1;                                              
+	PERIOD=P+(12-MES_FS)+MES_FI;                                              
+	RETURN(PERIOD);                                                           
+*/
+		DateHelper dateHelper = DateHelper.getInstance();
+		BigDecimal mesesDuracionPeriodoInicial = null;
+		BigDecimal mesFechaSolic = null;
+		BigDecimal anoFechaSolic = null;
+		BigDecimal mesFechaPrimerCambioInteres = null;
+		BigDecimal anoFechaPrimerCambioInteres = null;
+		
+		if ((null != fechaSolicitud) &&
+			(null != fechaPrimerCambioInteres))
+		{
+			anoFechaSolic = new BigDecimal(dateHelper.formatearFecha("yyyy", fechaSolicitud));
+			mesFechaSolic = new BigDecimal(dateHelper.formatearFecha("MM", fechaSolicitud));
+			mesFechaPrimerCambioInteres =
+				new BigDecimal(dateHelper.formatearFecha("MM", fechaPrimerCambioInteres));
+			anoFechaPrimerCambioInteres = new BigDecimal(dateHelper.formatearFecha("yyyy", fechaPrimerCambioInteres));
+			
+			mesesDuracionPeriodoInicial = anoFechaPrimerCambioInteres.subtract(
+				anoFechaSolic).multiply(IConstantesSolicitud.CTE_BID_12).subtract(
+					IConstantesSolicitud.CTE_BID_12).add(BigDecimal.ONE);
+			mesesDuracionPeriodoInicial = mesesDuracionPeriodoInicial.add(
+				IConstantesSolicitud.CTE_BID_12.subtract(mesFechaSolic)).add(
+					mesFechaPrimerCambioInteres);
+		}
+		
+		return mesesDuracionPeriodoInicial;
+	}
+	
+
+/*
+
+ /* MOD140108 INI                                                             
+ /*                                                                           
+ /* RECIBIMOS AHORA ADEMAS TIPO_REF Y DIFERENCIAL.                            
+ /* SI TIPO_REF VIENE INFORMADO SE BUSCA EL TIPO VIGENTE MAS RECIENTE         
+ /* MAS RECIENTE Y SE COMPARA CON EL INTERES. SE APLICA EL MAS ALTO           
+ /* DE LOS DOS PARA EL CALCULO DE LA CUOTA DE SCORING                         
+ /*                                                                           
+ /* CUOTA_SCORING: PROC(PRINCIPAL, INTERES, PAGOS)                            
+ CUOTA_SCORING: PROC(PRINCIPAL, INTERES, PAGOS, TIPO_REF, DIFERENCIAL)          
+                RETURNS (CHAR(70));                                             
+ /* MOD140108 FIN                                                             
+                                                                                
+   DCL PRINCIPAL  DEC FIXED(15,2) INIT(0);                                      
+   DCL INTERES    DEC FIXED(7,4)  INIT(0);                                      
+   DCL PAGOS      DEC FIXED(5,0)  INIT(0);                                      
+                                                                                
+   /* MOD140108 INI                                                           
+   DCL TIPO_REF      PIC '9999'     INIT(0);                                    
+   DCL 1 T_REF       DEF TIPO_REF,                                              
+         2 TR_CLAVE  PIC '99'       INIT(0),                                    
+         2 TR_PAGOS  PIC '99'       INIT(0);                                    
+   DCL DIFERENCIAL   DEC FIXED(7,4) INIT(0);                                    
+   DCL INTERES_VAR   DEC FIXED(7,4) INIT(0);                                    
+   /* MOD140108 FIN                                                           
+                                                                                
+   DCL PMM270PRP  BIN FLOAT(53)   INIT(0);                                      
+   DCL PMM270TIP  DEC FIXED(7,4)  INIT(0);                                      
+   DCL PMM270N    DEC FIXED(3)    INIT(0);                                      
+   DCL PMM270NP   DEC FIXED(3)    INIT(0);                                      
+   DCL PMM270W01  BIN FLOAT(53)   INIT(0);                                      
+   DCL PMM270W02  BIN FLOAT(53)   INIT(0);                                      
+   DCL PMM270WD2  DEC FIXED(15,2) INIT(0);                                      
+   DCL PMM270D01  DEC FIXED(15,2) INIT(0);
+*/
+
+	/**
+	 * Calcula la cuota scoring, equivalente al procedimiento CUOTA_SCORING de la include EEXPM007.
+	 * 
+	 * @param importeSolicitadoContravalor importe solicitado en divisa entidad.
+	 * @param interesInicial interés inicial.
+	 * @param plazo plazo.
+	 * @param tipoRef parámetro que contiene la clave con del tipo referencia. Se compone de
+	 *  la clave del tipo de referencia (char de 2) y el plazo (char de 3, aunque en tipoRef se encuentran
+	 *  los dos ultimos carácteres del plazo, el primero siempre es un 0 y se le concatena en el servicio
+	 *  invocado para obtener el tipo de referencia, PTMO_130).
+	 * @param diferencial diferencial del tipo de referencia.
+	 * 
+	 * @return cuotaScoring el importe de la cuota scoring en divisa entidad.
+	 */
+	public static BigDecimal calcularCuotaScoring(
+		BigDecimal importeSolicitadoContravalor,
+		BigDecimal plazo, BigDecimal interesAplicar)
+	{
+		BigDecimal cuotaScoring = null;
+		
+		MathContext mathContextPrecision17 = new MathContext(17, RoundingMode.HALF_UP);
+		BigDecimal pmm270prp = null; //nombre provisional
+		BigDecimal pmm270tip = null; //nombre provisional
+		BigDecimal pmm270n = null; //nombre provisional
+		BigDecimal pmm270np = null; //nombre provisional
+		BigDecimal pmm270w01 = null; //nombre provisional
+		BigDecimal pmm270w02 = null; //nombre provisional
+		BigDecimal pmm270wd2 = null; //nombre provisional
+		BigDecimal pmm270d01 = null; //nombre provisional
+
+		/*Aquí comienza el cálculo propiamente dicho. */
+		
+		cuotaScoring = BigDecimal.ZERO;
+		pmm270prp = importeSolicitadoContravalor;
+		pmm270n = BigDecimal.ONE;
+		pmm270tip = interesAplicar;
+		pmm270np = plazo;
+		
+		
+	   /* CALCULO DEL INTERES EN TANTO POR UNO Y                                  
+	   /* REFERIDO AL SUBPERIODO DEL AñO: TRI,MES,ETC.                            
+	                                                                                
+	   PMM270W01=(PMM270TIP*PMM270N)/1200;                                          
+	   */
+	
+		pmm270w01 = pmm270tip.multiply(pmm270n, mathContextPrecision17);
+		pmm270w01 = pmm270w01.divide(IConstantesSolicitud.CTE_BID_1200, mathContextPrecision17);
+		
+	/*
+	   IF (1+PMM270W01) = 0 THEN ;                                                  
+	   ELSE DO;                                                                     
+	*/
+		if (0 != BigDecimal.ZERO.compareTo(BigDecimal.ONE.add(pmm270w01, mathContextPrecision17)))
+		{
+	     /* CALCULO DE LA ENTREGA CONSTANTE*/
+	     //PMM270W02 = PMM270PRP*PMM270W01*((1+PMM270W01)**PMM270NP);
+			pmm270w02 = pmm270prp.multiply(
+				pmm270w01, mathContextPrecision17).multiply(
+					BigDecimal.ONE.add(pmm270w01, mathContextPrecision17).pow(pmm270np.intValue()),
+				mathContextPrecision17);
+	     //PMM270W02 = PMM270W02/(((1+PMM270W01)**PMM270NP)-1);
+			pmm270w02 = pmm270w02.divide(
+				(BigDecimal.ONE.add(pmm270w01, mathContextPrecision17).pow(pmm270np.intValue())).subtract(BigDecimal.ONE),
+				mathContextPrecision17);
+	     //PMM270WD2 = PMM270W02;
+			pmm270wd2 = pmm270w02;
+	     //PMM270D01 = PMM270WD2 + 0.005;
+			pmm270d01 = pmm270wd2.add(new BigDecimal(0.005), mathContextPrecision17);
+	   /* MOD140108 INI                                                           
+	   /* CUOTA  = PMM270D01;   //COMENTADO EN EEXPM007                                                  
+	     EEXP007_CUOTA_SCOR = PMM270D01;
+	     */                                            
+	     	cuotaScoring = pmm270d01.setScale(2, RoundingMode.HALF_UP);
+		}
+	                                                                                
+	   /* RETURN (CUOTA);  //COMENTADO EN EEXPM007                                                       
+	   RETURN (EEXP007_TIRA_SCORING);                                               
+	   /* MOD140108 FIN                                                           
+	                                                                                
+	 END CUOTA_SCORING;                                                             
+
+ */
+		
+		return cuotaScoring;
+	}
+	
+	
+	/**
+	 * Metodo que obtiene el interes a aplicar para el calculo de la cuota scoring.
+	 * En funcion del parametro tipoCalculo se leeran los datos de un sitio u otro:
+	 * <ul>
+	 * <li>TipoCalculo = 0: calculo para llamadas desde solicitud o desde el servicio de calculo
+	 *     de la cuota scoring (ANPM_403). Para realizar el calculo se leen los valores de catalogo.</li>
+	 * <li>TipoCalculo = 1: calculo para llamadas desde simulacion. Para realizar el calculo se leen
+	 *     los valores del parametro de entrada salidaANPM048.</li>
+	 * </ul>
+	 * 
+	 * @param nucExpediente NUC
+	 * @param idTarifa id de tarifa
+	 * @param plazo plazo en meses
+	 * @param codProducto codigo de producto
+	 * @param codSubproducto codigo de subproducto
+	 * @param salidaANPM048 contextos de salida del servicio ANPM_048
+	 * @param versionGeneralProd version general del producto
+	 * @param tipoCalculo tipo de calculo a realizar (0: se leen los valores de catalogo, 
+	 *        1: se utilizan los valores del parametro de entrada salidaANPM048). 
+	 * @return
+	 */
+	public static BigDecimal obtenerInteresAplicar(BigDecimal nucExpediente, BigDecimal idTarifa,
+		BigDecimal plazo, BigDecimal codProducto, BigDecimal codSubproducto, IContexto[] salidaANPM048, 
+		BigDecimal versionGeneralProd, int tipoCalculo)
+	{
+		BigDecimal interesAplicar = null;
+		
+		/*20141124, modificación en los campos de entrada: 
+		 *  si no se informa NUC_EXPEDIENTE, se considera que el interés se obtiene a nivel de catálogo,
+		 *  de forma que deben venir informados los campos COD_PRODUCTO y COD_SUBPRODUCTO.*/
+		if (null != nucExpediente)
+		{
+			/*Consultamos el interés a aplicar contra la solicitud*/
+			interesAplicar = obtenerInteresAplicarSolic(nucExpediente, idTarifa, plazo, salidaANPM048, 
+					versionGeneralProd, tipoCalculo);
+		}
+		else
+		{
+			/*Consultamos el interés a aplicar contra catálogo*/
+			interesAplicar = obtenerInteresAplicarCatalogo(codProducto, codSubproducto, idTarifa, plazo, 
+					salidaANPM048, versionGeneralProd, tipoCalculo);
+		}
+
+		return interesAplicar;
+	}
+	
+	
+	
+	/**
+	 * Obtenemos el interés a aplicar en la fórmula de cálculo scoring de una 
+	 * forma u otra dependiendo de si estamos en Evo o Abanca.
+	 * 
+	 * @param nucExpediente
+	 * @return interesAplicar
+	 * 
+	 */
+	private static BigDecimal obtenerInteresAplicarSolic(BigDecimal nucExpediente, BigDecimal idTarifa, 
+			BigDecimal plazo, IContexto[] salidaANPM048, BigDecimal versionGeneralProd, int tipoCalculo)
+	{
+		BigDecimal interesAplicar = null;
+		BigDecimal codProducto = null;
+		BigDecimal codSubproducto = null;
+		
+		
+		DatosSolicitudC datosSolicitud = null;
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		
+		// 2016-10-03 - Si no encuentra la ultima version completa, obtener la incompleta.
+		// Modificacion para solucionar problema llamada a ANPM_403 desde comprobaciones Triad 
+		// en el paso 5 de la solicitud, para altas de solicitud (en este punto solo hay version 
+		// incompleta de la solicitud, no existe version completa)
+		datosSolicitud = gds.getUltimaVersionCompleta(nucExpediente);
+		if (null == datosSolicitud)
+		{
+			datosSolicitud = gds.getUltimaVersionIncompleta(nucExpediente);
+		}
+		
+		if (null == datosSolicitud)
+		{
+			SolicitudPmosVO solicitudPmosVO = consultarSolicitudPmos (nucExpediente);
+			return solicitudPmosVO.getInteresInicial();
+		}
+		
+		codProducto = datosSolicitud.getProducto();
+		codSubproducto = datosSolicitud.getSubproducto();
+		
+		if (UtilidadesTramitacion.esEntornoAbanca())
+		{
+			interesAplicar = obtenerInteresAplicarAbanca(datosSolicitud);
+		}
+		else if (UtilidadesTramitacion.esEntornoEvo())
+		{
+			interesAplicar = obtenerInteresAplicarCatalogo(codProducto, codSubproducto, idTarifa, 
+					plazo, salidaANPM048, versionGeneralProd, tipoCalculo);
+		}
+		
+		return interesAplicar;
+	}
+
+	
+	/**
+	 * Metodo que calcula el interes a aplicar utilizando datos de catalogo.
+	 * En funcion del parametro tipoCalculo se leeran los datos de catalogo o se utilizaran los valores
+	 * recibidos en el array de contextos de salida del servicio ANPM_048 (parametro salidaANPM048):
+	 * <li>
+	 * <ul>TipoCalculo = 0: calculo para llamadas desde solicitud o desde el servicio de calculo
+	 *     de la cuota scoring (ANPM_403). Para realizar el calculo se leen los valores de catalogo.</ul>
+	 * <ul>TipoCalculo = 1: calculo para llamadas desde simulacion. Para realizar el caluclo se leen
+	 *     los valores del parametro de entrada salidaANPM048.</ul>
+	 * </li>
+	 * 
+	 * @param codProducto codigo de producto
+	 * @param codSubproducto codigo de subproducto
+	 * @param idTarifa id de tarifa
+	 * @param plazo plazo en meses
+	 * @param salidaANPM048 contextos de salida del servicio ANPM_048.
+	 * @param tipoCalculo tipo de calculo a realizar (0: se leen los valores de catalogo, 1: se utilizan
+	 *        los valores del parametro de entrada salidaANPM048).
+	 * @return interes a aplicar.
+	 */
+	private static BigDecimal obtenerInteresAplicarCatalogo(BigDecimal codProducto, BigDecimal codSubproducto,
+			BigDecimal idTarifa, BigDecimal plazo, IContexto[] salidaANPM048, BigDecimal versionGeneralProd, 
+			int tipoCalculo)
+	{
+		
+		BigDecimal interesAplicarEvo = null;
+		MathContext mathContextPrecision17 = new MathContext(17, RoundingMode.HALF_UP);
+		BigDecimal porcentajeEstresCuotaScoring = null; /*Sólo para EVO*/
+		IDatosEntradaTx datosEntradaDetalleSubprod = null;
+		BigDecimal interesPrimerTramoCatalogo = null;
+		BigDecimal interesSegundoTramoCatalogo = null;
+		IContexto[] resultadoDetalleSubproducto = null;
+		//String tipoRefTipo = null; //PM700010
+		//String tipoRefPlazo = null; //PM700020
+		BigDecimal versionGeneral = null;
+		
+	    /* MOD140108 INI                                                           
+	    IF TIPO_REF > 0  /* EL INTERES ES VARIABLE                                 
+	    THEN DO;                                                                     
+	      INTERES_VAR = 0;                                                          
+	      PM700010    = TR_CLAVE;                                                   
+	      PM700020    = '0'||TR_PAGOS;                                              
+	      CALL PMOSM313(PM700010,PM700020);                                         
+	    */
+		
+		/*Invocamos el ANPM_042, enviandole el codigo producto, recibiendo contextos
+		 * ANPMN021 con producto y subproducto, obtenemos el contexto que sea
+		 * subproducto, ANPMN021010 = 2, con ANPMN021030 = codSubproducto,
+		 * de ahi recuperamos la version general, ANPMN021040. */
+		
+		/*20151017 Vamos a obtener la versión general llamando al ANPM_015, para optimizar la búsqueda de la versión general.*/
+		//versionGeneral = obtenerVersionGeneral(codProducto, codSubproducto);
+		// 2016-12-16 - En funcion del valor de tipoCalculo:
+		// - Si tipoCalculo = 0: se obtiene la version general como hasta ahora (llamada ANPM_015).
+		// - Si tipoCalculo = 1: se utiliza la version general recibida en el parametro versionGeneralProd
+		if (0 == tipoCalculo)
+		{
+			versionGeneral = obtenerVersionGeneralOptimizada(codProducto, codSubproducto);
+		}
+		else
+		{
+			if (1 == tipoCalculo)
+			{
+				versionGeneral = versionGeneralProd;
+			}
+		}
+		
+		if (null == versionGeneral)
+		{
+			ServicioNegocio.rollback(
+					CodigosError.CTE_ERROR_BUSQ_PROD_NO_VERSION_GEN,
+					null,
+					new String[] {codProducto.toString(),codSubproducto.toString()},
+					null);
+		}
+		
+		/* Invocamos el ANPM_048 pasandole el cod prod, cod subprod, version, colectivo = 0 */
+		// 2016-12-16- En funcion del valor de tipoCalculo:
+		// - Si tipoCalculo = 0: se obtienen los datos de catalogo llamando al servicio ANPM_048.
+		// - Si tipoCalculo = 1: se utilizan los datos de catalogo recibidos en salidaANPM048.
+		if (0 == tipoCalculo)
+		{
+			datosEntradaDetalleSubprod = ServicioNegocio.getPrograma(
+				ServicioNegocio.getContexto(),
+				Constantes.CTE_SN_DETALLE_SUBPROD_CC,
+				Constantes.CTE_SN_DETALLE_SUBPROD_CO);
+			
+			datosEntradaDetalleSubprod.addCampo("Codigo_producto", codProducto);
+			datosEntradaDetalleSubprod.addCampo("Codigo_subproducto", codSubproducto);
+			datosEntradaDetalleSubprod.addCampo("Colectivo", BigDecimal.ZERO);
+			datosEntradaDetalleSubprod.addCampo("Version_general", versionGeneral);
+			datosEntradaDetalleSubprod.addCampo("Paso", Constantes.CTE_PASO_3);
+			
+			/*20150909 Si está informado el id tarifa y el plazo se lo enviamos como campo de entrada
+			 * al servicio de consulta datos subproducto, ANPM_048, para que nos sobreescriba
+			 * los contextos de catálogo para el interés y el diferencial con los precios de la tarifa.
+			 * */
+			if (null != idTarifa)
+			{
+				datosEntradaDetalleSubprod.addCampo("ID_TARIFA", idTarifa);
+			}
+			if (null != plazo)
+			{
+				datosEntradaDetalleSubprod.addCampo("PLAZO", plazo.toString());
+				
+			}
+			//20150924 Esto es: llamadas a catálogo, ANPM_048, desde el servicio de cálculo cuota scoring, ANPM_403.
+			//Cuando es Abanca y no se informa el nuc quiere decir que el origen es simulación.
+			datosEntradaDetalleSubprod.addCampo("ORIGEN", Constantes.CTE_ORIGEN_CONSULTA_TARIFA_SIMULACION);
+	
+			//con Paso = 3 me devuelve ANPMN014 y ANPMN015 entre otros.
+			
+			resultadoDetalleSubproducto = ServicioNegocio.invocarServicio(
+				ServicioNegocio.getContexto(),
+				datosEntradaDetalleSubprod);
+		}
+		else
+		{
+			if (1 == tipoCalculo)
+			{
+				resultadoDetalleSubproducto = salidaANPM048;
+			}
+		}
+		
+		/*Ahora:
+		 * Recuperamos ANPMN014 con tramo = 1 (ANPMN014060)
+		 * - Compruebo el tipo de préstamo, ANPMN014070, si es fijo:
+		 *   - if ANPMN014070 in (00, 01, 06)
+		 *      * Se toma el interés ANPMN014150
+		 *      * Este interés es el definitivo, con él se calcula la cuota scoring.
+		 *   - else (variable):
+		 *     - Recuperamos ANPMN015 con tramo = 1 (ANPMN015060):
+		 *      * Diferencial = ANPMN015090.
+		 *      * Tipo referencia: ANPMN015210.
+		 *      * Con el tipo de referencia llamamos al PTMO_130 para obtener
+		 *       el valor del tipo de referencia.
+		 *      * interes inicial = valorTipoReferencia + diferencial
+		 *      * si estamos en EVO:
+		 *        - interes inicial = interes inicial + porcentaje estress.
+		 *        * Este interés es el definitivo, con él se calcula la cuota scoring.
+		 * */
+		
+		/* 
+		 * el método en el que se basó la primera versión del cálculo cuota scoring está en EEXPM007.CUOTA_SCORING
+	     */
+		
+		interesPrimerTramoCatalogo = obtenerInteresTramoCatalogo(BigDecimal.ONE, resultadoDetalleSubproducto);
+		interesSegundoTramoCatalogo = obtenerInteresTramoCatalogo(Constantes.CTE_BID_2, resultadoDetalleSubproducto);
+		
+		if (null == interesSegundoTramoCatalogo)
+		{
+			interesAplicarEvo = interesPrimerTramoCatalogo;
+		}
+		else
+		{
+			interesAplicarEvo = UtilidadesTramitacion.mayor(interesPrimerTramoCatalogo, interesSegundoTramoCatalogo);
+		}
+		
+		/*Si estamos en EVO estresamos la cuota scoring*/
+		if (UtilidadesTramitacion.esEntornoEvo())
+		{
+			//Entidad EVO.
+			/*Obtenemos el porcentaje estrés de la cuota scoring*/
+			porcentajeEstresCuotaScoring = new BigDecimal(UtilidadesTramitacion.obtenerValorParametroUnico(
+				IConstantesSolicitud.CTE_PARAMETRO_AGRUPACION_GENERAL,
+				IConstantesSolicitud.CTE_PARAMETRO_NOMBRE_ESTRES_CUOTA_SCORING));
+			/*Sumamos el estrés de la cuota scoring al interes a aplicar.*/
+			interesAplicarEvo = interesAplicarEvo.add(porcentajeEstresCuotaScoring, mathContextPrecision17);
+		}
+
+		/*Si el interés a aplicar es cero lo convertimos a un "valor cercano a cero" para que no
+		 * nos falle el cálculo de la cuota scoring.*/
+
+		if (Constantes.CTE_INT_CERO == BigDecimal.ZERO.compareTo(interesAplicarEvo))
+		{
+			interesAplicarEvo = Constantes.CTE_INTERES_CERCANO_A_CERO;
+		}
+		
+		return interesAplicarEvo;
+	}
+
+	public static BigDecimal obtenerInteresAplicarAbanca(DatosSolicitudC datosSolicitud)
+	{
+		BigDecimal interesAplicarAbanca = null;
+		
+		BigDecimal interesPrimerTramoSolic = null;
+		BigDecimal interesSegundoTramoSolic = null;
+		
+		interesPrimerTramoSolic = obtenerInteresTramoSolic(Constantes.CTE_INT_UNO, datosSolicitud);
+		interesSegundoTramoSolic = obtenerInteresTramoSolic(Constantes.CTE_INT_DOS, datosSolicitud);
+		
+		if (null == interesSegundoTramoSolic)
+		{
+			interesAplicarAbanca = interesPrimerTramoSolic;
+		}
+		else
+		{
+			interesAplicarAbanca = UtilidadesTramitacion.mayor(interesPrimerTramoSolic, interesSegundoTramoSolic);
+		}
+
+		
+		
+		if (null != interesAplicarAbanca && Constantes.CTE_INT_CERO == BigDecimal.ZERO.compareTo(interesAplicarAbanca))
+		{
+			interesAplicarAbanca = Constantes.CTE_INTERES_CERCANO_A_CERO;
+		}
+		
+		
+		return interesAplicarAbanca;
+	}
+
+	
+	private static BigDecimal obtenerInteresTramoSolic(int tramo, DatosSolicitudC datosSolicitud)
+	{
+		BigDecimal interesTramoSolic = null;
+		
+		List<CondicionesInteresC> listaCondicionesInteres = null;
+		CondicionesInteresC condicionesInteresTramo = null;
+		BigDecimal interesFijoVariableNoReferenciado = null;
+		
+		
+		
+		String tipoInteres = null; //00: Fijo, 02: Variable, 03: Variable bonificable,...
+		
+		String tipoReferencia = null;
+		
+		BigDecimal diferencial = null; //solo para tramo variable
+		BigDecimal valorTipoReferencia = null; //solo para tramo variable, PTMO_130(AN270160)
+		
+		
+		listaCondicionesInteres = datosSolicitud.getCondicionesInteres();
+		
+		for (CondicionesInteresC condicionesInteres : listaCondicionesInteres)
+		{
+			/*Pillamos la condición interés del tramo indicado y que sea interés principal.*/
+			if ((tramo == condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) &&
+				(0 == Constantes.TIPO_CONDICION_INTERES.compareTo(new BigDecimal(condicionesInteres.getCondicionesInteresKey().getIntTipoCondicion()))))
+			{
+				condicionesInteresTramo = condicionesInteres;
+				break;
+			}
+		}
+		
+		if (null != condicionesInteresTramo)
+		{
+			tipoInteres = condicionesInteresTramo.getStrTipoDeInteres();
+			
+			if ((IConstantesSolicitud.CTE_TIPO_INTERES_FIJO.equals(tipoInteres)) ||
+				(IConstantesSolicitud.CTE_TIPO_INTERES_FIJO_PENALIZABLE.equals(tipoInteres)) ||
+				(IConstantesSolicitud.CTE_TIPO_INTERES_FIJO_REFERENCIADO.equals(tipoInteres)))
+			{
+				//tramo fijo
+				interesTramoSolic = condicionesInteresTramo.getIntInteres();
+			}
+			else
+			{
+				diferencial = condicionesInteresTramo.getIntDif();
+				tipoReferencia = condicionesInteresTramo.getIntTipoReferencia().toString();
+				interesFijoVariableNoReferenciado = condicionesInteresTramo.getIntTecho();
+				
+				/*20150128 primero buscamos el contexto de interés ANPMN014 de tramo 1, de esta forma, cuando tengamos 
+				 * que el producto tiene tramo 2 y éste es variable bonificable y el tipo de referencia asociado sea un tipo
+				 * no referenciado, obtengamos el valor del tipo de referencia
+				 * del valor del tipo fijo indicado en el tramo 1. */				
+				/*20151021 Ahora ya no, cuando el tramo es variable no referenciado ya sabemos el interés de ese tramo: es el techo.*/
+				if (esTipoReferenciaNoReferenciado(tipoReferencia))
+				{
+					interesTramoSolic = interesFijoVariableNoReferenciado;
+				}
+				else
+				{
+					//Tenemos que ver si es especialidad divisa para ir a la PI04 o PM70
+					if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getEspecialidad()) && 
+							 datosSolicitud.getEspecialidad().equals(Constantes.CTE_ESPECIALIDAD_DIVISA) ) {
+						valorTipoReferencia = obtenerInteresTipoReferenciaDivisa(datosSolicitud,condicionesInteresTramo);
+						if (null == valorTipoReferencia)
+						{
+							ServicioNegocio.rollback(
+									CodigosError.CTE_ERROR_TIPO_REFERENCIA,
+									null,
+									new String[] {tipoReferencia},
+									null);
+						}
+						if ((null == valorTipoReferencia) ||
+								(0 <= BigDecimal.ZERO.compareTo(valorTipoReferencia))) //interesTipoReferencia <= 0
+						{
+							//ServicioNegocio.rollback(Constantes.CTE_ERROR_INTERES_VARIABLE_NO_VALIDO, null, null, null);
+							valorTipoReferencia = BigDecimal.ZERO;
+						}
+						//Cuando es variable no referenciado el diferencial es 0.
+						interesTramoSolic = valorTipoReferencia.add(diferencial);
+					}
+					else {
+						valorTipoReferencia = obtenerInteresTipoReferencia(tipoReferencia);
+						if (null == valorTipoReferencia)
+						{
+							ServicioNegocio.rollback(
+									CodigosError.CTE_ERROR_TIPO_REFERENCIA,
+									null,
+									new String[] {tipoReferencia},
+									null);
+						}
+						if ((null == valorTipoReferencia) ||
+								(0 <= BigDecimal.ZERO.compareTo(valorTipoReferencia))) //interesTipoReferencia <= 0
+						{
+							//ServicioNegocio.rollback(Constantes.CTE_ERROR_INTERES_VARIABLE_NO_VALIDO, null, null, null);
+							valorTipoReferencia = BigDecimal.ZERO;
+						}
+						//Cuando es variable no referenciado el diferencial es 0.
+						interesTramoSolic = valorTipoReferencia.add(diferencial);
+					}
+
+				}
+
+			}
+		}
+		
+		return interesTramoSolic;
+	}
+	
+	
+	
+	/**
+	 * Se obtiene el interés del tramo.
+	 */
+	private static BigDecimal obtenerInteresTramoCatalogo(BigDecimal tramo, IContexto[] resultadoDetalleSubproducto)
+	{
+		MathContext mathContextPrecision17 = new MathContext(17, RoundingMode.HALF_UP);
+		String tipoRefStrTramo = null;
+		
+		//BigDecimal interesVar = null; //INTERES_VAR
+		String tipoPrestamo = null;
+
+		IContexto ctxInteresCatalogoTramo = null; //ANPMN014
+		IContexto ctxDiferTipoRefCatalogoTramo = null; //ANPMN015
+		
+		BigDecimal interesTipoRefTramo = null;
+		
+		BigDecimal diferencialTramo = null;
+		
+		BigDecimal interesTramo = null;
+		
+		//BigDecimal valorTipoFijoTramo = null;
+		
+		//BigDecimal valorTipoFijoTramoUno = null;
+		
+		BigDecimal interesTecho = null;
+		
+		/*Recuperamos el contexto ANPMN014 del tramo (ANPMN014060)*/
+		for (IContexto ctxDetalleSubprod : resultadoDetalleSubproducto)
+		{
+			if ((Constantes.CTE_ANPMN014.equals(ctxDetalleSubprod.getNombre().trim())) &&
+				(tramo.equals(ctxDetalleSubprod.getBigDecimal("ANPMN014060"))))
+			{
+				
+				ctxInteresCatalogoTramo = ctxDetalleSubprod;
+				break;
+			}
+		}
+		
+		if (null != ctxInteresCatalogoTramo)
+		{
+			/*
+			ServicioNegocio.rollback(
+				Constantes.CTE_ERROR_DETALLE_SUBPROD_NO_CTX_INT,
+				null, null, null);
+			*/
+	
+			/*Si el tipo de prestamo es fijo*/
+			tipoPrestamo = ctxInteresCatalogoTramo.getString("ANPMN014070");
+			if (Constantes.TIPO_INT_FIJO.equals(tipoPrestamo) ||
+				Constantes.TIPO_INT_FIJO_PENLZABLE.equals(tipoPrestamo) ||
+				Constantes.TIPO_INT_FIJO_REFERENCIADO.equals(tipoPrestamo))
+			{
+				interesTramo = ctxInteresCatalogoTramo.getBigDecimal("ANPMN014150");
+			}
+			else
+			{
+				/*Tipo de interés variable*/
+				/* Recuperamos ANPMN015 tramo (ANPMN015060) */
+				for (IContexto ctxDetalleSubprod : resultadoDetalleSubproducto)
+				{
+					if ((Constantes.CTE_ANPMN015.equals(ctxDetalleSubprod.getNombre().trim())) &&
+						(tramo.equals(ctxDetalleSubprod.getBigDecimal("ANPMN015060"))))
+					{
+						
+						ctxDiferTipoRefCatalogoTramo = ctxDetalleSubprod;
+						break;
+					}
+				}
+				if (null == ctxDiferTipoRefCatalogoTramo)
+				{
+					ServicioNegocio.rollback(
+						CodigosError.CTE_ERROR_DETALLE_SUBPROD_NO_CTX_DIFER_TIPO_REF,
+						null, null, null);
+				}
+				diferencialTramo = ctxDiferTipoRefCatalogoTramo.getBigDecimal("ANPMN015090");
+				
+				//20155123 Este valor no lo necesitamos.
+				//valorTipoFijoTramo = ctxInteresCatalogoTramo.getBigDecimal("ANPMN014150");
+				interesTecho = ctxDiferTipoRefCatalogoTramo.getBigDecimal("ANPMN015270");
+				
+				/*Tipo referencia: ANPMN015210. (p. ej. 9800)*/
+				tipoRefStrTramo = ctxDiferTipoRefCatalogoTramo.getBigDecimal("ANPMN015210").toString();
+				
+				/*20150129 primero buscamos el contexto de interés ANPMN014 de tramo 1, de esta forma, cuando tengamos 
+				 * que el producto tiene tramo 2 y éste es variable bonificable y el tipo de referencia asociado sea un tipo
+				 * no referenciado, obtengamos el valor del tipo de referencia
+				 * del valor del tipo fijo indicado en el tramo 1. */
+				/*20151023 Ahora, cuando el tramo es variable, tenemos dos opciones:
+				 *  - Si el tipo de referencia es no referenciado, pillamos el interés del techo.
+				 *  - Si el tipo de referencia no es no referenciado, es decir, apunta contra un índice bursátil válido,
+				 *  entonces llamaremos al PTMO_130 para obtener el valor actual del tipo de referencia.*/
+				if (esTipoReferenciaNoReferenciado(tipoRefStrTramo))
+				{
+					interesTramo = interesTecho;
+				}
+				else
+				{
+					//TODO Faltan datos necesarios para la llamada al ANPM_505.
+					// 2016-01-05 - El interes del tipo de referencia se obtiene de uno u otro servicio en funcion
+					// de si es divisa o no:
+					// - Si es divisa (especialidad = D): llamada a ANPM_505 para obtener el LIBOR
+					// - En caso contrario: llamada a PTMO_130
+					//IContexto ctxProducto = UtilidadesTramitacion.getContexto(resultadoDetalleSubproducto, "ANPMN001");
+					//boolean esDivisa = false;
+					//if (!UtilidadesTramitacion.isBlankOrNull(ctxProducto))
+					//{
+					//	esDivisa = UtilidadesTramitacion.esDivisaPorEspecialidad(ctxProducto.getString("ANPMN001120"));
+					//}
+					
+					//if (esDivisa)
+					//{
+					//	interesTipoRefTramo = obtenerInteresTipoReferenciaDivisa(); // Llamada a ANPM_505
+					//}
+					//else
+					//{
+						interesTipoRefTramo = obtenerInteresTipoReferencia(tipoRefStrTramo); // Llamada al PTMO_130
+					//}
+					
+					/*
+					 * 20150129 Es válido un tipo de interés negativo.
+					 * Si es negativo se establece a cero el valor del tipo referencia.
+					 * */
+					if ((null == interesTipoRefTramo) ||
+						(0 <= BigDecimal.ZERO.compareTo(interesTipoRefTramo))) //interesTipoReferencia <= 0
+					{
+						//ServicioNegocio.rollback(Constantes.CTE_ERROR_INTERES_VARIABLE_NO_VALIDO, null, null, null);
+						interesTipoRefTramo = BigDecimal.ZERO;
+					}
+					interesTramo = interesTipoRefTramo.add(diferencialTramo, mathContextPrecision17);
+				}
+				
+			}
+		}
+		return interesTramo;
+	}
+	
+	/**
+	 * Invoca al servicio de negocio ANPM_505 para obtener el tipo de referencia en prestamos internacionales
+	 * 
+	 * @param contexto datosInteres
+	 * @param contexto datosSolicitud
+	 * 
+	 * @return interesTipoReferencia
+	 */
+	public static BigDecimal obtenerInteresTipoReferenciaDivisa(IContexto datosInteres, IContexto contextoSolicitud)
+	{
+		DatosSolicitudC datosSolicitud  = new DatosSolicitudC();
+		CondicionesInteresC condicionesInteres = new CondicionesInteresC();
+		final String DIVISA = "D";
+		final int GARANTIAS = 1;
+		String fechaTransformadaFormalizacion = null;
+		String fechaTransformadaSolicitud = null;
+		BigDecimal resultado = null;
+	
+		if(!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getString("ANPMN050590")))
+		{
+			datosSolicitud.setMonedaImporteSolicitado(contextoSolicitud.getString("ANPMN050590"));
+		}
+		
+		if(DIVISA.equals(contextoSolicitud.getString("ANPMN050120"))    
+				&& GARANTIAS == contextoSolicitud.getBigDecimal("ANPMN050220").intValue())
+		{
+			
+			datosSolicitud.setEspecialidad(contextoSolicitud.getString("ANPMN050120"));
+		    datosSolicitud.setTipoGarantia(contextoSolicitud.getBigDecimal("ANPMN050220"));
+		}
+
+		//Si la fecha de formalizacion es distinta de nula se mete la de formalizacion sino la de solicitud
+		if(!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getString("ANPMN050920")) 
+				&& (!contextoSolicitud.getString("ANPMN050920").toString().equals(DateUtils.CTE_DATELOWEST_FORMATO_CORTO))) 
+		{
+			// convertimos la fecha en el formato adecuado
+			 fechaTransformadaFormalizacion = DateUtils.cambiaFormatoFecha(contextoSolicitud.getString("ANPMN050920"), "dd-mm-yyyy", "yyyy-mm-dd");			 
+			 datosSolicitud.setFechaFormalizacion(new Date(DateUtils.parseDate(fechaTransformadaFormalizacion, "yyyy-mm-dd").getTime()));
+		}
+		else if (!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getString("ANPMN050915"))
+				&& (!contextoSolicitud.getString("ANPMN050915").toString().equals(DateUtils.CTE_DATELOWEST_FORMATO_CORTO))) 
+		{
+			// convertimos la fecha en el formato adecuado
+			fechaTransformadaSolicitud = DateUtils.cambiaFormatoFecha(contextoSolicitud.getString("ANPMN050915"), "dd-mm-yyyy", "yyyy-mm-dd");
+			datosSolicitud.setFechaFormalizacion(new Date(DateUtils.parseDate(fechaTransformadaSolicitud, "yyyy-mm-dd").getTime()));
+		}
+		
+		if(!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getBigDecimal("ANPMN050710")))  
+		{
+			condicionesInteres.setIntNumPeriodosRevision(new Integer(datosInteres.getBigDecimal("ANPMN052380").toString()));
+		}
+		if(!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getBigDecimal("ANPMN050580"))) 
+		{
+			datosSolicitud.setImporteSolicitado(contextoSolicitud.getBigDecimal("ANPMN050580"));
+		}
+		
+		if(!UtilidadesTramitacion.isBlankOrNull(contextoSolicitud.getBigDecimal("ANPMN050260"))) 
+		{
+			datosSolicitud.setGarantiaContable(contextoSolicitud.getBigDecimal("ANPMN050260"));
+		}
+		
+		resultado = obtenerInteresTipoReferenciaDivisa (datosSolicitud,condicionesInteres);
+		
+		return resultado;
+		
+	}
+	
+	
+	/**
+	 * Invoca al servicio de negocio ANPM_505 para obtener el tipo de referencia en prestamos internacionales
+	 * @param datosSolicitud
+	 * @return
+	 */
+	public static BigDecimal obtenerInteresTipoReferenciaDivisa(DatosSolicitudC datosSolicitud,CondicionesInteresC condicionesInteres) {
+		
+		BigDecimal interesTipoReferencia = null;
+		IDatosEntradaTx datosEntradaTx = null;
+		IContexto[] datosSalidaTx = null; 
+		ParametroEng parametroDao = new ParametroEng();
+		String garantia = null;
+		
+		final String DIVISA = "D";
+		final int GARANTIAS = 1;
+		
+		datosEntradaTx = ServicioNegocio.getPrograma(
+												ServicioNegocio.getContexto(),
+												new Integer(CTE_SN_OBTENER_TIPO_REF_CC_DIVISA), 
+												new Integer(CTE_SN_OBTENER_TIPO_REF_CO_DIVISA)); 
+	
+		if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getMonedaImporteSolicitado())) {
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_DIVISA, datosSolicitud.getMonedaImporteSolicitado());
+		}
+		
+		// Se comprueba que sea divisa AN250120 = 'D'
+		// y que esté en garantías AN250220 = 1
+		if(DIVISA.equals(datosSolicitud.getEspecialidad())
+		&& GARANTIAS == datosSolicitud.getTipoGarantia().intValue())
+		{
+			garantia = parametroDao.obtenerGarantia(datosSolicitud.getGarantiaGMR().toString());
+		}
+		
+		if(null != garantia)
+		{
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_GARANTIA, garantia.trim());
+		}
+		else
+		{
+			if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getGarantiaContable())) 
+			{
+				datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_GARANTIA, datosSolicitud.getGarantiaContable().toString());
+			}
+		}
+		
+		//Si la fecha de formalizacion es distinta de nula se mete la de formalizacion sino la de solicitud
+		if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getFechaFormalizacion()) 
+		&& !datosSolicitud.getFechaFormalizacion().toString().equals(DateUtils.CTE_DATELOWESTONLYDAY)) 
+		{
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_FECHA, datosSolicitud.getFechaFormalizacion().toString());
+		}
+		else if (!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getFechaSolicitud())) 
+		{
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_FECHA, datosSolicitud.getFechaSolicitud().toString());
+		}
+		if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getPlazoTotal())) 
+		{
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_PLAZO_MAXIMO_MESES, new BigDecimal(condicionesInteres.getIntNumPeriodosRevision()));
+		}
+		if(!UtilidadesTramitacion.isBlankOrNull(datosSolicitud.getImporteSolicitado())) 
+		{
+			datosEntradaTx.addCampo(CTE_SN_OBTENER_TIPO_REF_DIVISA_ENTRADA_IMPORTE_MAXIMO, datosSolicitud.getImporteSolicitado());
+		}
+		
+		datosSalidaTx = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaTx);
+		
+		if(null != datosSalidaTx 
+		&& 0 < datosSalidaTx.length)
+		{
+			interesTipoReferencia = 
+				datosSalidaTx[0].getBigDecimal("ANPMN505080");
+		}
+		
+		return interesTipoReferencia;
+	}
+	
+	
+	
+	/**
+	 * Invoca el servicio PTMO_130 para obtener el valor actual del tipo de referencia que se
+	 * le pasa como parámetro de entrada.
+	 * 
+	 * @param tipoRef
+	 * @return interes valor actual del tipo de referencia indicado.
+	 */
+	public static BigDecimal obtenerInteresTipoReferencia(String tipoRef)
+	{
+		String tipoRefClave = null; //TR_CLAVE
+		String tipoRefPagos = null; //TR_PAGOS
+		ClaveTipoReferenciaVO claveTipoReferenciaVO = null;
+		IDatosEntradaTx datosEntradaObtenerTipoRef = null;
+		IContexto[] arrayContextosObtenerTipoRef = null;
+		
+		BigDecimal interesTipoReferencia = null;
+		
+/*
+			if (IConstantesSolicitud.CTE_INT_3 <= tipoRefStr.length())
+			{
+*/
+			tipoRefClave = tipoRef.substring(0, IConstantesSolicitud.CTE_INT_2);
+			tipoRefPagos = StringUtils.leftPad(
+				tipoRef.substring(IConstantesSolicitud.CTE_INT_2),
+				IConstantesSolicitud.CTE_INT_3,
+				IConstantesSolicitud.CTE_CHAR_0);
+		
+		//tipoRefTipo = tipoRefClave;
+		//tipoRefPlazo = IConstantesSolicitud.CTE_STR_0.concat(tipoRefPagos);
+		//tipoRefPlazo = tipoRefPagos;
+		//CALL PMOSM313(PM700010,PM700020);
+		claveTipoReferenciaVO = new ClaveTipoReferenciaVO();
+		claveTipoReferenciaVO.setTipo(tipoRefClave);
+		claveTipoReferenciaVO.setPlazo(tipoRefPagos);
+		
+		claveTipoReferenciaVO = traducirClaveTiposReferencia(claveTipoReferenciaVO);
+		
+		datosEntradaObtenerTipoRef = ServicioNegocio.getPrograma(
+			ServicioNegocio.getContexto(),
+			new Integer(CTE_SN_OBTENER_TIPO_REF_CC),
+			new Integer(CTE_SN_OBTENER_TIPO_REF_CO));
+		
+		datosEntradaObtenerTipoRef.addCampo(CTE_SN_SN_OBTENER_TIPO_REF_ENTRADA_TIPO, claveTipoReferenciaVO.getTipo());
+		datosEntradaObtenerTipoRef.addCampo(CTE_SN_SN_OBTENER_TIPO_REF_ENTRADA_PLAZO, claveTipoReferenciaVO.getPlazo());
+		/*20140825: Si estamos en entorno de EVO buscamos el valor tipo ref. por fecha publicación y
+		 * si estamos en entorno ABANCA buscamos por fecha referencia.*/
+		if (UtilidadesTramitacion.esEntornoEvo())
+		{
+			datosEntradaObtenerTipoRef.addCampo(CTE_SN_OBTENER_TIPO_REF_IND_BUS_FECHA, Constantes.CTE_STR_P);
+		}
+		else if (UtilidadesTramitacion.esEntornoAbanca())
+		{
+			datosEntradaObtenerTipoRef.addCampo(CTE_SN_OBTENER_TIPO_REF_IND_BUS_FECHA, Constantes.CTE_STR_R);
+		}
+		
+		arrayContextosObtenerTipoRef = ServicioNegocio.invocarServicio(
+			ServicioNegocio.getContexto(),
+			datosEntradaObtenerTipoRef);
+		
+		//interesTipoReferencia = BigDecimal.ZERO;
+		if ((null != arrayContextosObtenerTipoRef) &&
+			(0 < arrayContextosObtenerTipoRef.length))
+		{
+			interesTipoReferencia = 
+				arrayContextosObtenerTipoRef[0].getBigDecimal("PTMON010010");
+		}
+		return interesTipoReferencia;
+	}
+	
+	/**
+	 * 
+	 * Método que comprueba si el tipo de referencia está parametrizado como 
+	 * "tipo de referencia no referenciado".
+	 * 
+	 * @param tipoRef Tipo de referencia.
+	 * @return
+	 */
+	public static boolean esTipoReferenciaNoReferenciado(String tipoRef)
+	{
+		boolean resultado = false;
+		String esNoReferenciado = null;
+		String tipoRefCorregido = null;
+		
+		tipoRefCorregido = StringUtils.leftPad(tipoRef, Constantes.CTE_INT_CUATRO, Constantes.CTE_CHAR_CERO);
+		esNoReferenciado = UtilidadesTramitacion.getParametroUnicoIndicador2(Constantes.CTE_CLAVE_TIPO_REF, tipoRefCorregido, false);
+		
+		if ((null != esNoReferenciado) &&
+			(Constantes.CTE_STR_F.equals(esNoReferenciado)))
+		{
+			resultado = true;
+		}
+		
+		return resultado;
+	}
+	
+	
+	public static BigDecimal obtenerVersionGeneral(BigDecimal codProducto, BigDecimal codSubproducto)
+	{
+		BigDecimal versionGeneral = null;
+		IDatosEntradaTx datosEntradaBusqProd = null; //ANPM_042
+		IContexto[] resultadoBusqProd = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		
+		
+		datosEntradaBusqProd = ServicioNegocio.getPrograma(
+			contextoEjecucion, 
+			new Integer(507),
+			new Integer(42));
+		
+		datosEntradaBusqProd.addCampo(0, codProducto);
+		datosEntradaBusqProd.addCampo(11, Constantes.CTE_STR_1);
+		//cuidado, en tipo de operacion: pos 11=1, en llamada desde pantalla busqueda productos.
+		
+		
+		resultadoBusqProd = ServicioNegocio.invocarServicio(
+			contextoEjecucion, datosEntradaBusqProd);
+		
+		if (Utilidades.isBlankOrNull(resultadoBusqProd))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_BUSQ_PROD_NO_ENCUENTRA,
+				null,
+				new String[] {codProducto.toString()},
+				null);
+		}
+		
+		for (IContexto ctxBusqProd : resultadoBusqProd)
+		{
+			if ((Constantes.CTE_BID_2.equals(ctxBusqProd.getBigDecimal("ANPMN021010"))) &&
+				(codSubproducto.equals(ctxBusqProd.getBigDecimal("ANPMN021030"))))
+			{
+				versionGeneral = ctxBusqProd.getBigDecimal("ANPMN021040");
+			}
+		}
+		
+		return versionGeneral;
+	}
+	
+	/**
+	 *  Llamamos al ANPM_015 para obtener la versión general del contexto ANPMN008 y comprobamos si está activo el subproducto y el producto.
+	 *  
+	 * @param codProducto
+	 * @param codSubproducto
+	 * @return
+	 */
+	public static BigDecimal obtenerVersionGeneralOptimizada(BigDecimal codProducto, BigDecimal codSubproducto)
+	{
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		IDatosEntradaTx datosEntrada = null;
+		IContexto[] resultado = null;
+		BigDecimal versionGeneral = null;
+		Date fechaHoy = null;
+		String fechaHoyStrDb2 = null;
+		String fechaInicio = null;
+		String fechaInicioDb2 = null;
+		String fechaFin = null;
+		String fechaFinDb2 = null;
+		ProductoC productoC = null;
+		SubProductoC subproductoC = null;
+		
+		ProductoEng productoDao = new ProductoEng();
+		SubProductoEng subproductoDao = new SubProductoEng(CTE_JNDI_DATASOURCE);
+		
+		fechaHoy = new Date(DateHelper.getInstance().askTime().getTime());
+		fechaHoyStrDb2 = DateHelper.sqlDateToString(fechaHoy, DateHelper.FORMATO_DB2_DATE);
+		
+		
+		
+		
+		datosEntrada = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			Constantes.CTE_SN_CC_ANPM,
+			new Integer(15));
+		
+		datosEntrada.addCampo(0, codProducto);
+		datosEntrada.addCampo(1, codSubproducto);
+		
+		resultado = ServicioNegocio.invocarServicio(
+			contextoEjecucion, datosEntrada);
+		
+		for (IContexto contextoVG : resultado)
+		{
+			if (CTE_CONTEXTO_VG.equalsIgnoreCase(contextoVG.getNombre().trim()))
+			{
+				fechaInicio = contextoVG.getString(CTE_CONTEXTO_VG_FECHA_INICIO);
+				fechaInicioDb2 = DateHelper.getInstance().formatearFecha(
+					DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_DB2_DATE, fechaInicio);
+				
+				fechaFin = contextoVG.getString(CTE_CONTEXTO_VG_FECHA_FIN);
+				if (! UtilidadesTramitacion.isBlankOrNull(fechaFin))
+				{
+					fechaFinDb2 = DateHelper.getInstance().formatearFecha(
+						DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_DB2_DATE, fechaFin);
+				}
+				else
+				{
+					fechaFinDb2 = DateUtils.CTE_DATELOWESTONLYDAY;
+				}
+				
+				/*Si está vigente, es decir: 
+				 *   ((fechaInicio < fechaHoy) ||
+				 *   ((fechaInicio = fechaHoy) && (horaInicio < horaActual))) 
+				 *   
+				 *Además, si la fecha fin está informada:
+				 *   (fechaFin > fechaHoy) ||
+				 *   ((fechaFin = fechaHoy) && (horaFin > horaActual))
+				 *   
+				 *   */
+				
+				if (0 > fechaInicioDb2.compareTo(fechaHoyStrDb2) ||
+						0 == fechaInicioDb2.compareTo(fechaHoyStrDb2))
+				{
+					//si la fecha fin no está informada o si es mayor o igual que la de hoy
+					if ((DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaFinDb2)) ||
+						(0 <= fechaFinDb2.compareTo(fechaHoyStrDb2)))
+					{
+						versionGeneral = contextoVG.getBigDecimal(CTE_CONTEXTO_VG_VERSION_GENERAL);
+					}
+				}
+				
+			}
+		}
+		
+		if (null == versionGeneral)
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_BUSQ_PROD_NO_VERSION_GEN,
+				null,
+				new String[] {codProducto.toString(), codSubproducto.toString()},
+				null);
+		}
+		
+		/*Comprobamos que esté activo a nivel de producto y de subproducto*/
+		productoC = productoDao.obtenerProducto(
+			new Integer(codProducto.intValue()),
+			Constantes.CTE_INTEGER_UNO, //!! aqui va la versión DEL PRODUCTO, es siempre 1.
+			false, //borrado
+			true //activo
+			);
+		
+		subproductoC = subproductoDao.obtenerSubProducto(
+			new Integer(codProducto.intValue()),
+			new Integer(codSubproducto.intValue()),
+			Constantes.CTE_INTEGER_UNO, //!! aqui va la versión DEL SUBPRODUCTO, es siempre 1.
+			false, //borrado
+			true //activo
+			);
+		
+		if ((null == productoC) ||
+			(null == subproductoC))
+		{
+			//si no encontró el producto activo, o el subproducto, no devolvemos versión general.
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_BUSQ_PROD_NO_VERSION_GEN,
+				null,
+				new String[] {codProducto.toString(), codSubproducto.toString()},
+				null);
+		}
+		
+		
+		return versionGeneral;
+	}
+	
+	
+	/**
+	 *  Llamamos al ANPM_015 para obtener la versión general del contexto ANPMN008 y comprobamos si está activo el subproducto y el producto.
+	 *  
+	 * @param codProducto
+	 * @param codSubproducto
+	 * @return
+	 */
+	public static BigDecimal obtenerVersionGeneralFecha(BigDecimal codProducto, BigDecimal codSubproducto, String fecha)
+	{
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		IDatosEntradaTx datosEntrada = null;
+		IContexto[] resultado = null;
+		BigDecimal versionGeneral = null;
+	
+		String fechaStrDb2 = null;
+		String fechaInicio = null;
+		String fechaInicioDb2 = null;
+		String fechaFin = null;
+		String fechaFinDb2 = null;
+		ProductoC productoC = null;
+		SubProductoC subproductoC = null;
+		
+		ProductoEng productoDao = new ProductoEng();
+		SubProductoEng subproductoDao = new SubProductoEng(CTE_JNDI_DATASOURCE);
+		
+		fechaStrDb2	= DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_DB2_DATE, fecha);
+		
+		datosEntrada = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			Constantes.CTE_SN_CC_ANPM,
+			new Integer(15));
+		
+		datosEntrada.addCampo(0, codProducto);
+		datosEntrada.addCampo(1, codSubproducto);
+		
+		resultado = ServicioNegocio.invocarServicio(
+			contextoEjecucion, datosEntrada);
+		
+		for (IContexto contextoVG : resultado)
+		{
+			if (CTE_CONTEXTO_VG.equalsIgnoreCase(contextoVG.getNombre().trim()))
+			{
+				fechaInicio = contextoVG.getString(CTE_CONTEXTO_VG_FECHA_INICIO);
+				fechaInicioDb2 = DateHelper.getInstance().formatearFecha(
+					DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_DB2_DATE, fechaInicio);
+				
+				fechaFin = contextoVG.getString(CTE_CONTEXTO_VG_FECHA_FIN);
+				if (! UtilidadesTramitacion.isBlankOrNull(fechaFin))
+				{
+					fechaFinDb2 = DateHelper.getInstance().formatearFecha(
+						DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_DB2_DATE, fechaFin);
+				}
+				else
+				{
+					fechaFinDb2 = DateUtils.CTE_DATELOWESTONLYDAY;
+				}
+				
+				if (0 > fechaInicioDb2.compareTo(fechaStrDb2) ||
+						0 == fechaInicioDb2.compareTo(fechaStrDb2))
+				{
+					//si la fecha fin no está informada o si es mayor o igual que la de entrada
+					if ((DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaFinDb2)) ||
+						(0 <= fechaFinDb2.compareTo(fechaStrDb2)))
+					{
+						versionGeneral = contextoVG.getBigDecimal(CTE_CONTEXTO_VG_VERSION_GENERAL);
+					}
+				}
+				
+			}
+		}
+		
+		if (null == versionGeneral)
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_BUSQ_PROD_NO_VERSION_GEN,
+				null,
+				new String[] {codProducto.toString(), codSubproducto.toString()},
+				null);
+		}
+		
+		/*Comprobamos que esté activo a nivel de producto y de subproducto*/
+		productoC = productoDao.obtenerProducto(
+			new Integer(codProducto.intValue()),
+			Constantes.CTE_INTEGER_UNO, //!! aqui va la versión DEL PRODUCTO, es siempre 1.
+			false, //borrado
+			true //activo
+			);
+		
+		subproductoC = subproductoDao.obtenerSubProducto(
+			new Integer(codProducto.intValue()),
+			new Integer(codSubproducto.intValue()),
+			Constantes.CTE_INTEGER_UNO, //!! aqui va la versión DEL SUBPRODUCTO, es siempre 1.
+			false, //borrado
+			true //activo
+			);
+		
+		if ((null == productoC) ||
+			(null == subproductoC))
+		{
+			//si no encontró el producto activo, o el subproducto, no devolvemos versión general.
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_BUSQ_PROD_NO_VERSION_GEN,
+				null,
+				new String[] {codProducto.toString(), codSubproducto.toString()},
+				null);
+		}
+		
+		
+		return versionGeneral;
+	}
+
+	/**
+	 * Substituye los valores de tipoRefTipo (PM700010) y tipoRefPlazo (PM700020) para
+	 * obtener un tipo de referencia accediendo a la tabla PM70TB01
+	 * (aplicación PTMO, SN500130, ObternerTiposReferenciaSrv).
+	 * Equivalente al procedimiento de la include PMOSM313.
+	 * 
+	 * @param claveTipoReferenciaVO
+	 */
+	private static ClaveTipoReferenciaVO traducirClaveTiposReferencia(ClaveTipoReferenciaVO claveTipoReferenciaVO)
+	{
+		//BigDecimal pic2 = null; //PIC2, nombre temporal.
+		//BigDecimal pic3 = null; //PIC3, nombre temporal.
+		BigDecimal pic4 = null; //PIC4, nombre temporal.
+		
+		String tipoRefTipo = null;
+		String tipoRefPlazo = null;
+		
+		tipoRefTipo = claveTipoReferenciaVO.getTipo();
+		tipoRefPlazo = claveTipoReferenciaVO.getPlazo();
+		
+		if ((StringUtils.isBlank(tipoRefTipo)) || (StringUtils.isBlank(tipoRefPlazo)))
+		{
+			ServicioNegocio.rollback(0, null, null, null);
+		}
+		
+		//PIC4 = M3130010||SUBSTR(TRIM (M3130020),2,2);
+		/*cando en tipoRefPlazo ven o 0 concatenado pola esquerda, tamaño 3:*/
+		//pic4 = new BigDecimal(tipoRefTipo.concat(tipoRefPlazo.trim().substring(1,3)));
+		pic4 = new BigDecimal(tipoRefTipo.concat(tipoRefPlazo.trim().substring(0,2)));
+		
+		//Nota importante: a los enteros en java no se les puede dejar el 0 delante
+		//porque si se le deja considera que está en octal y hace la traducción a decimal y no queremos eso.
+		
+		//SELECT (PIC4);
+		switch (pic4.intValue())
+		{
+			//WHEN (0115,0120,0125,0130) DO; /* EURIBOR PUBLICACION DIARIA */
+			case 115:
+			case 120:
+			case 125:
+			case 130:
+			{
+				tipoRefTipo = "98";
+				switch (pic4.intValue())
+				{
+					case 115: //0115
+					{
+						//tipoRefPlazo = "001";
+						tipoRefPlazo = "01";
+						break;
+					}
+					case 120:
+					{
+						tipoRefPlazo = "03";
+						break;
+					}
+					case 125:
+					{
+						tipoRefPlazo = "06";
+						break;
+					}
+					case 130:
+					{
+						tipoRefPlazo = "12";
+						break;
+					}
+				}
+				break;
+			}
+		     /* TIPOS DE EMPLEADO */ 
+			//0300,0301,0302,0303,0304,0311,0312,0313,0314,0315
+			case 300:
+			case 301:
+			case 302:
+			case 303:
+			case 304:
+			case 311:
+			case 312:
+			case 313:
+			case 314:
+			case 315:
+			{
+				tipoRefTipo = "03";
+				tipoRefPlazo = pic4.toString().substring(2,4);
+				break;
+			}
+				
+			//5621,5626,5631
+			case 5621:
+			case 5626:
+			case 5631:
+			{
+				tipoRefTipo = "56";
+				tipoRefPlazo = pic4.toString().substring(2,4);
+				break;
+			}
+				
+			//WHEN (0132,0909) DO; /* INTERBANCARIO 1 AñO */                             
+			case 132:
+			case 909:
+			{
+				tipoRefTipo = "98";
+				tipoRefPlazo = "00";
+				break;
+			}
+			
+			//WHEN (5400) DO; /* CECA */
+			case 5400:
+			{
+				tipoRefTipo = "30";
+				tipoRefPlazo = "00";
+				break;
+			}
+
+			//WHEN (5300) DO; /* IRCA */                                                 
+			case 5300:
+			{
+				tipoRefTipo = "53";
+				tipoRefPlazo = "00";
+				break;
+			}
+			
+			//WHEN (5600,5700) DO; /* TIPO INTERBANCARIO 1 AÑO (MIBOR) */               
+			case 5600:
+			case 5700:
+			{
+				tipoRefTipo = "12";
+				tipoRefPlazo = "00";
+				break;
+			}
+			
+			//WHEN (5601,5603,5606,5612) DO;   /* MIBOR PUBLICACION DIARIA */            
+			case 5601:
+			case 5603:
+			case 5606:
+			case 5612:
+			{
+				tipoRefTipo = "02";
+				switch (pic4.intValue())
+				{
+					case 5601:
+					{
+						tipoRefPlazo = "01";
+						break;
+					}
+					case 5603:
+					{
+						tipoRefPlazo = "03";
+						break;
+					}
+					case 5606:
+					{
+						tipoRefPlazo = "06";
+						break;
+					}
+					case 5612:
+					{
+						tipoRefPlazo = "12";
+						break;
+					}
+				}
+				break;
+			}
+			
+			//WHEN (5500) DO; /* IRPH */                                                 
+			case 5500:
+			{
+				tipoRefTipo = "13";
+				tipoRefPlazo = "00";
+				break;
+			}
+		}
+		claveTipoReferenciaVO.setTipo(tipoRefTipo);
+		claveTipoReferenciaVO.setPlazo(tipoRefPlazo);
+		
+		return claveTipoReferenciaVO;
+	}
+	
+	/**
+	 * 
+	 * Médodo que consulta la descripción de la comisión dada por parámetro
+	 * 
+	 * @param tipoComision
+	 * @return descripcion
+	 */
+	public static String obtenerDescripcionTipoComision(String tipoComision)
+	{
+		
+		ParametrosEng dao = new ParametrosEng();
+		
+		String descripcion = dao.obtenerDescripcionComision(tipoComision);
+		
+		return descripcion;
+		
+	}
+	
+	private static SolicitudPmosVO consultarSolicitudPmos (BigDecimal nucExpediente)
+	{
+		IDatosEntradaTx entrada = null;
+		IContexto[] ctxRespuesta = null;
+		SolicitudPmosVO solicitudPmosVO = null;
+		
+		entrada = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 500, 107);
+   	    entrada.addCampo(0, "S");
+   	    entrada.addCampo(5, nucExpediente);
+				
+		ctxRespuesta = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), entrada);
+
+		if ((ctxRespuesta.length > 0) && (null != ctxRespuesta[0]))
+		{
+			FromContextCreator fccre = new FromContextCreator(SolicitudPmosVO.class);
+			solicitudPmosVO = fccre.createObject(ctxRespuesta[0]);
+		}
+		
+		return solicitudPmosVO;
+		
+		
+	
+	}
+
+}

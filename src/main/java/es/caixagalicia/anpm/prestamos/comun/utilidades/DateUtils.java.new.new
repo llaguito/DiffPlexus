@@ -1,0 +1,823 @@
+/**
+ * Aplicacion de Banca online de Portugal
+ * Caixa Galicia © 2008-2009
+ *
+ * Desarrollado por: Treelogic S.L.
+ */
+package es.caixagalicia.anpm.prestamos.comun.utilidades;
+
+import java.math.BigDecimal;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.StringTokenizer;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Dispone al usuario de funciones extra para tratar fechas y horas.
+ *
+ * @author v35345
+ */
+public final class DateUtils {
+
+    public static final String CTE_DATELOWEST = "0001-01-01 00:00:00";
+
+    public static final String CTE_DATELOWEST_DB2 = "0001-01-01-00.00.00.000000";
+
+    public static final String CTE_DATELOWESTONLYDAY = "0001-01-01";
+
+    public static final String CTE_DATELOWEST_FORMATO_CORTO = "01-01-0001";
+
+    public static final String CTE_FECHA_FINAL_CENTRO = "2999-12-31";
+
+    private static final int CTE_59 = 59;
+
+    public static final ResultUnit MILLISECOND = new ResultUnit();
+
+    public static final ResultUnit SECOND = new ResultUnit();
+
+    public static final ResultUnit MINUTE = new ResultUnit();
+
+    public static final ResultUnit HOUR = new ResultUnit();
+
+    public static final ResultUnit DAY = new ResultUnit();
+
+    public static final ResultUnit WEEK = new ResultUnit();
+
+    public static final ResultUnit MONTH = new ResultUnit();
+
+    public static final ResultUnit YEAR = new ResultUnit();
+
+    public static final long MILLISECONDS_IN_SECOND = 1000;
+
+    public static final long MILLISECONDS_IN_MINUTE = 60 * MILLISECONDS_IN_SECOND;
+
+    public static final long MILLISECONDS_IN_HOUR = 60 * MILLISECONDS_IN_MINUTE;
+
+    public static final long MILLISECONDS_IN_DAY = 24 * MILLISECONDS_IN_HOUR;
+
+    public static final long MILLISECONDS_IN_WEEK = 7 * MILLISECONDS_IN_DAY;
+
+    public static final long MILLISECONDS_IN_MONTH = 30 * MILLISECONDS_IN_DAY;
+
+    public static final long MILLISECONDS_IN_YEAR = 365 * MILLISECONDS_IN_DAY;
+
+    public static final RoundingMode FLOOR = new RoundingMode();
+
+    public static final RoundingMode NO_ROUNDING = new RoundingMode();
+
+    public static final RoundingMode CEIL = new RoundingMode();
+
+    public static final RoundingMode ROUND = new RoundingMode();
+
+    /**
+     * Formato de fecha dd-MM-yyyy
+     */
+    public static final String FORMATO_FECHA_CORTO = "dd-MM-yyyy";
+
+    /**
+     * Formato de fecha dd-MM-yyyy HH:mm
+     */
+    public static final String FORMATO_FECHAHORA_CORTO = "dd-MM-yyyy HH:mm";
+
+    /**
+     * Formato de fecha dd-MM-yyyy HH:mm:ss
+     */
+    public static final String FORMATO_FECHAHORA_LARGO = "dd-MM-yyyy HH:mm:ss";
+
+    /**
+     * Formato de fecha MM-yyyy
+     */
+    public static final String FORMATO_FECHA_MES_ANHO = "MM-yyyy";
+
+    public static final String FORMATO_HORA_SIMPLE = "HHmm";
+
+    private static final String ERROR_REQUIRED_DATE = "Date arguments are required";
+
+    public static final String FORMATO_HORA_CORTO = "HH:mm:ss";
+
+    public static final String CTE_FORMATO_HORA = "HH:mm";
+
+    // $NON-NL-1$
+    public static final String CTE_TEXTO_REQUIRED = "ALL_ARGUMENTS_ARE_REQUIRED_1322716116";
+
+    public static final String FORMATO_FECHA_AMERICANO = "yyyy-MM-dd";
+
+    public static final String FORMATO_FECHA_EEXP = "yyyyMMdd";
+
+    /**
+     * Servicio de negocio que consulta el proximo dia habil en una oficina a partir de una fecha de entrada y el numero de dias a sumar
+     */
+    private static final Integer CTE_CUENTA_CONTABLE_ENCA = Integer.valueOf(603);
+
+    private static final Integer CTE_COD_OPERACION_FECHA_HABIL = Integer.valueOf(401);
+
+    private static final String CTE_CTX_FECHA_HABIL = "EN401CON";
+
+    private static final String CTE_CAMPO_FECHA_HABIL = "EN4010030";
+
+    public DateUtils() {
+    }
+
+    /**
+     * Convierte de una hora de formato HH:MM a formato float
+     * @param horas - una cadena con formato HH:MM que represente a una hora en formato 24h
+     * @return Hora en formato float
+     * @throws ParseException - si la cadena <code>horas</code> no tiene el formato esperado
+     */
+    public static Float horasHHMMtoH(String horas) throws ParseException {
+        StringTokenizer tk = new StringTokenizer(horas, ":");
+        if (2 == tk.countTokens()) {
+            String sH = tk.nextToken();
+            String sM = tk.nextToken();
+            final int h = Integer.parseInt(sH);
+            if (2 <= sM.length()) {
+                final int m = Integer.parseInt(sM);
+                if (0 > m || CTE_59 < m) {
+                    throw new ParseException("Los minutos deben tener un valor entre 0 y 59.", horas.length());
+                }
+                return new Float(h + m / 60f);
+            }
+            throw new ParseException("Los minutos deben tener 2 digitos.", horas.length());
+        }
+        throw new ParseException("Formato de hora incompatible con HH:MM.", horas.length());
+    }
+
+    /**
+     * Convierte de una hora de float a formato HH:MM (hora en formato 24h)
+     * @param horas Un numero float
+     * @return La representacion en horas HH:MM del numero introducido
+     */
+    public static String horasHtoHHMM(Float horas) {
+        final int h = horas.intValue();
+        final int m = Math.round((horas.floatValue() - h) * 60);
+        String s_m = Integer.toString(m);
+        if (10 > m) {
+            s_m = "0" + m;
+        }
+        return h + ":" + s_m;
+    }
+
+    /**
+     * Cambia la fecha dada <code>fecha</code> la cual tiene un formato especifico
+     * <code>formatoIn</code> a un nuevo formato <code>formatoOut</code>.
+     * <p>
+     * Si se produce algun error de parseo el resultado que se devuelve es <code>null</code>
+     *
+     * @param fecha - Fecha que se desea mostrar en otro formato.
+     * @param formatoIn - Patron de la fecha de entrada.
+     * @param formatoOut - Patron que se le quiere dar a la fecha de salida.
+     * @return La fecha de entrada con el nuevo formato.
+     */
+    public static String cambiaFormatoFecha(String fecha, String formatoIn, String formatoOut) {
+        String result = null;
+        try {
+            Date date = new SimpleDateFormat(formatoIn).parse(fecha);
+            result = new SimpleDateFormat(formatoOut).format(date);
+        } catch (ParseException e) {
+            result = null;
+        }
+        return result;
+    }
+
+    /**
+     * Devuelve la diferencia entre dos fechas (la primera menos la segunda).
+     *
+     * Es posible elegir la unidad de retorno (millisegundos, segundos, horas, dias, semanas, meses o años
+     * y el modo de redondeo (floor, ceiling, or round).
+     *
+     * @param dateMinuend - Fecha minuendo
+     * @param dateSubtrahend - Fecha sustraendo
+     * @param resultUnit - Medida de resultado
+     * @param roundingMode - Modo de redondeo
+     * @return La diferencia de tiempo entre las fechas
+     */
+    public static double getDifference(final Date dateMinuend, final Date dateSubtrahend, final ResultUnit resultUnit, final RoundingMode roundingMode) {
+        if (dateMinuend == null || dateSubtrahend == null) {
+            throw new IllegalArgumentException(ERROR_REQUIRED_DATE);
+        }
+        final long millisMinuend = dateMinuend.getTime();
+        final long millisSubtrahend = dateSubtrahend.getTime();
+        final double millisDiff = millisMinuend - millisSubtrahend;
+        final double result;
+        // Make calculation for correct returnUnit
+        if (resultUnit.equals(MILLISECOND)) {
+            result = millisDiff;
+        } else if (resultUnit.equals(MINUTE)) {
+            result = millisDiff / MILLISECONDS_IN_MINUTE;
+        } else if (resultUnit.equals(HOUR)) {
+            result = millisDiff / MILLISECONDS_IN_HOUR;
+        } else if (resultUnit.equals(DAY)) {
+            result = millisDiff / MILLISECONDS_IN_DAY;
+        } else if (resultUnit.equals(WEEK)) {
+            result = millisDiff / MILLISECONDS_IN_WEEK;
+        } else if (resultUnit.equals(MONTH)) {
+            result = millisDiff / MILLISECONDS_IN_MONTH;
+        } else if (resultUnit.equals(YEAR)) {
+            result = millisDiff / MILLISECONDS_IN_YEAR;
+        } else {
+            throw new IllegalArgumentException("Unknown resultUnit.");
+        }
+        double ret;
+        if (roundingMode.equals(FLOOR)) {
+            ret = Math.floor(new Double(result).doubleValue());
+        } else if (roundingMode.equals(NO_ROUNDING)) {
+            ret = new Double(result).doubleValue();
+        } else if (roundingMode.equals(CEIL)) {
+            ret = Math.ceil(new Double(result).doubleValue());
+        } else if (roundingMode.equals(ROUND)) {
+            ret = Math.round(new Double(result).doubleValue());
+        } else {
+            throw new IllegalArgumentException("Unknown roundingMode.");
+        }
+        return ret;
+    }
+
+    /**
+     * Retorna el dia de hoy como una nueva fecha con todos sus campos
+     * para el {@link Locale} por defecto
+     *
+     * @return La fecha actual
+     * @see Locale#getDefault()
+     */
+    public static Date dateNow() {
+        return dateNow(Locale.getDefault());
+    }
+
+    /**
+     * Retorna el dia de hoy como una nueva fecha con todos sus campos
+     * para el {@link Locale} especificado
+     *
+     * @param loc {@link Locale} de resulucion de fecha
+     * @return La fecha actual
+     */
+    public static Date dateNow(final Locale loc) {
+        return dateNow(loc, false);
+    }
+
+    /**
+     * Retorna el dia de hoy como una nueva fecha
+     *
+     * @param loc {@link Locale} de resulucion de fecha
+     * @param onlyDate <code>true</code> para obtener solo la fecha (año, mes y dia)
+     * @return La fecha actual
+     */
+    public static Date dateNow(final Locale loc, boolean onlyDate) {
+        final Date now = Calendar.getInstance((loc == null) ? Locale.getDefault() : loc).getTime();
+        return (onlyDate) ? getSoloFecha(now) : now;
+    }
+
+    /**
+     * Retorna el dia siguiente al que le pases como una nueva fecha
+     *
+     * @param date Fecha
+     * @return La fecha del dia siguiente
+     */
+    public static Date dateNext(final Date date) {
+        return dateAmount(date, Calendar.DAY_OF_MONTH, 1);
+    }
+
+    /**
+     * Retorna el dia anterior al que le pases como una nueva fecha
+     *
+     * @param date Fecha
+     * @return La fecha del día anterior
+     */
+    public static Date datePrev(final Date date) {
+        return dateAmount(date, Calendar.DAY_OF_MONTH, -1);
+    }
+
+    /**
+     * Retorna el ultimo instante de la fecha pasada como parametro
+     *
+     * @param date Fecha
+     * @return Ultimo instante
+     */
+    public static Date dateLastMinute(final Date date) {
+        Date d = getSoloFecha(date);
+        d = dateAmount(d, Calendar.DAY_OF_MONTH, 1);
+        d = dateAmount(d, Calendar.SECOND, -1);
+        return d;
+    }
+
+    /**
+     * Obtiene el ultimo dia del mes especficiado en forma de fecha
+     *
+     * @param month Mes (Enero=1 ... Diciembre=12)
+     * @param year Año
+     * @return Fecha del último día del mes
+     * @see Calendar#getActualMaximum(int)
+     */
+    public static Date dateLastDay(int month, int year) {
+        // Usamos cualquier dia del mes indicado como semilla
+        final Date date = getSoloFecha(1, month, year);
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        final int maxDaysMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        cal.set(Calendar.DATE, maxDaysMonth);
+        return cal.getTime();
+    }
+
+    /**
+     * Obtiene el ultimo dia del mes especficiado en forma de numero
+     *
+     * @param month Mes (Enero=1 ... Diciembre=12)
+     * @param year Año
+     * @return Ultimo día del mes
+     * @see Calendar#getActualMaximum(int)
+     */
+    public static int dateLastDayI(int month, int year) {
+        return dateGet(dateLastDay(month, year), Calendar.DATE);
+    }
+
+    /**
+     * Obtiene la representacion del calendario de la fecha indicada
+     * @param date fecha indicada
+     * @return representacion del calendario
+     */
+    public static Calendar dateCalendar(final Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        return cal;
+    }
+
+    /**
+     * Obtiene la fecha mas baja posible segun Java
+     *
+     * @return fecha mas baja
+     */
+    public static Timestamp dateLowest() {
+        return Timestamp.valueOf(CTE_DATELOWEST);
+    }
+
+    /**
+     * Suma a la fecha pasada por parametro el <code>amount</code> especificado
+     * por su unidad <code>calField</code> y la retorna como una nueva fecha
+     *
+     * @param date Fecha
+     * @param calField Mirar {@see Calendar} para posibilidades
+     * @param amount Cantidad
+     * @return La fecha tras la suma
+     * @see java.util.Calendar#add(int,int)
+     */
+    public static Date dateAmount(final Date date, int calField, int amount) {
+        if (date == null) {
+            throw new IllegalArgumentException(ERROR_REQUIRED_DATE);
+        }
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.add(calField, amount);
+        return cal.getTime();
+    }
+
+    /**
+     * Establece a la fecha pasada por parametro el <code>amount</code> especificado
+     * por su unidad <code>calField</code> y la retorna como una nueva fecha
+     *
+     * @param date Fecha
+     * @param calField Mirar {@see Calendar} para posibilidades
+     * @param value Cantidad
+     * @return La fecha tras la modificación
+     * @see java.util.Calendar#set(int,int)
+     */
+    public static Date dateSet(final Date date, int calField, int value) {
+        if (date == null) {
+            throw new IllegalArgumentException(ERROR_REQUIRED_DATE);
+        }
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(calField, value);
+        return cal.getTime();
+    }
+
+    /**
+     * Obtiene de la fecha pasada por parametro el valor que representa la
+     * unidad <code>calField</code>
+     *
+     * @param date Fecha
+     * @param calField Mirar {@see Calendar} para posibilidades
+     * @return La propiedad de la fecha
+     * @see java.util.Calendar#get(int,int)
+     */
+    public static int dateGet(final Date date, int calField) {
+        if (date == null) {
+            throw new IllegalArgumentException(ERROR_REQUIRED_DATE);
+        }
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        return cal.get(calField);
+    }
+
+    /**
+     * Comprueba si un campo de una fecha es igual al de otra.
+     *
+     * @param date1 Fecha a comparar
+     * @param date2 Fecha con la que comparar
+     * @param calField Mirar {@see Calendar} para posibilidades
+     * @param amount Cantidad
+     * @return Si el campo a comparar es igual o no
+     * @see java.util.Calendar#get(int,int)
+     */
+    public static boolean dateFieldEqual(final Date date1, final Date date2, int calField) {
+        if (date1 == null || date2 == null) {
+            throw new IllegalArgumentException(new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_TEXTO_REQUIRED).toString()).toString()).toString()).toString()).toString()).toString());
+        }
+        Calendar cal1 = Calendar.getInstance();
+        cal1.setTime(date1);
+        Calendar cal2 = Calendar.getInstance();
+        cal2.setTime(date2);
+        return cal1.get(calField) == cal2.get(calField);
+    }
+
+    /**
+     * Comprueba si una fecha esta comprendida entre otras dos.
+     * <BR/>
+     * <ul>
+     * 	<li>
+     * 		Si <code>date</code>==<code>dateFirst</code>==<code>dateLast</code>
+     * 		se retorna <code>true</code>
+     * 	</li>
+     * 	<li>
+     * 		Si <code>dateFirst</code> es posterior a <code>dateLast</code>
+     * 		se intercambian sus valores.
+     * 	</li>
+     * 	<li>
+     * 		El flag <code>inclMode</code> sirve para tener tambien en cuenta la fecha de los
+     * 		extremos del intervalo
+     * 	</li>.
+     * </ul>
+     * @param date Fecha a comprobar si está en el intervalo
+     * @param dateFirst Fecha de inicio del intervalo
+     * @param dateLast Fecha de fin del intervalo
+     * @param inclMode Incluir los extremos del intervalo
+     * @return Si la fecha está comprendida en el intervalor formado por las otras dos
+     */
+    public static boolean isDateBetween(final Date date, final Date dateFirst, final Date dateLast, boolean inclMode) {
+        boolean bBeetween = false;
+        // si es la misma fecha
+        if (date != null && date.equals(dateFirst) && date.equals(dateLast)) {
+            bBeetween = true;
+        } else if (date == null || dateFirst == null || dateLast == null) {
+            throw new IllegalArgumentException(new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_TEXTO_REQUIRED).toString()).toString()).toString()).toString()).toString()).toString());
+        }
+        // Clonamos para evitar que se intercambien las fechas al salir del metodo
+        Date date1 = (Date) dateFirst.clone();
+        Date date2 = (Date) dateLast.clone();
+        if (date1.after(date2)) {
+            // intercambiamos valores
+            Date dateAux = Calendar.getInstance().getTime();
+            dateAux.setTime(date2.getTime());
+            date2.setTime(date1.getTime());
+            date1.setTime(dateAux.getTime());
+        }
+        if (!inclMode) {
+            // si no =>   date > dateFist y date < dateLast
+            bBeetween = date.after(date1) && date.before(date2);
+        } else {
+            // si no =>   date >= dateFist y date <= dateLast
+            bBeetween = isDateGreaterEqual(date, date1) && isDateLessEqual(date, date2);
+        }
+        return bBeetween;
+    }
+
+    /**
+     * Comprueba si una fecha esta dentro del rango establecido
+     * <ul>
+     * <li>
+     * 		Los parametros pueden ser <code>null</code>.
+     * 		<ul>
+     * 			<li>
+     * 				Si todas las fechas pasadas son <code>null</code> se retorna <code>true</code>
+     * 			</li>
+     * 			<li>
+     * 				Si <code>date!=null</code> pero <code>dateFirst==dateLast</code> y
+     * 				<code>null</code> se retorna <code>false</code> ya que no existe
+     * 				forma de comparar.
+     * 			</li>
+     * 			<li>
+     * 				Si <code>date!=null</code>, <code>dateFirst==null</code> y
+     * 				<code>dateLast &gt;= date</code> se retorna <code>true</code>
+     * 			</li>
+     * 			<li>
+     * 				Si <code>date!=null</code>, <code>dateFirst &lt;= date </code> y
+     * 				<code>dateLast==null</code> se retorna <code>true</code>
+     * 			</li>
+     * 			<li>
+     * 				Y por ultimo si no son <code>null</code> y
+     * 				<code>dateFirst &lt;= date &lt;= dateLast</code> se retorna <code>true</code>
+     * 			</li>
+     * 		</ul>
+     *	</li>
+     * <li></li>
+     * </ul>
+     *
+     * @param date fecha a comparar
+     * @param dateFirst cota mas baja del rango
+     * @param dateLast cota mas alta del rango
+     * @return Si la fecha está dentro del rango
+     */
+    public static boolean isDateIn(final Date date, final Date dateFirst, final Date dateLast) {
+        boolean bIn = true;
+        if (date == null && (dateFirst != null || dateLast != null)) {
+            bIn = bIn && false;
+        } else if (dateFirst == null && dateLast != null) {
+            // date <= dateLast
+            bIn = bIn && DateUtils.isDateLessEqual(date, dateLast);
+        } else if (dateLast == null && dateFirst != null) {
+            // dateFirst <= date
+            bIn = bIn && DateUtils.isDateGreaterEqual(date, dateFirst);
+        } else if (dateFirst != null && dateLast != null) {
+            // //dateFirst <= date <=dateLast
+            bIn = bIn && DateUtils.isDateGreaterEqual(date, dateFirst) && DateUtils.isDateLessEqual(date, dateLast);
+        } else {
+            // date==dateFirst==dateLast = "null"
+            bIn = bIn && true;
+        }
+        return bIn;
+    }
+
+    /**
+     * Comprueba si una fecha es igual o mayor que otra.
+     * @param date1 Fecha a comparar
+     * @param date2 Fecha con la que comparar
+     * @return Si la fecha es mayor o igual
+     */
+    public static boolean isDateGreaterEqual(final Date date1, final Date date2) {
+        if (date1 == null || date2 == null) {
+            throw new IllegalArgumentException(new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_TEXTO_REQUIRED).toString()).toString()).toString()).toString()).toString()).toString());
+        }
+        return (0 <= date1.compareTo(date2));
+    }
+
+    /**
+     * Comprueba si una fecha es mayor que otra.
+     * @param date1 Fecha a comparar
+     * @param date2 Fecha con la que comparar
+     * @return Si la fecha es mayor o igual
+     */
+    public static boolean isDateGreater(final Date date1, final Date date2) {
+        if (date1 == null || date2 == null) {
+            throw new IllegalArgumentException(new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_TEXTO_REQUIRED).toString()).toString()).toString()).toString()).toString()).toString());
+        }
+        return (0 < date1.compareTo(date2));
+    }
+
+    /**
+     * Comprueba si una fecha es igual o menor que otra.
+     * @param date1 Fecha a comparar
+     * @param date2 Fecha con la que comparar
+     * @return Si la fecha es menor o igual
+     */
+    public static boolean isDateLessEqual(final Date date1, final Date date2) {
+        if (date1 == null || date2 == null) {
+            throw new IllegalArgumentException(new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), new Mensaje(ServicioNegocio.getContexto(), CTE_TEXTO_REQUIRED).toString()).toString()).toString()).toString()).toString()).toString());
+        }
+        return (0 >= date1.compareTo(date2));
+    }
+
+    /**
+     * Retorna una copia de la fecha eliminandole las horas, minutos, segundos etc.
+     * por lo que solo quedaran los años, meses y dias.
+     *
+     * @param date Fecha
+     * @return Fecha sin hora
+     */
+    public static Date getSoloFecha(final Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        // le quitamos las horas
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        // le quitamos los minutos
+        cal.set(Calendar.MINUTE, 0);
+        // le quitamos los segundos
+        cal.set(Calendar.SECOND, 0);
+        // le quitamos los millisegundos
+        cal.set(Calendar.MILLISECOND, 0);
+        return (Date) cal.getTime().clone();
+    }
+
+    /**
+     * Devuelve un objeto Date con la fecha especificada y despreciando
+     * las horas, minutos, segundos etc.
+     *
+     * @param dia Dia (1..31)
+     * @param mes Mes (Enero=0 ... Diciembre=11)
+     * @param anio Año
+     * @return Fecha sin hora
+     */
+    public static Date getSoloFecha(int dia, int mes, int anio) {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.DATE, dia);
+        cal.set(Calendar.MONTH, mes);
+        cal.set(Calendar.YEAR, anio);
+        return DateUtils.getSoloFecha(cal.getTime());
+    }
+
+    /**
+     * Convierte un Date del paquete java.util en un Date del paquete java.sql
+     * @param date un objeto Date del paquete java.util
+     * @return un objeto Date del paquete java.sql
+     */
+    public static java.sql.Date toSQLDate(final Date date) {
+        java.sql.Date sqlDate = null;
+        if (date != null) {
+            sqlDate = new java.sql.Date(date.getTime());
+        }
+        return sqlDate;
+    }
+
+    /**
+     * Convierte un Date del paquete java.util en un Timestamp del paquete java.sql
+     * @param date un objeto Date del paquete java.util
+     * @return un objeto Timestamp del paquete java.sql
+     */
+    public static Timestamp toSQLTimestamp(final Date date) {
+        Timestamp sqlDate = null;
+        if (date != null) {
+            sqlDate = new Timestamp(date.getTime());
+        }
+        return sqlDate;
+    }
+
+    /**
+     * Convierte una cadena String con un formato dado en un objeto Date.
+     * @param fecha String con la fecha en el formato especificado por el patron
+     * @param pattern Patron de fecha
+     * @return Un date con la fecha pasada o null si no tiene el formato correcto
+     */
+    public static Date parseDate(String fecha, String pattern) {
+        Date date = null;
+        if (fecha != null && pattern != null) {
+            try {
+                date = new SimpleDateFormat(pattern).parse(fecha);
+            } catch (ParseException e) {
+                date = null;
+            }
+        }
+        return date;
+    }
+
+    /**
+     * Convierte una cadena String con un formato dado en un objeto Date.
+     *
+     * @param fecha Fecha
+     * @param dateStyle Estilo de formateo definido por DateFormat para la fecha
+     * @param timeStyle Estilo de formateo definido por DateFormat para las horas minutos y segundos
+     * @return Un date con la fecha pasada o null si no tiene el formato correcto
+     */
+    public static Date parseDate(String fecha, int dateStyle, int timeStyle) {
+        Date date = null;
+        if (fecha != null) {
+            try {
+                date = DateFormat.getDateTimeInstance(dateStyle, timeStyle).parse(fecha);
+            } catch (ParseException e) {
+                date = null;
+            }
+        }
+        return date;
+    }
+
+    /**
+     * Convierte un Date en una cadena String con el formato especificado.
+     *
+     * @param date Fecha
+     * @param pattern Patron de fecha
+     * @return Una fecha con el formato especificado o cadena vacia si no tiene el formato correcto
+     */
+    public static String formatDate(final Date date, String pattern) {
+        String strDate = null;
+        if (date != null && pattern != null) {
+            strDate = new SimpleDateFormat(pattern).format(date);
+        }
+        return strDate;
+    }
+
+    /**
+     * Convierte un Date en una cadena String con el formato especificado.
+     *
+     * @param date Fecha
+     * @param dateStyle Estilo de formateo definido por DateFormat para la fecha
+     * @param timeStyle Estilo de formateo definido por DateFormat para las horas minutos y segundos
+     * @return Una fecha con el formato especificado o cadena vacia si no tiene el formato correcto
+     */
+    public static String formatDate(final Date date, int dateStyle, int timeStyle) {
+        String strDate = null;
+        if (date != null) {
+            DateFormat.getDateTimeInstance(dateStyle, timeStyle).format(date);
+        }
+        return strDate;
+    }
+
+    /**
+     * @param dias el valor a formatear
+     * @return HHMM
+     */
+    public static String diasToHHMM(Float dias) {
+        final int h = (int) (dias.floatValue() * 24);
+        final int m = Math.round((dias.floatValue() * 24 - h) * 60);
+        String s_h = Integer.toString(h);
+        if (10 > h) {
+            s_h = "0" + h;
+        }
+        String s_m = Integer.toString(m);
+        if (10 > m) {
+            s_m = "0" + m;
+        }
+        return s_h + ":" + s_m;
+    }
+
+    /**
+     * Retorna la hora:minutos:segundos de una determinada fecha.
+     *
+     * @param date Fecha
+     * @return Fecha sin hora
+     */
+    public static Time getSoloHorario(final Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        // le quitamos las horas
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        // le quitamos los minutos
+        cal.set(Calendar.MINUTE, 0);
+        // le quitamos los segundos
+        cal.set(Calendar.SECOND, 0);
+        // le quitamos los millisegundos
+        cal.set(Calendar.MILLISECOND, 0);
+        Date fechaInicio = (Date) cal.getTime().clone();
+        Time retorno = new Time(date.getTime() - fechaInicio.getTime() + Constantes.CTE_HORA_DEFECTO.getTime());
+        return retorno;
+    }
+
+    /**
+     * Suma el número de días indicado a la fecha que se le pasa como parámetro
+     * Si el número de días es negativo, el resultado es la resta de ese número de días a la fecha que se le pasa como parámetro
+     *
+     * @param date fecha
+     * @param int numDias, número de días a aumentar
+     * @return Fecha aumentada en numDias
+     */
+    public static Date addDays(Date fecha, int numDias) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(fecha);
+        cal.add(Calendar.DAY_OF_YEAR, numDias);
+        return cal.getTime();
+    }
+
+    /**
+     * Devuelve la fecha del proximo dia habil en una oficina a partir de una fecha de entrada y el numero de dias a sumar
+     * @param date fecha
+     * @param bigDecimal numDias, número de días a aumentar
+     * @param bigDecimal oficina
+     * @return Fecha hábil aumentada en numDias en formato DD-MM-YYYY
+     */
+    public static String calcularDiasHabiles(Date fecha, BigDecimal numDias, BigDecimal oficina) {
+        String fechaHabil = "";
+        final IDatosEntradaTx consultarFechaHabil = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), CTE_CUENTA_CONTABLE_ENCA, CTE_COD_OPERACION_FECHA_HABIL);
+        consultarFechaHabil.addCampo(0, DateUtils.formatDate(fecha, FORMATO_FECHA_AMERICANO));
+        consultarFechaHabil.addCampo(2, oficina.toString());
+        consultarFechaHabil.addCampo(3, numDias);
+        consultarFechaHabil.addCampo(4, BigDecimal.ONE);
+        IContexto[] datos = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), consultarFechaHabil);
+        IContexto ctx = UtilidadesTramitacion.getContexto(datos, CTE_CTX_FECHA_HABIL);
+        if (ctx != null) {
+            fechaHabil = ctx.getString(CTE_CAMPO_FECHA_HABIL);
+        }
+        return cambiaFormatoFecha(fechaHabil, FORMATO_FECHA_AMERICANO, FORMATO_FECHA_CORTO);
+    }
+}
+
+/**
+ * Modo de redondeo
+ * @author v35345
+ */
+final class RoundingMode {
+
+    /**
+     * Constructor
+     */
+    public RoundingMode() {
+    }
+}
+
+/**
+ * Unidad de resultado
+ * @author v35345
+ */
+final class ResultUnit {
+
+    /**
+     * Constructor
+     */
+    public ResultUnit() {
+    }
+}

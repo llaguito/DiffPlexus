@@ -1,0 +1,297 @@
+/**
+ * Aplicacion de Activo
+ * Caixa Galicia © 2009-2010
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Time;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condCapital.CondicionesCapitalC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionConCapital;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextoRespuesta;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextosCondicionesCapital;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.ResultadoOperacionVersionesVO;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Servicio para la gestion de las condiciones de capital de un subproducto
+ *
+ * @author Pablo González
+ */
+public class CondicionesCapitalSrv extends ServicioNegocio {
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO = 0;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO = 1;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_VERSION = 2;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ORDEN = 3;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_PAGO_UNICO_VENCIMIENTO = 4;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_NUM_PERIODOS_PERIODICIDAD = 5;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_IND_NUM_PERIODOS_PERIODICIDAD = 6;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_UNIDAD_PERIODO_PERIODICIDAD = 7;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_IND_PERIODO_PERIODICIDAD = 8;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_TIPO_PERIODO_PERIODICIDAD = 9;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_IND_TIPO_PERIODO_PERIODICIDAD = 10;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_PLAZO_CAPITAL = 11;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_PLAZO_CAPITAL_DESDE = 12;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_PLAZO_CAPITAL_HASTA = 13;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_IND_PLAZO_CAPITAL = 14;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_UNIDAD_PLAZO = 15;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO = 16;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO_DESDE = 17;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO_HASTA = 18;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_TIPO_PAGO_APLAZADO = 19;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_IND_PAGO_APLAZADO = 20;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_CONDICIONES_PARA = 21;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_PLAZO_MAX_CUOTA_BLINDADA = 22;
+
+    // private static final int CTE_POSICION_TIRA_USUARIO = 23; // OBLIGATORIO
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_FECHA_VIGENCIA_DESDE = 24;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_FECHA_VIGENCIA_HASTA = 25;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_VERSION_GENERAL = 26;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_SUBPRODUCTO_AUX = 27;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_PREGUNTA = 28;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_IND_PERIODO_MIN_LIQUIDACION = 29;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_NUM_PERIODO_MIN_LIQUIDACION = 30;
+
+    // OPCIONAL
+    private static final int CTE_POSICION_TIRA_UNIDAD_PERIODO_MIN_LIQUIDACION = 31;
+
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(CondicionesCapitalSrv.class);
+
+    /**
+     *  Constructor sin parametros.
+     */
+    public CondicionesCapitalSrv() {
+        super();
+    }
+
+    /**
+     * Ejecuta la logica de negocio del servicio
+     *
+     * @see es.caixagalicia.ifrt.core.ServicioNegocio
+     * 		#ejecutar(
+     * 			es.caixagalicia.ifrt.core.IContextoEjecucion,
+     * 			es.caixagalicia.ifrt.core.IDatosEntradaTx)
+     * @param contexto contexto de ejecucion
+     * @param datosEntrada datos de entrada
+     * @return <code>IContexto[]</code>
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada) {
+        final long lInicio = System.currentTimeMillis();
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM019: Alta/modificación condiciones de capital");
+        }
+        contexto.setDiarioElectronico(new DiarioElectronico(Constantes.CTE_OPERACION_AC, Integer.valueOf(0), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, BigDecimal.ZERO, BigDecimal.ZERO, Integer.valueOf(0)));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        ResultadoOperacionVersionesVO resultado = null;
+        GestionConCapital gcc = new GestionConCapital();
+        Integer idVersionGeneral = null;
+        CondicionesCapitalC condicion = null;
+        BigDecimal bidIdProducto = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO);
+        BigDecimal bidIdSubProducto = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO);
+        BigDecimal bidIdVersion = datosEntrada.getDecimal(CTE_POSICION_TIRA_VERSION);
+        BigDecimal bidOrden = datosEntrada.getDecimal(CTE_POSICION_TIRA_ORDEN);
+        String strPagoUnicoVen = datosEntrada.getString(CTE_POSICION_TIRA_PAGO_UNICO_VENCIMIENTO);
+        BigDecimal bidNumPeriodoPeriodicidad = datosEntrada.getDecimal(CTE_POSICION_TIRA_NUM_PERIODOS_PERIODICIDAD);
+        String strIndNumPeriodoPeriodicidad = datosEntrada.getString(CTE_POSICION_TIRA_IND_NUM_PERIODOS_PERIODICIDAD);
+        String strUnidadPeriodoPeriodicidad = datosEntrada.getString(CTE_POSICION_TIRA_UNIDAD_PERIODO_PERIODICIDAD);
+        String strIndUnidadPeriodoPeriodicidad = datosEntrada.getString(CTE_POSICION_TIRA_IND_PERIODO_PERIODICIDAD);
+        BigDecimal bidTipoPeriodoPeriodicidad = datosEntrada.getDecimal(CTE_POSICION_TIRA_TIPO_PERIODO_PERIODICIDAD);
+        String strIndTipoPeriodoPeriodicidad = datosEntrada.getString(CTE_POSICION_TIRA_IND_TIPO_PERIODO_PERIODICIDAD);
+        BigDecimal bidPlazoCapital = datosEntrada.getDecimal(CTE_POSICION_TIRA_PLAZO_CAPITAL);
+        BigDecimal bidPlazoCapitalDesde = datosEntrada.getDecimal(CTE_POSICION_TIRA_PLAZO_CAPITAL_DESDE);
+        BigDecimal bidPlazoCapitalHasta = datosEntrada.getDecimal(CTE_POSICION_TIRA_PLAZO_CAPITAL_HASTA);
+        String strIndPlazoCapita = datosEntrada.getString(CTE_POSICION_TIRA_IND_PLAZO_CAPITAL);
+        String strUnidadPlazo = datosEntrada.getString(CTE_POSICION_TIRA_UNIDAD_PLAZO);
+        BigDecimal bidCantidadPagoAplazado = datosEntrada.getDecimal(CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO);
+        BigDecimal bidCantidadPagoAplazadoDesde = datosEntrada.getDecimal(CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO_DESDE);
+        BigDecimal bidCantidadPagoAplazadoHasta = datosEntrada.getDecimal(CTE_POSICION_TIRA_CANTIDAD_PAGO_APLAZADO_HASTA);
+        BigDecimal bidTipoPagoAplazado = datosEntrada.getDecimal(CTE_POSICION_TIRA_TIPO_PAGO_APLAZADO);
+        String strIndTipoPagoAplazado = datosEntrada.getString(CTE_POSICION_TIRA_IND_PAGO_APLAZADO);
+        BigDecimal bidCondicionesPAra = datosEntrada.getDecimal(CTE_POSICION_TIRA_CONDICIONES_PARA);
+        BigDecimal bidPlazoMaxBlindada = datosEntrada.getDecimal(CTE_POSICION_TIRA_PLAZO_MAX_CUOTA_BLINDADA);
+        BigDecimal bidVG = datosEntrada.getDecimal(CTE_POSICION_TIRA_VERSION_GENERAL);
+        BigDecimal bidpregunta = datosEntrada.getDecimal(CTE_POSICION_TIRA_PREGUNTA);
+        // este campo vendrá con valor siempre que se realice el alta de un cero, para saber en que rango de
+        // fechas debe moverse.
+        BigDecimal bidSubAux = datosEntrada.getDecimal(CTE_POSICION_TIRA_SUBPRODUCTO_AUX);
+        // datosEntrada.getString(CTE_POSICION_TIRA_USUARIO);
+        String strUsuario = contexto.getUsuario();
+        String strFechaDesdeVigen = datosEntrada.getString(CTE_POSICION_TIRA_FECHA_VIGENCIA_DESDE);
+        String strFechaHastaVigen = datosEntrada.getString(CTE_POSICION_TIRA_FECHA_VIGENCIA_HASTA);
+        final BigDecimal bidIndPerLiq = datosEntrada.getDecimal(CTE_POSICION_TIRA_IND_PERIODO_MIN_LIQUIDACION);
+        final BigDecimal bidNumPerLiq = datosEntrada.getDecimal(CTE_POSICION_TIRA_NUM_PERIODO_MIN_LIQUIDACION);
+        final String strUnidadPerLiq = datosEntrada.getString(CTE_POSICION_TIRA_UNIDAD_PERIODO_MIN_LIQUIDACION);
+        Integer intNumPeriodosPerio = null;
+        Integer intTipoPeriodoPerio = null;
+        Integer intPlazoCapital = null;
+        Integer intPlazoCapitalDesde = null;
+        Integer intPlazoCapitalHasta = null;
+        Integer intTipoPagoAplazado = null;
+        Integer intPregunta = null;
+        Integer intPlazoMaxBlindada = null;
+        Integer intSubAux = null;
+        Integer intIndPerLiq = null;
+        Integer intNumPerLiq = null;
+        Date dateFechaDesde = new Date(DateUtils.parseDate(strFechaDesdeVigen, DateUtils.FORMATO_FECHA_CORTO).getTime());
+        Time horaDesde = null;
+        Time horaHasta = null;
+        if (DateUtils.getSoloFecha(DateUtils.dateNow(null)).equals(DateUtils.getSoloFecha(dateFechaDesde))) {
+            // son el mismo dia por tanto la hora debe ser la actual + 1
+            horaDesde = new Time(DateUtils.getSoloHorario(DateUtils.dateNow(null)).getTime() + Constantes.MILISEGUNDOS_SEGUNDO);
+        // fechaDesde = new Date(fechaDesde.getTime() + horaDesde.getTime());
+        } else {
+            horaDesde = Constantes.CTE_HORA_DEFECTO;
+        }
+        horaHasta = Constantes.CTE_HORA_FIN_DIA;
+        Date dateFechaHasta;
+        if (Utilidades.isBlankOrNull(strFechaHastaVigen)) {
+            dateFechaHasta = new Date(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO).getTime());
+        } else {
+            dateFechaHasta = new Date(DateUtils.parseDate(strFechaHastaVigen, DateUtils.FORMATO_FECHA_CORTO).getTime());
+        }
+        if (bidNumPeriodoPeriodicidad != null) {
+            intNumPeriodosPerio = new Integer(bidNumPeriodoPeriodicidad.intValue());
+        }
+        if (bidTipoPeriodoPeriodicidad != null) {
+            intTipoPeriodoPerio = new Integer(bidTipoPeriodoPeriodicidad.intValue());
+        }
+        if (bidpregunta != null) {
+            intPregunta = new Integer(bidpregunta.intValue());
+        }
+        if (bidPlazoCapital != null) {
+            intPlazoCapital = new Integer(bidPlazoCapital.intValue());
+        }
+        if (bidPlazoCapitalDesde != null) {
+            intPlazoCapitalDesde = new Integer(bidPlazoCapitalDesde.intValue());
+        }
+        if (bidPlazoCapitalHasta != null) {
+            intPlazoCapitalHasta = new Integer(bidPlazoCapitalHasta.intValue());
+        }
+        if (bidTipoPagoAplazado != null) {
+            intTipoPagoAplazado = new Integer(bidTipoPagoAplazado.intValue());
+        }
+        if (bidPlazoMaxBlindada != null) {
+            intPlazoMaxBlindada = new Integer(bidPlazoMaxBlindada.intValue());
+        }
+        if (bidSubAux != null) {
+            intSubAux = new Integer(bidSubAux.intValue());
+        }
+        if (bidIndPerLiq != null) {
+            intIndPerLiq = new Integer(bidIndPerLiq.intValue());
+        }
+        if (bidNumPerLiq != null) {
+            intNumPerLiq = new Integer(bidNumPerLiq.intValue());
+        }
+        // vamos a realizar una modificación, sino será un alta.
+        if (Utilidades.isBlankOrNull(bidIdVersion)) {
+            // es una condición nueva.
+            resultado = gcc.altaCondicion(new Integer(bidVG.intValue()), new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), intSubAux, Constantes.CTE_CERO, new Integer(bidOrden.intValue()), strPagoUnicoVen, intNumPeriodosPerio, strIndNumPeriodoPeriodicidad, strUnidadPeriodoPeriodicidad, strIndUnidadPeriodoPeriodicidad, intTipoPeriodoPerio, strIndTipoPeriodoPeriodicidad, intPlazoCapital, intPlazoCapitalDesde, intPlazoCapitalHasta, strIndPlazoCapita, strUnidadPlazo, bidCantidadPagoAplazado, bidCantidadPagoAplazadoDesde, bidCantidadPagoAplazadoHasta, intTipoPagoAplazado, strIndTipoPagoAplazado, new Integer(bidCondicionesPAra.intValue()), intPlazoMaxBlindada, strUsuario, dateFechaDesde, dateFechaHasta, intPregunta, strUsuario, intIndPerLiq, intNumPerLiq, strUnidadPerLiq);
+            if (resultado.getCodError().intValue() > Constantes.CTE_CERO.intValue()) {
+                idVersionGeneral = resultado.getCodError();
+            } else {
+                idVersionGeneral = null;
+            }
+        } else {
+            // obtenemos la version de las condiciones de capital.
+            condicion = (CondicionesCapitalC) gcc.obtenerVersion(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), new Integer(bidIdVersion.intValue()), new Integer(bidOrden.intValue()), true, true, Constantes.CTE_CERO, Constantes.CTE_CERO, null, null);
+            if (condicion != null) {
+                // debemos modificar todos sus valores,
+                resultado = gcc.modificarCondiciones(new Integer(bidVG.intValue()), condicion, new Integer(bidOrden.intValue()), strPagoUnicoVen, intNumPeriodosPerio, strIndNumPeriodoPeriodicidad, strUnidadPeriodoPeriodicidad, strIndUnidadPeriodoPeriodicidad, intTipoPeriodoPerio, strIndTipoPeriodoPeriodicidad, intPlazoCapital, intPlazoCapitalDesde, intPlazoCapitalHasta, strIndPlazoCapita, strUnidadPlazo, bidCantidadPagoAplazado, bidCantidadPagoAplazadoDesde, bidCantidadPagoAplazadoHasta, intTipoPagoAplazado, strIndTipoPagoAplazado, new Integer(bidCondicionesPAra.intValue()), intPlazoMaxBlindada, strUsuario, dateFechaDesde, horaDesde, dateFechaHasta, horaHasta, intSubAux, strUsuario, intIndPerLiq, intNumPerLiq, strUnidadPerLiq);
+                if (resultado.getCodError().intValue() > Constantes.CTE_CERO.intValue()) {
+                    idVersionGeneral = resultado.getCodError();
+                } else {
+                    idVersionGeneral = null;
+                }
+            }
+        }
+        // debemos generar el contexto de salida
+        final IContexto[] contextoSalida;
+        if (Integer.valueOf(-1).equals(resultado.getCodError())) {
+            contextoSalida = ContextoRespuesta.rellenarDatosContexto(idVersionGeneral, new Mensaje(ServicioNegocio.getContexto(), PREGUNTA_1287271702).toString());
+        } else {
+            contextoSalida = ContextosCondicionesCapital.rellenarDatosContexto(resultado, idVersionGeneral, resultado.getCodError().intValue());
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Se ha dado de alta/modificado las condiciones de capital corerctamente");
+            LOGGER.debug("FIN SNANPM019: Alta/modificación condiciones de capital. " + "Tiempo total: " + (System.currentTimeMillis() - lInicio) + "ms");
+        }
+        return contextoSalida;
+    }
+
+    private static final String PREGUNTA_1287271702 = "PREGUNTA_1287271702";
+}

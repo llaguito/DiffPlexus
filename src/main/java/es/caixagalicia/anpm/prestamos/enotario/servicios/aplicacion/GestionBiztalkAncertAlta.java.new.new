@@ -1,0 +1,868 @@
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosKey;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.titularesavalistas.TitularesavalistasC;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.AltaModificacion;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.AltaModificacionResponse;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.AltaModificacionStub;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.ArrayOfRequestAvalista;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.ArrayOfRequestDOCUMENTO;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.ArrayOfRequestINFOECONOMICACOMISION;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.ArrayOfRequestTitular;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.Avalista_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.COLEGIADO_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.COMISION_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.CabeceraAncert_type1;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.DETALLE_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.ELEMENTODET_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.IMPPROD_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.INFOECONOMICA_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.INFOTELFN_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.Operacion_type1;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.Request_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.Response_type0;
+import es.caixagalicia.anpm.prestamos.enotario.ws.altaModificacion.Titular_type0;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+public class GestionBiztalkAncertAlta {
+
+    public static Response_type0 respuestaAncert(String codigoOperacionEnotario, String contratoPrestamo, DatosgeneralesC datosGenerales, DatosSolicitudC datosSolicitud, List<TitularesavalistasC> listaTitulares, List<TitularesavalistasC> listaAvalistas, List<ComisionesgastosC> listaComisionesGastos, String literalDivisa, String telefonoEntidadFinanciera) throws org.apache.axis2.AxisFault, java.rmi.RemoteException {
+        AltaModificacionStub stub = new AltaModificacionStub(IConstantesEnotario.CTE_URL_WS_ALTA_MODIFICACION);
+        AltaModificacion altaModificacion = new AltaModificacion();
+        Request_type0 request = new Request_type0();
+        /*Nodos hijos de Request_type0*/
+        COLEGIADO_type0 colegiadoAncert = new COLEGIADO_type0();
+        INFOTELFN_type0 infoTelefonoFinancieraAncert = new INFOTELFN_type0();
+        String entidad = datosSolicitud.getEntidad();
+        String claveNotario = null;
+        /*
+
+		Operacion_type1 operacionAncert = new Operacion_type1();  //en EnvioChequeoCancelacion está como type0
+		CabeceraAncert_type1 cabeceraAncert = new CabeceraAncert_type1(); //en EnvioChequeoCancelacion está como type0
+		ArrayOfRequestTitular titularesAncert = new ArrayOfRequestTitular();
+		ArrayOfRequestAvalista avalistasAncert = new ArrayOfRequestAvalista();
+		COLEGIADO_type0 colegiadoAncert = new COLEGIADO_type0();
+		INFOECONOMICA_type0 infoEconomicaComisionAncert = new INFOECONOMICA_type0();
+		ArrayOfRequestDOCUMENTO documentosAncert = new ArrayOfRequestDOCUMENTO(); //DOCAPORTAR
+		INFOTELFN_type0 infoTelefonoFinancieraAncert = new INFOTELFN_type0();
+ */
+        /*
+- COLEGIADO:
+  - CODCOLEG.
+//SEGURO QUE CODCOLEG = dg.getClaveNotario() ??? o será getCodigoNotaria() ???
+
+         /* NOTARIO TITULAR
+            IF PMNOT15010 ¬= '' & PMNOT15010 ¬= PME10100                        
+            THEN DO;                                                            
+              PME10100 = PMNOT15010;                                            
+            END;                                                                
+            /* NOTARIO FIRMANTE
+            IF PMNOT15020 ¬= '' & PMNOT15020 ¬= PME10110                        
+            THEN DO;                                                            
+              PME10110 = PMNOT15020;                                            
+            END;                                                                
+            /* FECHA DE FIRMA 
+            IF PMNOT15040 ¬= '' & PMNOT15040 ¬= PME10120                        
+            THEN DO;                                                            
+
+                                         /* NOOP9 - REQUEST           
+                                         /* ------------------------- 
+ DCL 1 PMNOTREG15 DEF(PMNOTCOM) POS(97),                              
+       2 PMNOT15010  CHAR(15),           /* COLEGIADO TITULAR         
+       2 PMNOT15020  CHAR(10),           /* NIF COLEGIADO FIRMANTE    
+       2 PMNOT15030  CHAR(20),           /* CUENTA ABONO              
+       2 PMNOT15040  CHAR(08),           /* FECHA DE FIRMA                    
+       2 PMNOT15060  CHAR(10),           /* NUMERO DE PROTOCOLO       
+
+*/
+        /*Se informan los nodos hijo del request*/
+        Operacion_type1 operacionAncert = obtenerOperacionAncert(codigoOperacionEnotario);
+        CabeceraAncert_type1 cabeceraAncert = obtenerCabeceraAncert(entidad, contratoPrestamo);
+        ArrayOfRequestTitular titularesAncert = obtenerTitularesAncert(listaTitulares);
+        ArrayOfRequestAvalista avalistasAncert = obtenerAvalistasAncert(listaAvalistas);
+        // AN401100 = PME10100 = PMNOT13030
+        claveNotario = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getClaveNotario());
+        /*
+			<xs:element name="CODCOLEG" type="stringlength15">
+		  <xs:simpleType name="stringlength15">
+		    <xs:restriction base="xs:string">
+		      <xs:maxLength value="15" />
+		    </xs:restriction>
+		  </xs:simpleType>
+		 * */
+        if (IConstantesEnotario.CTE_INT_15 < claveNotario.length()) {
+            ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CLAVE_NOTARIO_NO_VALIDA, null, null, null);
+        }
+        colegiadoAncert.setCODCOLEG(UtilidadesEnotario.comprobarDatoNull(claveNotario));
+        INFOECONOMICA_type0 infoEconomicaComisionAncert = obtenerInfoEconomicaComisionAncert(datosGenerales, listaComisionesGastos, literalDivisa);
+        // se setea con setDOCAPORTAR(..), de momento devuelve nulo.
+        ArrayOfRequestDOCUMENTO documentosAncert = obtenerDocumentosAncert();
+        /*
+		 * DOCAPORTAR tiene una lista de nodos que a su vez sólo tiene nodos hoja, los rellenamos
+		 *	En el programa PMOSR531 la matriz de documentos de la tira va sin informar.
+     PMNOT13120(*) = '';                                                        
+		//for (/*iterar una lista que no sé aún cuál es. EDIT: en principio el nodo va sin informar)
+		{
+			DOCUMENTO_type0 documentoAncert = new DOCUMENTO_type0(); //Padre: ArrayOfRequestDOCUMENTO, 0-N
+			
+			/*rellenar DOCUMENTO
+			documentoAncert.setCODDOCUMENTO("FALTA");
+			documentoAncert.setDESCRIPCOM("FALTA");
+			documentosAncert.addDOCUMENTO(documentoAncert);
+		}
+  */
+        // documentosAncert.addDOCUMENTO(new DOCUMENTO_type0());
+        /*infoTelefonoFinancieraAncert sólo tiene nodos hoja, los rellenamos.*/
+        /*<xs:element name="TELENTFIN" type="stringlength24" minOccurs="0">
+		Def. tipo:
+		  <xs:simpleType name="stringlength24"><xs:restriction base="xs:string"><xs:maxLength value="24" />
+		 * </xs:restriction></xs:simpleType>*/
+        infoTelefonoFinancieraAncert.setTELENTFIN(telefonoEntidadFinanciera);
+        /*<xs:element name="TELCALLCEN" type="stringlength24" minOccurs="0">*/
+        infoTelefonoFinancieraAncert.setTELCALLCEN(IConstantesEnotario.CTE_TELEFONO_CALL_CENTER);
+        /*
+  PROG PMOSR531, PROC CARGAR_TELEFONOS:
+     PMNOT13100 = CGM0380250||' '||SUBSTR(CGM0380260,1,3)                       
+                  ||' '||SUBSTR(CGM0380260,4,3);                                
+                                                                                
+     PMNOT13110 = '981 179 634';                                                
+		 * */
+        request.setOperacion(operacionAncert);
+        request.setCabeceraAncert(cabeceraAncert);
+        request.setTitulares(titularesAncert);
+        request.setAvalistas(avalistasAncert);
+        request.setCOLEGIADO(colegiadoAncert);
+        request.setINFOECONOMICA(infoEconomicaComisionAncert);
+        request.setDOCAPORTAR(documentosAncert);
+        request.setINFOTELFN(infoTelefonoFinancieraAncert);
+        altaModificacion.setRequest(request);
+        AltaModificacionResponse altaModificacionResponse = stub.AltaModificacion(altaModificacion);
+        Response_type0 response = altaModificacionResponse.getResponse();
+        return response;
+    }
+
+    /**
+     * 	Nodo hijo de Request_type0
+     * @return operacionAncert;
+     */
+    private static Operacion_type1 obtenerOperacionAncert(String codigoOperacionEnotario) {
+        // en EnvioChequeoCancelacion está como type0
+        Operacion_type1 operacionAncert = new Operacion_type1();
+        /*operacionAncert sólo tiene nodos hoja, los rellenamos.*/
+        /*<xs:element name="CABECERA">
+		 * <xs:complexType><xs:sequence>
+		 *  <xs:element fixed="NO" name="APLICACION" type="xs:string" />..*/
+        // "NO"
+        operacionAncert.setCodigoAplicacion(IConstantesEnotario.CTE_CODIGO_APLICACION);
+        /*<xs:element name="CODOPER" type="operation">
+          <xs:annotation>
+            <xs:documentation>CODIGO OPERACION.
+             01: Alta (Deprecated),
+             02: Modificacion (Deprecated),
+             03: Solicitud de documentacion,
+             04: Modificacion con aviso (Deprecated),
+             05: Firma,
+             06: Cancel,
+             07: Suspension,
+             08: Rechazo,
+             09: Firma parcial,
+             10: Cancel con aviso,
+             11: Sincronizacion,
+             14: Conciliacion,
+             20: Alta,
+             22: Modificacion,
+             24: Modificacion con aviso,
+             99: Dummy</xs:documentation>
+         Def. tipo:
+    <xs:restriction base="xs:string">
+      <xs:length value="2" />
+      <xs:enumeration value="01" />
+      <xs:enumeration value="02" />
+      <xs:enumeration value="03" />
+      <xs:enumeration value="04" />
+      <xs:enumeration value="05" />
+      <xs:enumeration value="06" />
+      <xs:enumeration value="07" />
+      <xs:enumeration value="08" />
+      <xs:enumeration value="09" />
+      <xs:enumeration value="10" />
+      <xs:enumeration value="11" />
+      <xs:enumeration value="12" />
+      <xs:enumeration value="14" />
+      <xs:enumeration value="20" />
+      <xs:enumeration value="22" />
+      <xs:enumeration value="24" />
+      <xs:enumeration value="99" />
+    </xs:restriction>
+*/
+        operacionAncert.setCodigoOperacion(codigoOperacionEnotario);
+        /*<xs:element minOccurs="0" ref="TIER" />
+		 * Def. tipo:
+		 * 	<xs:element name="TIER" type="nodos" />
+		 *   <xs:simpleType name="nodos">
+    <xs:annotation>
+      <xs:documentation>DEPRECATED para HTTP Version Nodo (re)emisor. 1: Host, 2: Middleware, 3: CGN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:length value="1" />
+      <xs:enumeration value="1" />
+      <xs:enumeration value="2" />
+      <xs:enumeration value="3" />
+    </xs:restriction>
+*/
+        // "1"
+        operacionAncert.setNodoReemisor(IConstantesEnotario.CTE_NODO_HOST);
+        /*<xs:element minOccurs="0" ref="ORIGINAL" />
+		 * <xs:element name="ORIGINAL" type="nodos" />*/
+        // "1"
+        operacionAncert.setNodoOriginal(IConstantesEnotario.CTE_NODO_HOST);
+        /*        <xs:element minOccurs="0" name="TYPE">
+          <xs:annotation>
+            <xs:documentation>DEPRECATED para HTTP Version Tipo operacion 1: Request, 2: Reply</xs:documentation>
+          </xs:annotation>
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:length value="1" />
+              <xs:enumeration value="1" />
+              <xs:enumeration value="2" />
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:element>
+*/
+        // "1"
+        operacionAncert.setTipoOperacion(IConstantesEnotario.CTE_TIPO_OPERACION_REQUEST);
+        return operacionAncert;
+    }
+
+    /**
+     * 	Nodo hijo de Request_type0
+     * @return cabeceraAncert;
+     */
+    private static CabeceraAncert_type1 obtenerCabeceraAncert(String entidad, String contratoPrestamo) {
+        // en EnvioChequeoCancelacion está como type0
+        CabeceraAncert_type1 cabeceraAncert = new CabeceraAncert_type1();
+        /*cabeceraAncert sólo tiene nodos hoja, los rellenamos.*/
+        /*<xs:element fixed="011" name="PAIS" type="xs:string">
+		 * <xs:documentation>Codigo INE Pais España</xs:documentation>*/
+        cabeceraAncert.setPais(IConstantesEnotario.CTE_CODIGO_PAIS);
+        /*<xs:element name="CDEMPRES" type="xs:string">
+		 * <xs:documentation>Codigo Entidad</xs:documentation>*/
+        // "2080"
+        cabeceraAncert.setEntidad(entidad);
+        /*<xs:element minOccurs="0" name="INTPSERV">
+          <xs:annotation>
+            <xs:documentation>Tipo producto:
+            	01: préstamo personal,
+            	02: Cuentas Credito,
+            	03: Linea de avales/Contragarantia de avales,
+            	04: Factoring,
+            	05: Afianzamiento,
+            	06: Leasing
+            </xs:documentation>
+          </xs:annotation>
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:length value="2" />
+              <xs:enumeration value="01" />
+              <xs:enumeration value="02" />
+              <xs:enumeration value="03" />
+              <xs:enumeration value="04" />
+              <xs:enumeration value="05" />
+              <xs:enumeration value="06" />
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:element>*/
+        cabeceraAncert.setTipoPrestamo(IConstantesEnotario.CTE_TIPO_PRESTAMO_PERSONAL);
+        if (StringUtils.isBlank(contratoPrestamo) || (IConstantesEnotario.CTE_INT_35 < contratoPrestamo.length())) {
+            ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CONTRATO_PRESTAMO_NO_VALIDO, null, null, null);
+        }
+        // "20805986455001037694"
+        cabeceraAncert.setContratoPrestamo(UtilidadesEnotario.comprobarDatoNull(contratoPrestamo));
+        return cabeceraAncert;
+    }
+
+    private static ArrayOfRequestTitular obtenerTitularesAncert(List<TitularesavalistasC> listaTitulares) {
+        /*De esta forma cuando la lista de titulares está vacía el cliente WS no mete un nodo vacío
+		en el xml de request a Ancert, de todos modos, esto no debería ocurrir porque tiene que haber
+		al menos un titular.*/
+        ArrayOfRequestTitular titularesAncert = null;
+        String nif = null;
+        String nombre = null;
+        String primerApellido = null;
+        String segundoApellido = null;
+        String mail = null;
+        String numTel = null;
+        String codIne = null;
+        if (!UtilidadesEnotario.isBlankOrNull(listaTitulares)) {
+            titularesAncert = new ArrayOfRequestTitular();
+            /*titulares tiene una lista de nodos que a su vez sólo tiene nodos hoja, los rellenamos*/
+            for (TitularesavalistasC titular : listaTitulares) {
+                Titular_type0 titularAncert = new Titular_type0();
+                /*
+
+              <xs:element name="TITULAR" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element ref="NIF"/>
+                    <xs:element name="NOMBRE" type="stringlength20ob"></xs:element>
+                    <xs:element name="APELLIDO1" type="stringlength20" minOccurs="0"></xs:element>
+                    <xs:element name="APELLIDO2" type="stringlength20" minOccurs="0"></xs:element>
+                    <xs:element name="NUMTEL" type="stringlength24" minOccurs="0"></xs:element>
+                    <xs:element name="MAIL" type="stringlength105" minOccurs="0"></xs:element>
+                    <xs:element name="CODINE" type="stringlength9" minOccurs="0"></xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+				 */
+                /*Se informan los datos de cada titular.*/
+                /*
+				   <xs:element name="NIF">
+				    <xs:simpleType>
+				      <xs:restriction base="stringlength12ob" />
+				    </xs:simpleType>
+				  </xs:element>
+				  <xs:simpleType name="stringlength12ob">
+				    <xs:restriction base="xs:string">
+				      <xs:minLength value="1" />
+				      <xs:maxLength value="12" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				 */
+                nif = UtilidadesEnotario.comprobarDatoNull(titular.getId().getNif());
+                /*
+				if (StringUtils.isBlank(titular.getNif()) || (IConstantesEnotario.CTE_INT_12 < nif.length()))
+				{
+					ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_NIF_TITULAR_NO_VALIDO, null, null, null);
+				}
+*/
+                titularAncert.setNIF(nif);
+                /*
+                    <xs:element name="NOMBRE" type="stringlength20ob"></xs:element>
+				 */
+                nombre = UtilidadesEnotario.comprobarDatoNull(titular.getNombre());
+                if (StringUtils.isBlank(nombre) || (IConstantesEnotario.CTE_INT_20 < nombre.length())) {
+                    ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_NOMBRE_TITULAR_NO_VALIDO, null, null, null);
+                }
+                titularAncert.setNOMBRE(UtilidadesEnotario.comprobarDatoNull(nombre));
+                // titularAncert.setNOMBRE(UtilidadesEnotario.comprobarDatoNull("12345678901234567890"));
+                /*
+                    <xs:element name="APELLIDO1" type="stringlength20" minOccurs="0"></xs:element>
+			        <xs:simpleType name="stringlength20">
+				      <xs:restriction base="xs:string">
+				        <xs:maxLength value="20" />
+				      </xs:restriction>
+				    </xs:simpleType>
+				 */
+                primerApellido = UtilidadesEnotario.comprobarDatoNull(titular.getApellidoUno());
+                if ((StringUtils.isBlank(primerApellido)) || (IConstantesEnotario.CTE_INT_20 < primerApellido.length())) {
+                    ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_PRIMER_APELLIDO_NO_VALIDO, null, null, null);
+                }
+                titularAncert.setAPELLIDO1(primerApellido);
+                /*
+                    <xs:element name="APELLIDO2" type="stringlength20" minOccurs="0"></xs:element>
+				*/
+                segundoApellido = UtilidadesEnotario.comprobarDatoNull(titular.getApellidoDos());
+                if ((StringUtils.isBlank(segundoApellido)) || (IConstantesEnotario.CTE_INT_20 < segundoApellido.length())) {
+                    ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_SEGUNDO_APELLIDO_NO_VALIDO, null, null, null);
+                }
+                titularAncert.setAPELLIDO2(segundoApellido);
+                // titularAncert.setAPELLIDO2("12345678901234567890");
+                /*
+                    <xs:element name="NUMTEL" type="stringlength24" minOccurs="0"></xs:element>
+				  <xs:simpleType name="stringlength24">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="24" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				*/
+                numTel = UtilidadesEnotario.comprobarDatoNull(titular.getNºTelefono());
+                titularAncert.setNUMTEL(numTel);
+                /*
+                    <xs:element name="MAIL" type="stringlength105" minOccurs="0"></xs:element>
+				  <xs:simpleType name="stringlength105">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="105" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				 */
+                mail = UtilidadesEnotario.comprobarDatoNull(titular.getEmail());
+                titularAncert.setMAIL(mail);
+                /*
+                    <xs:element name="CODINE" type="stringlength9" minOccurs="0"></xs:element>
+				  <xs:simpleType name="stringlength9">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="9" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				 */
+                codIne = UtilidadesEnotario.comprobarDatoNull(titular.getCodigoIneTitularOLibre());
+                /*
+				if (StringUtils.isBlank(titular.getCodigoIneTitularOLibre()) ||
+					(IConstantesEnotario.CTE_INT_9 < titular.getCodigoIneTitularOLibre().length()))
+				{
+					ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CODIGO_INE_TITULAR_NO_VALIDO, null, null, null);
+				}
+*/
+                titularAncert.setCODINE(codIne);
+                titularesAncert.addTitular(titularAncert);
+            /*
+				Titular:
+					- NIF.
+					- NOMBRE.
+					- APELLIDO1.
+					- APELLIDO2.
+					- NUMTEL.
+					- MAIL.
+					- CODINE.
+				 */
+            }
+        }
+        return titularesAncert;
+    }
+
+    private static ArrayOfRequestAvalista obtenerAvalistasAncert(List<TitularesavalistasC> listaAvalistas) {
+        /*De esta forma cuando la lista de avalistas está vacía el cliente WS no mete un nodo vacío
+		en el xml de request a Ancert*/
+        ArrayOfRequestAvalista avalistasAncert = null;
+        String nif = null;
+        if (!UtilidadesEnotario.isBlankOrNull(listaAvalistas)) {
+            avalistasAncert = new ArrayOfRequestAvalista();
+            /*avalistas tiene una lista de nodos que a su vez sólo tiene nodos hoja, los rellenamos*/
+            for (TitularesavalistasC avalista : listaAvalistas) {
+                Avalista_type0 avalistaAncert = new Avalista_type0();
+                /*Se informan los datos de cada avalista.*/
+                /*<xs:element ref="NIF"/>
+				  <xs:element name="NIF">
+				    <xs:simpleType>
+				      <xs:restriction base="stringlength12ob" />
+				    </xs:simpleType>
+				  </xs:element>
+				  <xs:simpleType name="stringlength12ob">
+				    <xs:restriction base="xs:string">
+				      <xs:minLength value="1" />
+				      <xs:maxLength value="12" />
+				    </xs:restriction>
+				  </xs:simpleType>
+*/
+                nif = UtilidadesEnotario.comprobarDatoNull(avalista.getId().getNif());
+                /*
+				if (StringUtils.isBlank(nif) || (IConstantesEnotario.CTE_INT_12 < nif.length()))
+				{
+					ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_NIF_AVALISTA_NO_VALIDO, null, null, null);
+				}
+*/
+                avalistaAncert.setNIF(nif);
+                avalistasAncert.addAvalista(avalistaAncert);
+            /*
+				- Avalista (0-N):
+				  - NIF.
+				 */
+            }
+        }
+        return avalistasAncert;
+    }
+
+    /**
+     * @param datosGenerales
+     * @param listaComisionesGastos
+     * @param literalDivisa
+     * @return
+     */
+    private static INFOECONOMICA_type0 obtenerInfoEconomicaComisionAncert(DatosgeneralesC datosGenerales, List<ComisionesgastosC> listaComisionesGastos, String literalDivisa) {
+        INFOECONOMICA_type0 infoEconomicaComisionAncert = new INFOECONOMICA_type0();
+        /*Nodos hijos de INFOECONOMICA_type0*/
+        // Padre: INFOECONOMICA_type0
+        ArrayOfRequestINFOECONOMICACOMISION comisionesGastosAncert = null;
+        // Padre: INFOECONOMICA_type0
+        DETALLE_type0 detalleAncert = new DETALLE_type0();
+        // int i; //Usado para inicializar el array de ELEMENTO_DET_type0
+        String codigoDivisa = null;
+        String periodicidadAmort = null;
+        String periodicidadLiquid = null;
+        String codigoComision = null;
+        String descrComision = null;
+        String importeComision = null;
+        String tipoComision = null;
+        String nominalDatosGenerales = null;
+        String tipoInteres = null;
+        String plazo = null;
+        String indiceReferencia = null;
+        String literalIndiceReferencia = null;
+        String diferencial = null;
+        String codigoRedondeo = null;
+        String literalCodigoRedondeo = null;
+        String interesDemora = null;
+        String tae = null;
+        String codigoAmortizacion = null;
+        String literalCodigoAmortizacion = null;
+        /*Nodos hijos de DETALLE_type0*/
+        /*detalle tiene un array de ELEMENTODET, el nodo hoja FECHAVAL y el nodo hoja IMPPROD*/
+        // Padre: DETALLE_type0
+        IMPPROD_type0 impProdAncert = null;
+        // ELEMENTODET_type0[] elementosDetAncertArray = new ELEMENTODET_type0[IConstantesEnotario.CTE_INT_15];
+        ELEMENTODET_type0 elementoDetAncert;
+        if (!UtilidadesEnotario.isBlankOrNull(listaComisionesGastos)) {
+            /*De esta forma cuando la lista de comisiones está vacía el cliente WS no mete un nodo vacío
+			en el xml de request a Ancert*/
+            comisionesGastosAncert = new ArrayOfRequestINFOECONOMICACOMISION();
+            /*COMISIONES es un nodo que tiene una lista de nodos que a su vez tienen solo nodos hoja, los rellenamos.*/
+            for (ComisionesgastosC comisionGasto : listaComisionesGastos) {
+                ComisionesgastosKey comisionGastoId = comisionGasto.getId();
+                COMISION_type0 comisionGastoAncert = new COMISION_type0();
+                /*
+	              <xs:element name="CODCOM" type="stringlength3" minOccurs="0">
+	                <xs:annotation>
+	                  <xs:documentation>Código comisión y gastos</xs:documentation>
+	                </xs:annotation>
+	              </xs:element>
+
+				  <xs:simpleType name="stringlength3">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="3" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				 * */
+                codigoComision = UtilidadesEnotario.comprobarDatoNull(comisionGastoId.getCodigoComision());
+                if ((StringUtils.isBlank(codigoComision)) || (IConstantesEnotario.CTE_INT_3 > codigoComision.length())) {
+                    ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CODIGO_COMISION_NO_VALIDO, null, null, null);
+                }
+                comisionGastoAncert.setCODCOM(codigoComision);
+                /*
+					<xs:element name="DESCRIPCOM" type="stringlength20">
+					
+				  <xs:simpleType name="stringlength20">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="20" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				*/
+                descrComision = UtilidadesEnotario.comprobarDatoNull(comisionGasto.getDescripcion());
+                /*
+ * 20140519: TEMPORALMENTE, EN VEZ DE HACER ROLLBACK CUANDO EL TAMAÑO DEL ATRIBUTO ES MAYOR QUE EL
+ * TAMAÑO MÁXIMO DEL ELEMENTO XML, VAMOS A TRUNCAR, DE MOMENTO.
+				if (StringUtils.isBlank(descrComision) || IConstantesEnotario.CTE_INT_19 < descrComision.length())
+				{
+					ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_DESCR_COMISION_NO_VALIDO, null, null, null);
+				}
+*/
+                comisionGastoAncert.setDESCRIPCOM(UtilidadesEnotario.truncar(descrComision, IConstantesEnotario.CTE_INT_19));
+                // comisionGastoAncert.setDESCRIPCOM("1234567890123456789");
+                /*
+				<xs:element name="TIPOCOM" type="stringlength6" minOccurs="0">
+			  <xs:simpleType name="stringlength6">
+			    <xs:restriction base="xs:string">
+			      <xs:maxLength value="6" />
+			    </xs:restriction>
+			  </xs:simpleType>
+				 * */
+                tipoComision = UtilidadesEnotario.comprobarDatoNull(comisionGasto.getTipo()).toString();
+                tipoComision = tipoComision.replaceFirst("\\.", ",");
+                comisionGastoAncert.setTIPOCOM(tipoComision);
+                /*
+				<xs:element name="VALORCOM" type="stringlength15">
+				  <xs:simpleType name="stringlength15">
+				    <xs:restriction base="xs:string">
+				      <xs:maxLength value="15" />
+				    </xs:restriction>
+				  </xs:simpleType>
+				*/
+                importeComision = UtilidadesEnotario.comprobarDatoNull(comisionGasto.getImporte()).toString();
+                if (IConstantesEnotario.CTE_INT_15 < importeComision.length()) {
+                    ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_IMPORTE_COMISION_NO_VALIDO, null, null, null);
+                }
+                // esto lo hago para subsituir el punto de los decimales por una coma.
+                importeComision = importeComision.replaceFirst("\\.", ",");
+                comisionGastoAncert.setVALORCOM(importeComision);
+                comisionesGastosAncert.addCOMISION(comisionGastoAncert);
+            }
+        }
+        /*ELEMENTODET*/
+        /*ELEMENTODET: Se informa el código de divisa*/
+        codigoDivisa = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getCodigoDivisa());
+        if (!StringUtils.isBlank(codigoDivisa)) {
+            if (IConstantesEnotario.CTE_INT_15 < codigoDivisa.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CODIGO_DIVISA_NO_VALIDO, null, null, null);
+            }
+            /*
+				<xs:element name="CODELEMENTO" type="stringlength10" minOccurs="0">
+			  <xs:simpleType name="stringlength10">
+			    <xs:restriction base="xs:string">
+			      <xs:maxLength value="10" />
+			    </xs:restriction>
+			  </xs:simpleType>
+			 */
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("CDDIVISS");
+            /*
+				<xs:element name="DESCRIPELEM" type="stringlength20ob">
+			  <xs:simpleType name="stringlength20ob">
+			    <xs:restriction base="xs:string">
+			      <xs:minLength value="1" />
+			      <xs:maxLength value="20" />
+			    </xs:restriction>
+			  </xs:simpleType>
+			 */
+            elementoDetAncert.setDESCRIPELEM("DIVISA");
+            /*
+			<xs:element name="VALORELEM" type="stringlength15ob">
+		  <xs:simpleType name="stringlength15ob">
+		    <xs:restriction base="xs:string">
+		      <xs:minLength value="1" />
+		      <xs:maxLength value="15" />
+		    </xs:restriction>
+		  </xs:simpleType>
+			 */
+            elementoDetAncert.setVALORELEM(codigoDivisa);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el literal de la divisa*/
+        literalDivisa = UtilidadesEnotario.comprobarDatoNull(literalDivisa);
+        if (!StringUtils.isBlank(literalDivisa)) {
+            if (IConstantesEnotario.CTE_INT_15 < literalDivisa.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_LITERAL_DIVISA_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("NBDIVIC");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), LITERAL_DIVISA_1863611095).toString());
+            elementoDetAncert.setVALORELEM(literalDivisa);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa la periodicidad de amortización*/
+        periodicidadAmort = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getPeriodicidadAmortizacion());
+        if (!StringUtils.isBlank(periodicidadAmort)) {
+            if (IConstantesEnotario.CTE_INT_15 < periodicidadAmort.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_PERIODICIDAD_AMORT_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TPPERCAP");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), PERIODICI_AMORTIZ_2126036548).toString());
+            elementoDetAncert.setVALORELEM(periodicidadAmort);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa la periodicidad de liquidación*/
+        periodicidadLiquid = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getPeriodicidadLiquidacion());
+        if (!StringUtils.isBlank(periodicidadLiquid)) {
+            if (IConstantesEnotario.CTE_INT_15 < periodicidadLiquid.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_PERIODICIDAD_LIQUID_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TPPERINT");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), PERIODICI_LIQUIDAC_16650992).toString());
+            elementoDetAncert.setVALORELEM(periodicidadLiquid);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*Ninguna columna de la AN40 puede ser nula, por lo tanto ningún atributo de datosGenerales puede ser nulo. */
+        /*ELEMENTODET: Se informa el plazo*/
+        plazo = IConstantesEnotario.CTE_MESES.concat(UtilidadesEnotario.comprobarDatoNull(datosGenerales.getPlazo()).toString());
+        if (!StringUtils.isBlank(plazo)) {
+            if (IConstantesEnotario.CTE_INT_15 < plazo.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_PLAZO_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("PZOPERACP");
+            elementoDetAncert.setDESCRIPELEM("PLAZO");
+            elementoDetAncert.setVALORELEM(plazo);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el tipo de interés*/
+        tipoInteres = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getTipoInteres()).toString();
+        if (!StringUtils.isBlank(tipoInteres)) {
+            if (IConstantesEnotario.CTE_INT_15 < tipoInteres.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_TIPO_INTERES_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TPINTER");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), TIPO_INTERES_687154590).toString());
+            tipoInteres = tipoInteres.replaceFirst("\\.", ",");
+            elementoDetAncert.setVALORELEM(tipoInteres);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el índice de referencia*/
+        indiceReferencia = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getIndiceReferencia()).toString();
+        if (!StringUtils.isBlank(indiceReferencia)) {
+            if (IConstantesEnotario.CTE_INT_15 < indiceReferencia.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_INDICE_REFERENCIA_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("CDTPREF");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), INDICE_REFERENCIA_185901754).toString());
+            indiceReferencia = indiceReferencia.replaceFirst("\\.", ",");
+            elementoDetAncert.setVALORELEM(indiceReferencia);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el literal del índice de referencia*/
+        // provisional
+        literalIndiceReferencia = UtilidadesEnotario.comprobarDatoNull("FALTA");
+        if (!StringUtils.isBlank(literalIndiceReferencia)) {
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TEXTREF");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), LITERAL_IND_REF_376697485).toString());
+            elementoDetAncert.setVALORELEM(UtilidadesEnotario.truncar(literalIndiceReferencia, IConstantesEnotario.CTE_INT_15));
+            // PMNOT13083(8) = PM531E_100; CAMPO DA PM531COM, entrada de PMOSR531.
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el diferencial*/
+        diferencial = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getDiferencial()).toString();
+        if (!StringUtils.isBlank(diferencial)) {
+            if (IConstantesEnotario.CTE_INT_15 < diferencial.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_DIFERENCIAL_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TPDIFER");
+            elementoDetAncert.setDESCRIPELEM("DIFERENCIAL");
+            diferencial = diferencial.replaceFirst("\\.", ",");
+            elementoDetAncert.setVALORELEM(diferencial);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el código de redondeo*/
+        codigoRedondeo = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getCodigoDeRedondeo());
+        if (!StringUtils.isBlank(codigoRedondeo)) {
+            if (IConstantesEnotario.CTE_INT_15 < codigoRedondeo.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CODIGO_REDONDEO_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("PMCDREDO");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), CODIGO_REDONDEO_814311813).toString());
+            elementoDetAncert.setVALORELEM(codigoRedondeo);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el literal del código de redondeo*/
+        // provisional
+        literalCodigoRedondeo = UtilidadesEnotario.comprobarDatoNull("FALTA");
+        if (!StringUtils.isBlank(literalCodigoRedondeo)) {
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TEXTREDO");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), LIT_COD_REDONDEO_1722768771).toString());
+            elementoDetAncert.setVALORELEM(UtilidadesEnotario.truncar(literalCodigoRedondeo, IConstantesEnotario.CTE_INT_15));
+            // PMNOT13083(11) = PM531E_110;
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el interés de demora*/
+        interesDemora = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getInteresDemora()).toString();
+        if (!StringUtils.isBlank(interesDemora)) {
+            if (IConstantesEnotario.CTE_INT_15 < interesDemora.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_INTERES_DEMORA_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("POTPINMR");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), INTERES_DEMORA_1710764632).toString());
+            interesDemora = interesDemora.replaceFirst("\\.", ",");
+            elementoDetAncert.setVALORELEM(interesDemora);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el TAE*/
+        tae = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getTae()).toString();
+        if (!StringUtils.isBlank(tae)) {
+            if (IConstantesEnotario.CTE_INT_15 < tae.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_TAE_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TAE");
+            elementoDetAncert.setDESCRIPELEM("TAE");
+            tae = tae.replaceFirst("\\.", ",");
+            elementoDetAncert.setVALORELEM(tae);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el código de amortización*/
+        codigoAmortizacion = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getCodigoAmortizacion()).toString();
+        if (!StringUtils.isBlank(codigoAmortizacion)) {
+            if (IConstantesEnotario.CTE_INT_15 < codigoAmortizacion.length()) {
+                ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CODIGO_AMORT_NO_VALIDO, null, null, null);
+            }
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("CDTPAMOR");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), COD_TIPO_AMORT_415469707).toString());
+            elementoDetAncert.setVALORELEM(codigoAmortizacion);
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        /*ELEMENTODET: Se informa el literal del código de amortización*/
+        literalCodigoAmortizacion = UtilidadesEnotario.comprobarDatoNull("FALTA");
+        // PMNOT13083(15) = PM531E_120;
+        if (!StringUtils.isBlank(literalCodigoAmortizacion)) {
+            elementoDetAncert = new ELEMENTODET_type0();
+            elementoDetAncert.setCODELEMENTO("TPAMOR");
+            elementoDetAncert.setDESCRIPELEM(new Mensaje(ServicioNegocio.getContexto(), LIT_TIPO_AMORT_161249740).toString());
+            elementoDetAncert.setVALORELEM(UtilidadesEnotario.truncar(literalCodigoAmortizacion, IConstantesEnotario.CTE_INT_15));
+            detalleAncert.addELEMENTODET(elementoDetAncert);
+        }
+        // ContextoEnvMsjEnotarioAltaModif.rellenarMatrizElementos(..)
+        // detalleAncert.addELEMENTODET(elementoDetAncert);
+        // detalleAncert.setELEMENTODET(elementosDetAncertArray);
+        // detalleAncert.addELEMENTODET();
+        DateHelper dateHelper = DateHelper.getInstance();
+        if (null != datosGenerales.getFechaCaducidad()) {
+            String fechaCaducidad = dateHelper.formatearFecha(DateHelper.FORMATO_DDMMYYYY, datosGenerales.getFechaCaducidad());
+            /*
+			<xs:element name="FECHAVAL" type="formatoDia">
+			  <xs:simpleType name="formatoDia">
+			    <xs:annotation>
+			      <xs:documentation>Formato de DIA: ddmmyyyy</xs:documentation>
+			    </xs:annotation>
+			    <xs:restriction base="xs:string">
+			      <xs:pattern value="([0-2][0-9]|[3][0-1])([0][1-9]|[1][0-2])(20[0-1][0-9])" />
+			    </xs:restriction>
+			  </xs:simpleType>
+
+			 */
+            detalleAncert.setFECHAVAL(fechaCaducidad);
+        }
+        /*rellenamos el IMPPROD (IMPPROD = NOMINAL?)*/
+        impProdAncert = new IMPPROD_type0();
+        /*
+		<xs:element name="CODIMPPROD" type="stringlength10" minOccurs="0">
+		  <xs:simpleType name="stringlength10">
+		    <xs:restriction base="xs:string">
+		      <xs:maxLength value="10" />
+		    </xs:restriction>
+		  </xs:simpleType>
+		 */
+        impProdAncert.setCODIMPPROD(IConstantesEnotario.CTE_ENVIO_ALTA_MODIF_ANCERT_CODIMPPROD);
+        /*<xs:element name="DESCRIMPPROD" type="stringlength20">*/
+        impProdAncert.setDESCRIMPPROD(IConstantesEnotario.CTE_ENVIO_ALTA_MODIF_ANCERT_DESCRIMPPROD);
+        nominalDatosGenerales = UtilidadesEnotario.comprobarDatoNull(datosGenerales.getNominal()).toString();
+        nominalDatosGenerales = nominalDatosGenerales.replaceFirst("\\.", ",");
+        /*<xs:element name="VALORIMPPROD" type="stringlength10">*/
+        impProdAncert.setVALORIMPPROD(nominalDatosGenerales);
+        detalleAncert.setIMPPROD(impProdAncert);
+        /*infoEconomicaComisionAncert tiene dos nodos intermedios: comisiones y detalle, los rellenamos*/
+        infoEconomicaComisionAncert.setCOMISIONES(comisionesGastosAncert);
+        infoEconomicaComisionAncert.setDETALLE(detalleAncert);
+        return infoEconomicaComisionAncert;
+    }
+
+    private static ArrayOfRequestDOCUMENTO obtenerDocumentosAncert() {
+        ArrayOfRequestDOCUMENTO documentosAncert = null;
+        // provisional
+        return documentosAncert;
+    }
+
+    private static final String PERIODICI_LIQUIDAC_16650992 = "PERIODICI_LIQUIDAC_16650992";
+
+    private static final String LIT_COD_REDONDEO_1722768771 = "LIT_COD_REDONDEO_1722768771";
+
+    private static final String LIT_TIPO_AMORT_161249740 = "LIT_TIPO_AMORT_161249740";
+
+    private static final String PERIODICI_AMORTIZ_2126036548 = "PERIODICI_AMORTIZ_2126036548";
+
+    private static final String INTERES_DEMORA_1710764632 = "INTERES_DEMORA_1710764632";
+
+    private static final String COD_TIPO_AMORT_415469707 = "COD_TIPO_AMORT_415469707";
+
+    private static final String CODIGO_REDONDEO_814311813 = "CODIGO_REDONDEO_814311813";
+
+    private static final String TIPO_INTERES_687154590 = "TIPO_INTERES_687154590";
+
+    private static final String LITERAL_DIVISA_1863611095 = "LITERAL_DIVISA_1863611095";
+
+    private static final String LITERAL_IND_REF_376697485 = "LITERAL_IND_REF_376697485";
+
+    private static final String INDICE_REFERENCIA_185901754 = "INDICE_REFERENCIA_185901754";
+}
