@@ -1,0 +1,545 @@
+/**/
+package es.caixagalicia.anpm.prestamos.autorizaciones.servicios.fachada;
+
+import java.math.BigDecimal;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.aplicacion.GestionDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.autorizaciones.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Servicio que da de alta una autorización de scoring si es necesario.
+ *
+ * Proyecto RAROC: Cuando el scoring es negativo o duda, nos llaman a este servicio para generar una autorización
+ * si es necesario, es decir, en el caso de que el nivel máximo asociado a esta autorización sea mayor que
+ * el nivel máximo de la autorización que tenga la solicitud por precios, en el caso de que la tenga.
+ *
+ * CO: ANPM_214
+ * CC: 507
+ * CTX: ANPMN214
+ * TX: ANU4
+ */
+public class DatosAutorizacionAltaScoringSrv extends DatosAutorizacionAbstractSrv {
+
+    /*Campos entrada ANPM_214 alta autorización scoring.*/
+    private static final String CTE_ENTRADA_NUC = "NUC";
+
+    private static final String CTE_ENTRADA_IND_DICTAMEN_SCORING = "IND_DICTAMEN_SCORING";
+
+    private static final String CTE_ENTRADA_TIPO_EXPEDIENTE = "TIPO_EXPEDIENTE";
+
+    private static final String CTE_ENTRADA_IND_SCORING_BINARIO = "IND_SCORING_BINARIO";
+
+    /*Campos entrada ANPM_210 alta autorización*/
+    private static final String CTE_ENTRADA_ALTA_AUTORIZ_OFI = "OFICINA_SOLICITUD";
+
+    private static final String CTE_ENTRADA_ALTA_AUTORIZ_NUC = "NUMERO_EXPEDIENTE";
+
+    private static final String CTE_ENTRADA_ALTA_AUTORIZ_IND_TIPO_AUTORIZ = "IND_TIPO_AUTORIZ";
+
+    private static final String CTE_ENTRADA_ALTA_AUTORIZ_NIVEL_MAX_AUTORIZ = "NIVEL_MAX_AUTORIZ";
+
+    /*Campos entrada ANPM_212 envio autorización*/
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_NUMERO_SOLICITUD = "NUMERO_SOLICITUD";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_NUMERO_AUTORIZACION = "NUMERO_AUTORIZACION";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_ID_AGRUPACION = "ID_AGRUPACION";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_IND_TIPO_AUTORIZ = "IND_TIPO_AUTORIZ";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_NIVEL_MAX_AUTORIZ = "NIVEL_MAX_AUTORIZ";
+
+    private static final String CTE_ENTRADA_ENVIO_AUTORIZ_IND_DICTAMEN_SCORING = "IND_DICTAMEN_SCORING";
+
+    /*Contexto de salida del servicio de alta autorización scoring ANPM_214*/
+    private static final String CTE_CTX = "ANPMN214";
+
+    private static final String CTE_CTX_COD_ERROR = "ANPMN214010";
+
+    private static final String CTE_CTX_DESCR_ERROR = "ANPMN214020";
+
+    private static final String CTE_CTX_IND_GENERA_AUTORIZ = "ANPMN214030";
+
+    /*Valores posibles de código error*/
+    private static final BigDecimal CTE_COD_ERROR_OK = BigDecimal.ZERO;
+
+    private static final BigDecimal CTE_COD_ERROR_RAROC_NO_ACTIV = BigDecimal.ONE;
+
+    private static final BigDecimal CTE_COD_ERROR_MODALIDAD_RAROC_NO = new BigDecimal(2);
+
+    private static final BigDecimal CTE_COD_ERROR_NIV_SCORING_LE_NIV_PRECIO = new BigDecimal(3);
+
+    private static final BigDecimal CTE_COD_ERROR_NO_GEN_AUT_SCORING_AUTOR_PREV_PRECIOS = new BigDecimal(4);
+
+    private static final BigDecimal CTE_COD_ERROR_NO_SOLIC = new BigDecimal(5);
+
+    private static final BigDecimal CTE_COD_ERROR_ALTA_AUTORIZACION = new BigDecimal(6);
+
+    private static final BigDecimal CTE_COD_ERROR_IND_DICTAMEN_NO_VALIDO = new BigDecimal(7);
+
+    /*Valores posibles de descr error*/
+    private static final String CTE_DESCR_ERROR_OK = StringUtils.EMPTY;
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_RAROC_NO_ACTIV = "ENV_O_AUTORIZACIONES_SCORING_EST_DESACTIVADO_CG3_1155321974";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_MODALIDAD_RAROC_NO_1 = "MODALIDAD_2124539221";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_MODALIDAD_RAROC_NO_2 = "EST_HABILITADA_ENVIAR_AUTORIZACIONES_SCORING_197979616";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_NIV_SCORING_LE_NIV_PRECIO = "NIVEL_AUTORIZACI_N_SCORING_INFERIOR_O_IGUAL_EXISTE_1713702484";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_NO_GEN_AUT_SCORING_AUTOR_PREV_PRECIOS = "GENERA_AUTORIZACI_N_EXISTE_AUTORIZACI_N_ANTERIOR_P_1644631492";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_NO_SOLIC = "EXISTE_SOLICITUD_ASOCIADA_EXPEDIENTE_1949568482";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_ALTA_AUTORIZACION = "PROBLEMA_DAR_ALTA_AUTORIZACI_N_1596984435";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_IND_DICTAMEN_NO_VALIDO = "IND_DICTAMEN_SCORING_V_LIDO_744971382";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_ERROR_TITULAR_NO_CONSUMIDOR = "GENERAR_AUTORIZACI_N_SCORING_TITULAR_PR_STAMO_NO_C_1418136387";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_SCORING_POSITIVO_ANULA_SCORING_ANT = "GENERA_AUTORIZACI_N_SCORING_POSITIVO_ANULA_AUTORI_337392658";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_SCORING_BINARIO_DENEGAR_ANULA_SCO_ANT = "GENERA_AUTORIZACI_N_SCORING_BINARIO_DENEGAR_ANULA_472713983";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_SCORING_BINARIO_RECHAZAR_ANULA_SCO_ANT = "GENERA_AUTORIZACI_N_SCORING_BINARIO_RECHAZAR_ANUL_2094146963";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_SCORING_POSITIVO = "GENERA_AUTORIZACI_N_SCORING_POSITIVO_1381281148";
+
+    // $NON-NL-1$
+    private static final String CTE_DESCR_SCORING_BINARIO_DENEGAR = "GENERA_AUTORIZACI_N_SCORING_BINARIO_DENEGAR_422160247";
+
+    /*Contexto de salida de los servicios de alta autorización, ANPM_210 y envio autorización, ANPM_213*/
+    private static final String CTE_CTX_ALTA_ENVIO_AUTORIZ = "ANPMN070";
+
+    private static final String CTE_NUMERO_AUTORIZACION = "ANPMN070040";
+
+    private static final String CTE_ERROR_PROP_COD_ERROR = "ANPMN004010";
+
+    /*Tipos de expediente válidos*/
+    private static final BigDecimal CTE_TIPO_EXP_VALIDO_PREST_PERS = new BigDecimal(1);
+
+    private static final BigDecimal CTE_TIPO_EXP_VALIDO_PREST_HIP = new BigDecimal(2);
+
+    private static final BigDecimal CTE_TIPO_EXP_VALIDO_PREST_HIPOT_ABANCA = new BigDecimal(252);
+
+    private static final BigDecimal CTE_TIPO_EXP_VALIDO_PREST_PERS_ABANCA = new BigDecimal(191);
+
+    private static final BigDecimal CTE_TIPO_EXP_VALIDO_PREST_PERS_DIV_ABANCA = new BigDecimal(46);
+
+    public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada) {
+        IContexto[] arrayContextos = null;
+        boolean seGeneraAutoriz = false;
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal codProducto = null;
+        StringBuilder descrErrorStb = null;
+        IContexto contextoSalida = null;
+        /*Establecemos el diario electrónico*/
+        contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+        /*Obtenemos las entradas*/
+        BigDecimal nuc = datosEntrada.getDecimal(CTE_ENTRADA_NUC);
+        String indDictamenScoringStr = datosEntrada.getString(CTE_ENTRADA_IND_DICTAMEN_SCORING);
+        BigDecimal indDictamenScoring = null;
+        BigDecimal tipoExpediente = datosEntrada.getDecimal(CTE_ENTRADA_TIPO_EXPEDIENTE);
+        String indScoringBinario = datosEntrada.getString(CTE_ENTRADA_IND_SCORING_BINARIO);
+        if ((!UtilidadesComun.isBlankOrNull(indDictamenScoringStr)) && (StringUtils.isNumeric(indDictamenScoringStr))) {
+            indDictamenScoring = new BigDecimal(indDictamenScoringStr);
+        }
+        /*CUIDADO: Aquí va el if principal de las validaciones, hay otro arriba que no es para esto.
+		 * Reformar esto en condiciones cuando haya tiempo.
+		 * 
+		 * */
+        if (!autorizacionesRarocActivado()) {
+            /*Si el parámetro que nos indica si se pueden hacer autorizaciones por scoring está deshabilitado informamos el error correspondiente.*/
+            seGeneraAutoriz = false;
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_RAROC_NO_ACTIV).toString(), seGeneraAutoriz);
+        } else if (null == nuc) {
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), NUC_NULO_516284864).toString(), false);
+        } else if ((UtilidadesComun.isBlankOrNull(indDictamenScoringStr)) || (!StringUtils.isNumeric(indDictamenScoringStr))) {
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_IND_DICTAMEN_NO_VALIDO).toString(), false);
+        } else /*20150623 Si el tipo de expediente es diferente de 1, 2, 252, 191 NO SE GENERA AUTORIZACIÓN POR SCORING. */
+        if (null == tipoExpediente) {
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), TIPO_EXPEDIENTE_NULO_989228790).toString(), false);
+        } else /*El tipo de expediente tiene que ser 1 o 2 o 252 o 191 para que se genere autorización, si no no se genera.*/
+        if ((0 != CTE_TIPO_EXP_VALIDO_PREST_PERS.compareTo(tipoExpediente)) && (0 != CTE_TIPO_EXP_VALIDO_PREST_HIP.compareTo(tipoExpediente)) && (0 != CTE_TIPO_EXP_VALIDO_PREST_PERS_ABANCA.compareTo(tipoExpediente)) && (0 != CTE_TIPO_EXP_VALIDO_PREST_HIPOT_ABANCA.compareTo(tipoExpediente)) && (0 != CTE_TIPO_EXP_VALIDO_PREST_PERS_DIV_ABANCA.compareTo(tipoExpediente))) {
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), TIPO_EXPEDIENTE_121935).toString() + tipoExpediente.toString() + new Mensaje(ServicioNegocio.getContexto(), V_LIDO_399188453).toString(), false);
+        } else /*Tiene que estar informado el IND_SCORING_BINARIO*/
+        if (UtilidadesComun.isBlankOrNull(indScoringBinario)) {
+            contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), IND_SCORING_BINARIO_NULO_590599698).toString(), false);
+        } else {
+            datosSolicitud = gds.getUltimaVersion(nuc);
+            if (null == datosSolicitud) {
+                seGeneraAutoriz = false;
+                contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_NO_SOLIC).toString().concat(nuc.toString()), seGeneraAutoriz);
+            } else /*Si el titular no es consumidor no se realiza el alta de autorización por scoring*/
+            if (!Constantes.SI.equals(UtilidadesTramitacion.esConsumidorNoIlog(nuc))) {
+                seGeneraAutoriz = false;
+                contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_TITULAR_NO_CONSUMIDOR).toString(), seGeneraAutoriz);
+            } else {
+                /*Puede ocurrir que la modalidad esté deshabilitada para enviar autorizaciones por scoring, lo comprobamos*/
+                codProducto = datosSolicitud.getProducto();
+                if (!modalidadValidaRaroc(codProducto)) {
+                    descrErrorStb = new StringBuilder();
+                    descrErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_MODALIDAD_RAROC_NO_1).toString());
+                    descrErrorStb.append(codProducto.toString());
+                    descrErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_MODALIDAD_RAROC_NO_2).toString());
+                    contextoSalida = rellenarContextoAltaAutorizScoring(CTE_COD_ERROR_OK, descrErrorStb.toString(), seGeneraAutoriz);
+                } else {
+                    contextoSalida = altaAutorizacionScoring(indDictamenScoring, tipoExpediente, indScoringBinario, datosSolicitud, gds);
+                }
+            }
+        }
+        arrayContextos = new IContexto[1];
+        arrayContextos[0] = contextoSalida;
+        // arrayContextos = listaContextos.toArray(new IContexto[listaContextos.size()]);
+        return arrayContextos;
+    }
+
+    /**
+     * Llama al ANPM_212 para enviar una autorización a AGEN.
+     *
+     * @param datosSolicitud
+     * @param indTipoAutoriz
+     * @param nivelMaximoScoring
+     * @return
+     */
+    private IContexto[] envioAutorizacion(DatosSolicitudC datosSolicitud, DatosAutorizacionC autorizacionNueva, BigDecimal indTipoAutoriz, BigDecimal indDictamenScoring, BigDecimal nivelMaximoScoring) {
+        IContexto[] resultado = null;
+        IDatosEntradaTx datosEntrada = null;
+        IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+        BigDecimal numeroAutorizacion = null;
+        numeroAutorizacion = autorizacionNueva.getDatosAutorizacionKey().getNumeroAutorizacion();
+        datosEntrada = ServicioNegocio.getPrograma(contextoEjecucion, Constantes.CTE_CC_ENVIO_AUTORIZ, Constantes.CTE_CO_ENVIO_AUTORIZ);
+        datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_OFICINA_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud());
+        datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_NUMERO_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+        datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_VERSION_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+        datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_NUMERO_AUTORIZACION, numeroAutorizacion);
+        // datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_ID_AGRUPACION,);
+        if (null != indTipoAutoriz) {
+            datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_IND_TIPO_AUTORIZ, indTipoAutoriz);
+        }
+        if (null != nivelMaximoScoring) {
+            datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_NIVEL_MAX_AUTORIZ, nivelMaximoScoring);
+        }
+        if (null != indDictamenScoring) {
+            datosEntrada.addCampo(CTE_ENTRADA_ENVIO_AUTORIZ_IND_DICTAMEN_SCORING, indDictamenScoring);
+        }
+        resultado = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntrada);
+        return resultado;
+    }
+
+    /**
+     * Método que rellena el contexto ANPMN214 con datos del alta de autorización scoring.
+     *
+     * @param resultadoAltaAutoriz
+     * @return
+     */
+    private static IContexto rellenarContextoAltaAutorizScoring(BigDecimal codError, String descrError, boolean seGeneraAutorizScoring) {
+        IContexto contextoSalida = null;
+        contextoSalida = ContextoFactory.getInstance().getContexto(CTE_CTX);
+        contextoSalida.put(CTE_CTX_COD_ERROR, codError);
+        contextoSalida.put(CTE_CTX_DESCR_ERROR, descrError);
+        if (seGeneraAutorizScoring) {
+            contextoSalida.put(CTE_CTX_IND_GENERA_AUTORIZ, Constantes.SI);
+        } else {
+            contextoSalida.put(CTE_CTX_IND_GENERA_AUTORIZ, Constantes.NO);
+        }
+        return contextoSalida;
+    }
+
+    private IContexto altaAutorizacionScoring(BigDecimal indDictamenScoring, BigDecimal tipoExpediente, String indScoringBinario, DatosSolicitudC datosSolicitud, GestionDatosSolicitud gds) {
+        BigDecimal nivelMaximoScoring = null;
+        IContexto[] resultadoEnvioAutoriz = null;
+        IContexto contextoAltaAutorizScoring = null;
+        boolean altaCorrecta = false;
+        boolean envioCorrecto = false;
+        boolean seGeneraAutorizScoring = false;
+        BigDecimal codError = CTE_COD_ERROR_OK;
+        String descrError = CTE_DESCR_ERROR_OK;
+        GestionDatosAutorizacion gda = new GestionDatosAutorizacion();
+        DatosAutorizacionC autorizacionPrevia = null;
+        DatosAutorizacionC autorizacionNueva = null;
+        BigDecimal codigoErrorAlta = null;
+        BigDecimal nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        ResultadoDatosSolicitudVO resultadoIntermedio = new ResultadoDatosSolicitudVO();
+        /*Detalle importante: una cosa es el indicador de DICTAMEN SCORING (si es duda o negativo) y otra cosa
+		 * es el indicador de tipo autorización (si es autorización por precios, scoring o preform/e-notario). */
+        nivelMaximoScoring = GestionDatosAutorizacion.obtenerNivelMaximo(indDictamenScoring);
+        /*Invocamos el alta de autorización, ANPM_210*/
+        /*Si existe una autorización previa y esa autorización tiene un nivel superior que la que se generaría por scoring
+		 * entonces no generamos autorización por scoring.*/
+        /*
+			GestionNivelesAutorizacion gna = new GestionNivelesAutorizacion();
+			BigDecimal nivelMaximoPrecios = 
+				gna.maximoNivelAutorizacion(datosSolicitud);
+*/
+        // 20150622 El nivel máximo lo sacamos de la autorización existente si la hay.
+        autorizacionPrevia = gda.buscarAutorizacionNoAnulada(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+        /*Si existe una autorización previa y ésta es por precios NO LA ANULAMOS, Y TAMPOCO GENERAMOS UNA NUEVA.*/
+        if ((null != autorizacionPrevia) && (0 == Constantes.CTE_TIPO_AUTORIZ_PRECIOS.compareTo(autorizacionPrevia.getTipoAutorizacion()))) {
+            /*No se genera autorización*/
+            codError = CTE_COD_ERROR_OK;
+            descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_NO_GEN_AUT_SCORING_AUTOR_PREV_PRECIOS).toString();
+            seGeneraAutorizScoring = false;
+        } else /*20150825 Se ponen bien los booleanos: lo que tiene que hacer es entrar aqui cuando es scoring binario y el dictamen es 
+		 * denegar o rechazar, pero lo que estaba haciendo es entrar aqui cuando el scoring es binario y denegar, o rechazar.*/
+        if ((Constantes.SI.equals(indScoringBinario)) && (((0 == Constantes.CTE_IND_DICTAMEN_SCORING_DENEGAR.compareTo(indDictamenScoring))) || ((0 == Constantes.CTE_IND_DICTAMEN_SCORING_RECHAZAR.compareTo(indDictamenScoring))))) {
+            /*TODO: CUANDO HAYA TIEMPO HACER UN MÉTODO QUE SÓLO ANULE E INFORME CAMPOS SALIDA.*/
+            if ((null != autorizacionPrevia) && (0 == Constantes.CTE_TIPO_AUTORIZ_SCORING.compareTo(autorizacionPrevia.getTipoAutorizacion()))) {
+                /*Anulamos la autorizacion anterior porque es de scoring, si fuera de precios NO se anularía.*/
+                UtilidadesAutorizacion.anularAutorizacionAGEN(ServicioNegocio.getContexto(), autorizacionPrevia);
+                UtilidadesAutorizacion.anularAutorizacion(autorizacionPrevia, ServicioNegocio.getContexto().getUsuario());
+                /*Cambiamos el estado de la tarea Solicitud de EEXP, la ponemos a Finalizado*/
+                UtilidadesComun.cambiarEstadoTareaExpediente(nuc, Constantes.CTE_TAREA_EEXP_SOLICITUD, Constantes.CTE_ESTADO_TAREA_EEXP_PENDIENTE_FINALIZADO);
+                codError = CTE_COD_ERROR_OK;
+                if (0 == Constantes.CTE_IND_DICTAMEN_SCORING_DENEGAR.compareTo(indDictamenScoring)) {
+                    descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_BINARIO_DENEGAR_ANULA_SCO_ANT).toString();
+                } else // rechazar
+                {
+                    descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_BINARIO_RECHAZAR_ANULA_SCO_ANT).toString();
+                }
+                seGeneraAutorizScoring = false;
+            } else {
+                codError = CTE_COD_ERROR_OK;
+                if (0 == Constantes.CTE_IND_DICTAMEN_SCORING_DENEGAR.compareTo(indDictamenScoring)) {
+                    descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_BINARIO_DENEGAR_ANULA_SCO_ANT).toString();
+                } else // rechazar
+                {
+                    descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_BINARIO_RECHAZAR_ANULA_SCO_ANT).toString();
+                }
+                seGeneraAutorizScoring = false;
+            }
+        } else if ((0 == Constantes.CTE_IND_DICTAMEN_SCORING_RECHAZAR.compareTo(indDictamenScoring)) || (0 == Constantes.CTE_IND_DICTAMEN_SCORING_DUDA.compareTo(indDictamenScoring)) || (0 == Constantes.CTE_IND_DICTAMEN_SCORING_DENEGAR.compareTo(indDictamenScoring))) {
+            /*20150622 Si el dictamen scoring es Negativo y existe autorización previa por precios entonces no vamos
+			 * a generar autorización por scoring, porque esto haría que anuláramos la autorización por precios, y esto está bien
+			 * siempre y cuando no nos llamen otra vez con scoring positivo, porque esto haría que se anulase la autorización por scoring
+			 * y la autorización por precios que se anuló antes ahora volvería a ser válida.*/
+            if ((0 == Constantes.CTE_IND_DICTAMEN_SCORING_DENEGAR.compareTo(indDictamenScoring)) && (null != autorizacionPrevia) && (0 == Constantes.CTE_TIPO_AUTORIZ_PRECIOS.compareTo(autorizacionPrevia.getTipoAutorizacion()))) {
+                /*No se genera autorización*/
+                codError = CTE_COD_ERROR_OK;
+                descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_NO_GEN_AUT_SCORING_AUTOR_PREV_PRECIOS).toString();
+                seGeneraAutorizScoring = false;
+            } else if ((null == autorizacionPrevia) || (0 < nivelMaximoScoring.compareTo(autorizacionPrevia.getNivelMaximo()))) {
+                /*
+				resultadoAltaAutoriz = altaAutorizacion(oficinaSolicitud, nuc,
+					Constantes.CTE_TIPO_AUTORIZ_SCORING, nivelMaximoScoring);
+				//listaContextos.add(resultadoAltaAutoriz);
+				
+				//Si acabó bien nos devuelve un contexto ANPMN070 con los datos de la autorización, si acabó mal un ANPMN004
+				//en el contexto ANPMN070 no hay campo de error, con lo cual si recibimos este contexto consideramos que acabó bien.
+				//si acaba bien enviamos la autorización a AGEN.
+				for (IContexto contexto : resultadoAltaAutoriz)
+				{
+					if (CTE_CTX_ALTA_ENVIO_AUTORIZ.equalsIgnoreCase(contexto.getNombre().trim()))
+					{
+						ctxDatosAutorizacion = contexto;
+						altaCorrecta = true;
+						break;
+					}
+				}
+*/
+                if (null != autorizacionPrevia) {
+                    UtilidadesAutorizacion.anularAutorizacionAGEN(ServicioNegocio.getContexto(), autorizacionPrevia);
+                    UtilidadesAutorizacion.anularAutorizacion(autorizacionPrevia, ServicioNegocio.getContexto().getUsuario());
+                }
+                /*20150618 Si la comparación de autorización viene de un alta de autorización scoring, es decir,
+				 * ANPM_214 -> ANPM_210 -> ANPM_213 y además no se ha generado autorización por precios,
+				 * entonces actualizamos el indicador de autorización AN251080 = 1*/
+                // 20151020 Se deja de actualizar el indicador de Autorización ya que se deja de generar y enviar las autorizaciones
+                // if (0 == BigDecimal.ZERO.compareTo(datosSolicitud.getIndicadorAutorizacion()))
+                // {
+                // datosSolicitud.setIndicadorAutorizacion(BigDecimal.ONE);
+                // resultadoIntermedio = gds.updateSolicitud(datosSolicitud);
+                // datosSolicitud = resultadoIntermedio.getDatos();
+                // }
+                /*20151020 Se comenta la generación y envío de autorizaciones porque ya no lo quieren.
+				autorizacionNueva = this.altaAutorizacion(
+					datosSolicitud,
+					ServicioNegocio.getContexto().getUsuario(),
+					true,
+					nivelMaximoScoring);
+				
+				
+				
+				if (null == autorizacionNueva)
+				{
+//					//Recuperamos el código de error
+//					if (! UtilidadesAutorizacion.isBlankOrNull(resultadoAltaAutoriz))
+//					{
+//						codigoErrorAlta = resultadoAltaAutoriz[0].getBigDecimal(CTE_ERROR_PROP_COD_ERROR);
+//					}
+//					//Lanzamos rollback
+//					ServicioNegocio.rollback(
+//						Constantes.CTE_ERR_ALTA_AUTORIZ,
+//						null,
+//						new String[] {codigoErrorAlta.toString()},
+//						null);
+					
+					codError = CTE_COD_ERROR_OK;
+					descrError = CTE_DESCR_ERROR_ALTA_AUTORIZACION;
+					seGeneraAutorizScoring = true;
+					
+					
+				}
+				else
+				{
+					//Enviamos la autorización a AGEN
+					//resultadoEnvioAutoriz = envioAutorizacion(datosSolicitud, ctxDatosAutorizacion, Constantes.CTE_TIPO_AUTORIZ_SCORING, nivelMaximoScoring);
+					resultadoEnvioAutoriz = envioAutorizacion(datosSolicitud, autorizacionNueva, Constantes.CTE_TIPO_AUTORIZ_SCORING, indDictamenScoring, nivelMaximoScoring);
+					
+					
+					//Si nos devuelve un contexto ANPMN070 con los datos de la autorización es que acabó bien.
+					for (IContexto contexto : resultadoEnvioAutoriz)
+					{
+						if (CTE_CTX_ALTA_ENVIO_AUTORIZ.equalsIgnoreCase(contexto.getNombre().trim()))
+						{
+							envioCorrecto = true;
+							
+							//Cambiamos el estado de la tarea "solicitud" en EEXP
+							UtilidadesAutorizacion.cambiarEstadoTareaExpediente(nuc, Constantes.CTE_TAREA_EEXP_SOLICITUD, Constantes.CTE_ESTADO_TAREA_EEXP_PENDIENTE_AUTORIZ);
+							
+							break;
+						}
+					}
+					//listaContextos.add(resultadoEnvioAutoriz);
+					
+					if (envioCorrecto)
+					{
+						seGeneraAutorizScoring = true;
+					}
+					else
+					{
+						//Recuperamos el código de error
+						if (! UtilidadesAutorizacion.isBlankOrNull(resultadoEnvioAutoriz))
+						{
+							codigoErrorAlta = resultadoEnvioAutoriz[0].getBigDecimal(CTE_ERROR_PROP_COD_ERROR);
+						}
+						//Lanzamos rollback
+// Se comenta el rollback porque no quieren que falle el servicio.
+//							ServicioNegocio.rollback(
+//								Constantes.CTE_ERR_ENVIO_AUTORIZ,
+//								null,
+//								new String[] {codigoErrorAlta.toString()},
+//								null);
+//
+					}
+					
+				}
+*/
+                codError = CTE_COD_ERROR_OK;
+                descrError = CTE_DESCR_ERROR_OK;
+                seGeneraAutorizScoring = true;
+            } else {
+                /*No se genera autorización*/
+                codError = CTE_COD_ERROR_OK;
+                descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_ERROR_NIV_SCORING_LE_NIV_PRECIO).toString();
+                seGeneraAutorizScoring = false;
+            }
+        } else {
+            /*El scoring es positivo, en este caso, si existe una autorización y ésta es por scoring la anulamos*/
+            if ((null != autorizacionPrevia) && (0 == Constantes.CTE_TIPO_AUTORIZ_SCORING.compareTo(autorizacionPrevia.getTipoAutorizacion()))) {
+                /*Anulamos la autorizacion anterior porque es de scoring, si fuera de precios NO se anularía.*/
+                UtilidadesAutorizacion.anularAutorizacionAGEN(ServicioNegocio.getContexto(), autorizacionPrevia);
+                UtilidadesAutorizacion.anularAutorizacion(autorizacionPrevia, ServicioNegocio.getContexto().getUsuario());
+                /*Cambiamos el estado de la tarea Solicitud de EEXP, la ponemos a Finalizado*/
+                UtilidadesComun.cambiarEstadoTareaExpediente(nuc, Constantes.CTE_TAREA_EEXP_SOLICITUD, Constantes.CTE_ESTADO_TAREA_EEXP_PENDIENTE_FINALIZADO);
+                codError = CTE_COD_ERROR_OK;
+                descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_POSITIVO_ANULA_SCORING_ANT).toString();
+                seGeneraAutorizScoring = false;
+            } else {
+                codError = CTE_COD_ERROR_OK;
+                descrError = new Mensaje(ServicioNegocio.getContexto(), CTE_DESCR_SCORING_POSITIVO).toString();
+                seGeneraAutorizScoring = false;
+            }
+        }
+        contextoAltaAutorizScoring = rellenarContextoAltaAutorizScoring(codError, descrError, seGeneraAutorizScoring);
+        return contextoAltaAutorizScoring;
+    }
+
+    /**
+     * Método que comprueba si está activado el envío de autorizaciones por RAROC.
+     *
+     * Para ello comprueba un parámetro de la CG32TB01 a través del método CGAL_373.
+     *
+     * @return
+     */
+    private static boolean autorizacionesRarocActivado() {
+        boolean lanzarRollback = false;
+        BigDecimal indicadorAutorizRarocActivado = null;
+        boolean activado = false;
+        indicadorAutorizRarocActivado = UtilidadesComun.getParametroUnicoImporte1(Constantes.CTE_PARAM_TABLA_PAR, Constantes.CTE_PARAM_CLAVE_DENTRO_TABLA_RAROC_ACTIV, lanzarRollback);
+        if ((null != indicadorAutorizRarocActivado) && (0 == BigDecimal.ONE.compareTo(indicadorAutorizRarocActivado))) {
+            activado = true;
+        }
+        return activado;
+    }
+
+    /**
+     * Comprueba si la modalidad del préstamo está habilitada para enviar autorizaciones por RAROC.
+     * Lo hace consultando parametros de la CG32TB01, concretamente aquellos productos que se encuentren en la tabla
+     * CG320010 = MRN son los que NO están habilitados para autorización por scoring.
+     *
+     * Es decir que si el parámetro CG320010 = MRN y CG320020 = <codProducto> no está en la tabla quiere decir que está
+     * habilitado para enviar autorizaciones por scoring (RAROC).
+     *
+     * @param codProducto
+     * @return
+     */
+    private static boolean modalidadValidaRaroc(BigDecimal codProducto) {
+        boolean esValida = true;
+        String tabla = Constantes.CTE_PARAM_MODALIDAD_RAROC_NOACTIV;
+        String claveDentroTabla = null;
+        boolean lanzarRollback = false;
+        IContexto resultadoParametro = null;
+        claveDentroTabla = StringUtils.leftPad(codProducto.toString(), 4, '0');
+        resultadoParametro = UtilidadesTramitacion.getParametroUnico(tabla, claveDentroTabla, lanzarRollback);
+        if (null != resultadoParametro) {
+            /*El parámetro está en la tabla, y como en la tabla se guardan las modalidades que NO están habilitadas para RAROC quiere
+			 * decir que esta modalidad no está habilitada, devolvemos false*/
+            esValida = false;
+        }
+        return esValida;
+    }
+
+    private static final String TIPO_EXPEDIENTE_121935 = "TIPO_EXPEDIENTE_121935";
+
+    private static final String V_LIDO_399188453 = "V_LIDO_399188453";
+
+    private static final String TIPO_EXPEDIENTE_NULO_989228790 = "TIPO_EXPEDIENTE_NULO_989228790";
+
+    private static final String NUC_NULO_516284864 = "NUC_NULO_516284864";
+
+    private static final String IND_SCORING_BINARIO_NULO_590599698 = "IND_SCORING_BINARIO_NULO_590599698";
+}

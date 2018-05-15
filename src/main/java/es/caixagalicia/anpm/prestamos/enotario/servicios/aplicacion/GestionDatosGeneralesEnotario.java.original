@@ -1,0 +1,1179 @@
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.parametro.ParametroC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.periodosTransitorio.PeriodoTransitorioC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionParametro;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionPeriodoTransitorio;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.comun.constantes.CodigosError;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesKey;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.ElementoDeterminadoVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.EnvioEnotarioAltaModificacionVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.InformacionEnotarioVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionParametros;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.persistencia.eccv02.CEcc;
+import es.caixagalicia.ifrt.util.Helper;
+
+public class GestionDatosGeneralesEnotario
+{
+	
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	/**
+	 * Log de la clase
+	 */
+	private static final LogHelper LOGGER = LogHelper.getLog(GestionDatosGeneralesEnotario.class);
+	
+	/**Recuperar la descripcion
+	 */
+	private static final String CTE_ANPMN011010_CTX = "ANPMN011010";
+	private static final String CTE_ANPMN011020_CTX = "ANPMN011020";
+	private static final String CTE_ANPMN011030_CTX = "ANPMN011030";
+	
+	/**
+	 * Nombre de la aplicacion
+	 */
+	private static final String CTE_NOMBRE_APLICACION = "ANPM";
+		
+	private static final String CTE_INICIALIZACION_STRING = "";
+	private static final BigDecimal CTE_INICIALIZACION_BIGD = BigDecimal.ZERO;
+
+			
+	/**
+	 * 	Metodo que devuelve la lista de valores de un parametro.
+	 * 
+	 * @param agrupacionParam
+	 * @param nombreParam
+	 * @return
+	 */
+	public EnvioEnotarioAltaModificacionVO obtenerDescripcionesEnotario(EnvioEnotarioAltaModificacionVO vo,DatosgeneralesC dg)
+	{
+
+
+		IDatosEntradaTx datosEntradaConsultaParametrosSrv = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+				IConstantesEnotario.CTE_CC_CONSULTA_PARAMETROS,IConstantesEnotario.CTE_CO_CONSULTA_PARAMETROSC_CG32);
+		datosEntradaConsultaParametrosSrv.addCampo(IConstantesEnotario.CTE_NOMBRE_PARAMETRO_OPERACION, "ENT");
+
+		List<ElementoDeterminadoVO> listaElementos = vo.getElementos();		
+
+		//Invocar al srv ANPM_180
+		IContexto[] salidaSrvParamNombre = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaConsultaParametrosSrv);
+
+		// Carga la lista de valores del parametro.
+		if(!UtilidadesEnotario.isBlankOrNull(salidaSrvParamNombre))
+		{
+			for(IContexto parametro:salidaSrvParamNombre) {
+
+				if(null != parametro.getString("ANPMN011010") &&
+						parametro.getString("ANPMN011010").equals(IConstantesEnotario.COD_CLAUSULA_MODALIDAD_AMORT))
+				{
+					if(UtilidadesEnotario.rellenarCerosDelante(dg.getCodigoAmortizacion().toString(),4).equals(parametro.getString("ANPMN011020"))) {
+						vo.setLiteralTipoAmortizacion(parametro.getString("ANPMN011030"));
+					}
+				}
+				if(null != parametro.getString("ANPMN011010") &&
+						parametro.getString("ANPMN011010").equals(IConstantesEnotario.COD_CLAVE_TIPO_REDONDEO))
+				{
+					if(UtilidadesEnotario.rellenarCerosDelante(dg.getCodigoDeRedondeo(),4).equals(parametro.getString("ANPMN011020"))) {
+						vo.setLiteralRedondeo(parametro.getString("ANPMN011030").substring(2));
+					}
+				}
+				if(null != parametro.getString("ANPMN011010") &&
+						parametro.getString("ANPMN011010").equals(IConstantesEnotario.COD_CLAVE_TIPO_REF))
+				{
+					if(UtilidadesEnotario.rellenarCerosDelante(dg.getIndiceReferencia().toString(), 4).equals(parametro.getString("ANPMN011020"))) {
+						vo.setLiteralTipoReferencia(parametro.getString("ANPMN011030"));
+					}
+				}
+			}
+			vo.setElementos(listaElementos);
+		}
+
+		return vo;
+	}
+	/**
+	 * Método equivalente a ACTUALIZAR_PME1TB01
+	 *en principio void, iré viendo despues lo que tiene que devolver. 
+	 */
+	public void actualizarDatosGeneralesFormalizacion(String colegiadoTitular, String nifColegiadoFirmante,
+			BigDecimal importeHonorariosBid, String numeroProtocolo, java.sql.Date fechaFirmaDate,DatosgeneralesC datosGeneralesActualizar)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		DateHelper dateHelper = DateHelper.getInstance();
+		Timestamp timestamp = dateHelper.askTimestampFromDB2();
+		DatosgeneralesC nuevoDatosGeneralesC = datosGeneralesDao.createNewObject();
+		if (null != datosGeneralesActualizar)
+		{
+			nuevoDatosGeneralesC.copiar(datosGeneralesActualizar);
+			
+			nuevoDatosGeneralesC.setTimestamp(timestamp);
+			nuevoDatosGeneralesC.setClaveNotario(colegiadoTitular);
+			nuevoDatosGeneralesC.setCodigoNotaria(nifColegiadoFirmante);
+			nuevoDatosGeneralesC.setImporteHonorarios(importeHonorariosBid);
+			nuevoDatosGeneralesC.setUltimoTextoDeError(numeroProtocolo); //MIRAR ISTO
+			nuevoDatosGeneralesC.setFechaPrevistaFirma(fechaFirmaDate);
+			nuevoDatosGeneralesC.setTimestamp(timestamp);
+			datosGeneralesDao.update(datosGeneralesActualizar,true);
+		}
+	}
+	
+	/**
+	 * Comprueba la vigencia del producto asociado a la solicitud
+	 * @param datosSolicitud
+	 * @param strFechaFormalizacion Fecha de formalización introducida por el usuario
+	 */
+	public static boolean comprobarVigenciaProducto(DatosSolicitudC datosSolicitud, String strFechaFormalizacion)
+	{
+		final Date dateNow = DateUtils.dateNow();
+		boolean validacion = true;
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("INICIO - comprobando vigencia producto. AltaDatosGeneralesComisionEnotarioSrv()");
+		}
+		VersionesC version = GestionVersiones.obtenerVersion(
+				datosSolicitud.getProducto().intValue(),
+				datosSolicitud.getSubproducto().intValue(),
+				datosSolicitud.getVersionGeneral().intValue(),
+				datosSolicitud.getLineaColectivo().intValue());
+		
+		// Si la fecha fin es mínima hay que comprobar que date es menor o igual
+		// que la fecha tope de formalizacion del subproducto
+		if (version.getFechaFin().compareTo(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO)) == 0)
+		{
+			List<String> nombreTablas = new ArrayList<String>(1);
+			nombreTablas.add(IConstantesEnotario.CTE_TABLA_DATOS_SUBPRODUCTO);
+			List<CEcc> lstSubproductos = GestionVersiones.obtenerDatosVersion(
+					datosSolicitud.getProducto().intValue(), 
+					datosSolicitud.getSubproducto().intValue(), 
+					datosSolicitud.getLineaColectivo().intValue(), 
+					datosSolicitud.getVersionGeneral().intValue(), 
+					nombreTablas);
+			SubProductoC subproducto = null;
+			int iLstSubproductos = lstSubproductos.size();
+			for (int i = 0; i < iLstSubproductos && subproducto == null; i++)
+			{
+				if (lstSubproductos.get(i) instanceof SubProductoC)
+				{
+					SubProductoC subproductoTmp = (SubProductoC) lstSubproductos.get(i);
+					if (subproductoTmp.getActivo().equals(BigDecimal.ONE.intValue()))
+					{
+						subproducto = subproductoTmp;
+					}
+				}
+			}
+			final Date dateMinima = DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO);
+			Date dateTopeFormalizacion = null;
+			Date dateFormalizacionSol = DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO);
+			if (subproducto != null)
+			{
+				dateTopeFormalizacion = subproducto.getFechaFormalizacion();
+			}
+			if (subproducto == null || (dateTopeFormalizacion != null && !dateMinima.equals(DateUtils.getSoloFecha(dateTopeFormalizacion)) && 
+				 DateUtils.isDateLessEqual(DateUtils.getSoloFecha(dateTopeFormalizacion), DateUtils.getSoloFecha(dateFormalizacionSol))))
+			{
+				validacion = false;
+			}
+		}
+//		si la fecha actual no esta comprendidas entre las fechas de
+//		vigencia de la version general, se comprueban los periodos transitorios
+		else if (!(
+				(DateUtils.isDateGreater(DateUtils.getSoloFecha(dateNow), DateUtils.getSoloFecha(version.getFechaInicio()))  
+						|| (DateUtils.getSoloFecha(dateNow).compareTo(DateUtils.getSoloFecha(version.getFechaInicio())) == 0 &&
+							DateUtils.isDateLessEqual(DateUtils.getSoloHorario(version.getHoraIncio()), DateUtils.getSoloHorario(dateNow)))) &&
+				(DateUtils.isDateGreater(DateUtils.getSoloFecha(version.getFechaFin()), DateUtils.getSoloFecha(dateNow)) 
+						||	(DateUtils.getSoloFecha(version.getFechaFin()).compareTo(DateUtils.getSoloFecha(dateNow)) == 0 &&				
+							DateUtils.isDateGreaterEqual(DateUtils.getSoloHorario(version.getHoraFin()), DateUtils.getSoloHorario(dateNow)))))){
+			
+			// Hay que comprobar si existe un periodo transitorio de tipo formalizacion (1)
+			List<PeriodoTransitorioC> lstPeridosTrans = GestionPeriodoTransitorio.obtenerPeriodoTransitorioFechas(
+					datosSolicitud.getProducto().intValue(),
+					datosSolicitud.getSubproducto().intValue(),
+					BigDecimal.ONE.intValue(),
+					DateUtils.toSQLDate(dateNow),
+					new Time(dateNow.getTime()));
+			if (!lstPeridosTrans.isEmpty())
+			{
+				boolean existeActivo = false;
+				int iLengthLst = lstPeridosTrans.size();
+				for (int i = 0; i < iLengthLst && !existeActivo; i++) 
+				{
+					existeActivo = Constantes.CTE_PERIODO_NO_ANULADO.equals(lstPeridosTrans.get(i).getBorrado());
+				}
+				if (!existeActivo)
+				{
+					validacion = false;
+				}
+			}
+			else
+			{
+				validacion = false;
+			}
+		}		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("FIN - comprobando vigencia producto. AltaDatosGeneralesComisionEnotarioSrv()");
+		}
+		
+		return validacion;
+	}
+	
+    /**
+     * Comprueba si existen cambios entre los datos generales introducidos con anterioridad de no ser asi ya no se hace nada
+     * @param datosGenerales
+     * @param strFechaFormalizacion
+     * @param strHoraFormalizacion
+     * @return
+     */
+    public boolean existeModificacionDatosGenerales(DatosgeneralesC datosGenerales,String strFechaFormalizacion,String strHoraFormalizacion){
+    	
+    	DateHelper dateHelper = DateHelper.getInstance();
+    	String fechaDatosGenerales = dateHelper.formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION,
+    			datosGenerales.getFechaPrevistaFirma());
+    	String strHoraDatosGenerales = new String();
+    	strHoraDatosGenerales = datosGenerales.getHoraPrevista().toString();
+    	
+    	if (strHoraFormalizacion.trim().length() == 4) {
+    		strHoraFormalizacion = DateUtils.parseTime(strHoraFormalizacion.trim(), DateUtils.FORMATO_HORA_SIMPLE).toString();
+		}else if	(strHoraFormalizacion.trim().length() == 5 ) {
+			strHoraFormalizacion = DateUtils.parseTime(strHoraFormalizacion.trim(), DateUtils.FORMATO_HORA_PUNTOS).toString();
+		}
+    	
+    	if(!fechaDatosGenerales.equals(strFechaFormalizacion)){
+    		return true;
+    	}else if(!strHoraDatosGenerales.equals(strHoraFormalizacion)){
+    		return true;
+    	}
+    	
+    	return false;
+    	
+    }
+    	
+	
+    /**
+     * Modifica los datos generales generando o no una nueva versión dependiendo de las necesidades concretas de cada caso.
+     * @param datosSolicitud
+     * @param datosGenerales
+     * @param strFechaFormalizacion
+     * @return
+     */
+    public DatosSolicitudC modificarEnotario(DatosSolicitudC datosSolicitud, DatosgeneralesC datosGenerales,String strFechaFormalizacion,String strHoraFormalizacion,String tipoExpediente,IContexto[] descripcion,boolean generarVersion){
+
+    	//Instancia a la gestion de los datos de comision de enotario
+    	GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+    	//Instancia a Gestion alta modificacion enotario
+    	GestionAltaModificacionEnotario game = new GestionAltaModificacionEnotario();
+
+
+    	if(existeModificacionDatosGenerales(datosGenerales, strFechaFormalizacion, strHoraFormalizacion)){
+
+    		if (!datosGenerales.getEstado().equalsIgnoreCase(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA)  && !datosGenerales.getEstado().equalsIgnoreCase(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ANULADO) 
+    				&& !datosGenerales.getEstado().equalsIgnoreCase(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SUSPENDIDO) ) {
+
+    			if(!datosSolicitud.getEstadoSolicitud().equals(IConstantesEnotario.CTE_DATOS_SOLIC_ESTADO_FORMALIZADO)
+    					&& !datosSolicitud.getEstadoSolicitud().equals(IConstantesEnotario.CTE_DATOS_SOLIC_ESTADO_PEND_DATOS)) {
+
+    				if(comprobarVigenciaProducto(datosSolicitud, strFechaFormalizacion)) {
+
+    					List<ParametroC> listaParametro = GestionParametro.obtenerParametros(IConstantesEnotario.CTE_PARAMETRO_ENOTARIO, IConstantesEnotario.CTE_AGRUPACION_ENOTARIO);
+    					Date data = DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO);
+    					Date dataposterior = DateUtils.sumarDias(DateUtils.dateNow(), new Integer(listaParametro.get(Integer.valueOf(0)).getStrValor().trim()));
+
+    					if (datosGenerales.getEstado().equalsIgnoreCase(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA)) {
+
+    						if(DateUtils.isDateLessEqual(data, dataposterior)){
+    							if(generarVersion){
+    								datosSolicitud = game.actualizaDatosGenerarNuevaVersionANPM172(datosSolicitud, new GestionDatosSolicitud(),strFechaFormalizacion,strHoraFormalizacion);
+    							}else{
+    								datosGenerales = gdge.actualizaDatosPreformalizacionEnotario(datosGenerales, strHoraFormalizacion, strFechaFormalizacion);
+    							}
+    						}else{
+    							//error fecha formalizacion
+    							ServicioNegocio.rollback(CodigosError.CTE_ERROR_FECHA_FORMALIZACION, 
+    									null, new String [] {}, null);
+    						}
+
+    					}else {
+    						//No esta enviado se actualiza a cualquier fecha.
+    						if(generarVersion){
+    							datosSolicitud = game.actualizaDatosGenerarNuevaVersionANPM172(datosSolicitud, new GestionDatosSolicitud(),strFechaFormalizacion,strHoraFormalizacion);
+    						}else{
+    							datosGenerales = gdge.actualizaDatosPreformalizacionEnotario(datosGenerales, strHoraFormalizacion, strFechaFormalizacion);
+    						}
+    					}							
+    				}else {
+    					//error vixencia
+    					ServicioNegocio.rollback(CodigosError.CTE_ERROR_VIGENCIA_PRODUCTO, 
+    							null, new String [] {strFechaFormalizacion}, null);
+    				}
+
+    			}else {
+    				//non se permite modificar
+    				ServicioNegocio.rollback(CodigosError.CTE_ERROR_ESTADO_INCORRECTO, 
+    						null, new String [] {datosGenerales.getEstado()}, null);
+    			}
+    		}else{
+    			//non se permite modificar
+    			ServicioNegocio.rollback(CodigosError.CTE_ERROR_ESTADO_INCORRECTO, 
+    					null, new String [] {datosGenerales.getEstado()}, null);
+    		}
+    	}
+
+    	return datosSolicitud;
+
+    }
+	
+	/**
+	 * Hace distintas comprobaciones para permitir o no un alta de eNotario
+	 * @param datosAutorizacion
+	 * @param datosSolicitud
+	 */
+	public int realizarAltaEnotario(DatosAutorizacionC datosAutorizacion, DatosSolicitudC datosSolicitud,String tipoExpediente,IContexto[] descripcion,String strFechaFormalizacion,String strHoraFormalizacion){
+		
+		int error = 0;
+		//Instancia a la gestion de los datos de comision de enotario
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		//Instancia a la gestion de los datos de comision de enotario
+		GestionComisionesEnotario gcen = new GestionComisionesEnotario();
+		
+		
+		/**
+		 * Comprobar como deberia estar la autorizacion en caso de existir si no existe ya se hace un alta
+		 */
+		if (((null != datosAutorizacion && datosAutorizacion.getEstado().equalsIgnoreCase(IConstantesEnotario.AUTORIZADA) && 
+				null != datosSolicitud && datosSolicitud.getEstadoSolicitud().equals(IConstantesEnotario.ESTADO_CONCEDIDA))) || 
+			((null == datosAutorizacion) &&
+				null != datosSolicitud && 0 == datosSolicitud.getEstadoSolicitud().compareTo(IConstantesEnotario.ESTADO_CONCEDIDA))) 
+		{
+			if(datosSolicitud.getGarantiaContable().intValue() > IConstantesEnotario.GARANTIA_PRESTAMO)
+			{
+				if(UtilidadesEnotario.isBlankOrNull(datosSolicitud.getEspecialidad()))
+				{
+					//Dar de alta los datos generales
+					gdge.altaDatosGenerales(datosSolicitud,datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), tipoExpediente, 
+							descripcion,strFechaFormalizacion, strHoraFormalizacion);
+					//Dar de alta las comisiones						
+					gcen.altaComisionesGastos(datosSolicitud.getComisiones(),datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), 
+							datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+				}
+				else
+				{
+					//Si la especialidad es erronea rollback.
+					ServicioNegocio.rollback(CodigosError.CTE_ERROR_ESPECIALIDAD_PRESTAMO, 
+							null, new String [] {}, null);
+				}
+			}
+			else
+			{
+				ServicioNegocio.rollback(CodigosError.CTE_ERROR_GARANTIA_INCORRECTA, 
+						null, new String [] {}, null);
+			}
+		}
+		else
+		{
+			// 2016-10-28 - Diferenciar error "tiene autorizacion" de error "estado incorrecto"
+			boolean tieneAutorizacion = (null != datosAutorizacion) && 
+					!(datosAutorizacion.getEstado().equalsIgnoreCase(IConstantesEnotario.AUTORIZADA)); 
+			
+			boolean estadoIncorrecto = (null != datosSolicitud) &&
+				   (0 != datosSolicitud.getEstadoSolicitud().compareTo(IConstantesEnotario.ESTADO_CONCEDIDA));
+			
+			if (tieneAutorizacion)
+			{
+				ServicioNegocio.rollback(CodigosError.CTE_ERROR_SOLICITUD_TIENE_AUTORIZACION, 
+						null, new String [] {}, null);
+			}
+			
+			if (estadoIncorrecto)
+			{
+				ServicioNegocio.rollback(CodigosError.CTE_ERROR_EN_ESTADO_SOLICITUD, 
+						null, new String [] {}, null);	
+			}
+	
+		}
+
+		return error;
+	}
+	
+	/**
+	 * Actualiza la fecha prevista de firma en el objeto de datos solicitud.
+	 * @param datosSolicitudC
+	 * @param strFechaPrevistaFirma
+	 */
+	public void actualizaFechaFormalizacion(DatosSolicitudC datosSolicitudC,String strFechaPrevistaFirma){
+		
+		DatosSolicitudEng dao = new DatosSolicitudEng();
+		datosSolicitudC.setFechaFormalizacion(DateUtils.toSQLDate( DateUtils.parseDate(strFechaPrevistaFirma, DateUtils.FORMATO_FECHA_CORTO)));
+		dao.update(datosSolicitudC,true);
+	}
+
+	/**
+	 * Devuelve true si es un alta false si es una modificacion
+	 * @param solicitud
+	 * @return true si hay alta, false si es modificacion
+	 */
+	public static boolean esAlta(DatosgeneralesC datosGenerales){
+		
+		if(null == datosGenerales){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Da de alta los datos generales en la tabla de enotario
+	 * @param solicitud
+	 * @param numSol
+	 * @param tipoExpediente
+	 * @param descripcion
+	 * @param fechaPrevista
+	 * @param horaPrevista
+	 */
+	public void altaDatosGenerales(DatosSolicitudC solicitud,BigDecimal numSol,String tipoExpediente, IContexto[] descripcion,String fechaPrevista,String horaPrevista) {
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Alta datos generales():INICIO");
+		}
+		
+		//Creamos una nueva instancia del objeto persistente
+		final DatosgeneralesC datosGenerales = this.crearDatosGenerales(solicitud,numSol,tipoExpediente,descripcion,fechaPrevista,horaPrevista);
+		//Guardamos los datos generales
+		datosGenerales.persist();
+		datosGenerales.refresh();
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Alta de datos generales():FIN");
+		}
+	}
+	
+	/**
+	 * Rellena la informacion referente a la cuenta de abono
+	 * @param cuentaAbono
+	 * @param informacionEnotario
+	 */
+	public  InformacionEnotarioVO rellenarInformacionCuentaAbono(String cuentaAbono,InformacionEnotarioVO informacionEnotario){
+		String cuentaContableAbono = null;
+		String oficinaAbono = null;
+		String numeroCuentaAbono = null;
+		String digitoAbono = null;
+		String divisionAbono = null;
+		String subdivisionAbono = null;
+		
+		cuentaAbono = cuentaAbono.substring(17,20);
+		oficinaAbono = cuentaAbono.substring(8,12);
+		numeroCuentaAbono = cuentaAbono.substring(14,24);
+		digitoAbono = cuentaAbono.substring(23);
+		divisionAbono = "0";
+		subdivisionAbono = "0";
+		
+		informacionEnotario.setCuentaContableAbono(cuentaContableAbono);
+		informacionEnotario.setOficinaAbono(oficinaAbono);
+		informacionEnotario.setNumeroCuentaAbono(numeroCuentaAbono);
+		informacionEnotario.setDigitoAbono(digitoAbono);
+		informacionEnotario.setDivisionAbono(divisionAbono);
+		informacionEnotario.setSubdivisionAbono(subdivisionAbono);
+		
+		return informacionEnotario;
+	}
+		
+	
+	/**
+	 * Crea una nueva instancia del objeto persistente DatosGeneralesC
+	 * y lo rellena con los datos basicos.
+	 * NOTA: Este metodo no lleva a cabo la inserccionen BD
+	 * (no persiste el contenido)
+	 * @return
+	 */
+	public DatosgeneralesC crearDatosGenerales(DatosSolicitudC solicitud,BigDecimal numSol, String tipoExpediente,
+			IContexto[] descripcion,String fechaPrevista, String horaPrevista) {
+		
+		final DatosgeneralesEng dao = new DatosgeneralesEng();
+		
+		//Informacion del objeto virtual de enotario
+		InformacionEnotarioVO infoEnotarioVO = new InformacionEnotarioVO();
+		infoEnotarioVO = this.rellenarInformacionEnotarioVO(solicitud, tipoExpediente, descripcion);
+		
+		
+		DatosgeneralesC datosGenerales = dao.createNewObject();
+		final DatosgeneralesKey datosGeneralesKey = datosGenerales.getId();
+		//Setear la clave
+		datosGeneralesKey.setVersionSolicitud(solicitud.getDatosSolicitudKey().getVersionSolicitud());
+		datosGeneralesKey.setNucExpediente(solicitud.getDatosSolicitudKey().getNucExpediente());
+		datosGeneralesKey.setNumeroSolicitud(solicitud.getDatosSolicitudKey().getNumSolicitud());
+		datosGeneralesKey.setOficinaSolicitud(solicitud.getDatosSolicitudKey().getOficinaSolicitud());
+		
+		
+		datosGenerales.setId(datosGeneralesKey);
+		
+		datosGenerales.setApplication(CTE_NOMBRE_APLICACION);
+		
+		datosGenerales.setClaveNotario(datosGenerales.getClaveNotario());
+		datosGenerales.setCodigoAmortizacion(infoEnotarioVO.getPlanAmortizacion());
+		datosGenerales.setCodigoDeRedondeo((null != infoEnotarioVO.getRedondeo()) ? infoEnotarioVO.getRedondeo() : CTE_INICIALIZACION_STRING);
+		datosGenerales.setCodigoDivisa(solicitud.getMonedaImporteTotal());
+		datosGenerales.setCodigoNotaria(datosGenerales.getCodigoNotaria());
+		
+		//datosGenerales.setConnection(null);
+		
+		datosGenerales.setContador(datosGenerales.getContador());
+		datosGenerales.setCuentaContableAbono(datosGenerales.getCuentaContableAbono());
+		datosGenerales.setNumeroCuentaAbono(datosGenerales.getNumeroCuentaAbono());
+		datosGenerales.setOficinaAbono(datosGenerales.getOficinaAbono());
+		datosGenerales.setSubdivisionAbono(datosGenerales.getSubdivisionAbono());
+		datosGenerales.setDigitoAbono(datosGenerales.getDigitoAbono());
+		datosGenerales.setDivisionAbono(datosGenerales.getDivisionAbono());
+		
+		datosGenerales.setDiferencial(infoEnotarioVO.getDiferencial());
+		datosGenerales.setDigito(solicitud.getDigitoSolicitud());
+		//Datos de las cuentas de abono
+	
+		//datosGenerales.setEstado(String.format("%1$2s", solicitud.getEstadoSolicitud().toString()).replace(' ', '0'));
+		datosGenerales.setEstado(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_PENDIENTE_ENVIO);	// Estado 00: Pendiente de Enviar.
+		
+		datosGenerales.setFechaCaducidad(DateUtils.toSQLDate( DateUtils.dateAmount( DateUtils.parseDate(fechaPrevista, DateUtils.FORMATO_FECHA_CORTO), Calendar.DAY_OF_MONTH,recuperaDiasVigencia())));
+		
+		datosGenerales.setFechaPrevistaFirma(DateUtils.toSQLDate( DateUtils.parseDate(fechaPrevista, DateUtils.FORMATO_FECHA_CORTO)));
+		datosGenerales.setFechaUltimoPdf(DateUtils.toSQLDate( DateUtils.parseDate(fechaPrevista, DateUtils.FORMATO_FECHA_CORTO)));
+		if (horaPrevista.trim().length() == 4) {
+			datosGenerales.setHoraPrevista(DateUtils.parseTime(horaPrevista.trim(), DateUtils.FORMATO_HORA_SIMPLE));
+		}else if	(horaPrevista.trim().length() == 5 ) {
+			datosGenerales.setHoraPrevista(DateUtils.parseTime(horaPrevista.trim(), DateUtils.FORMATO_HORA_PUNTOS));
+		}
+		
+		datosGenerales.setImporteHonorarios(CTE_INICIALIZACION_BIGD);
+		//Big decimal
+		//datosGenerales.setIndiceReferencia(new BigDecimal(solicitud.getCondicionesInteres().get(0).getIntTipoReferencia()));
+		datosGenerales.setInteresDemora(infoEnotarioVO.getInteresDemora());
+		datosGenerales.setNominal(infoEnotarioVO.getImporteNominal());
+		datosGenerales.setDivision(solicitud.getDivision());
+		datosGenerales.setSubdivision(solicitud.getSubDivision());
+		datosGenerales.setTimestamp(solicitud.getTimestamp());
+		
+		
+		datosGenerales.setPeriodicidadAmortizacion(infoEnotarioVO.getPeriodicidadAmortizacionUnidad().concat(UtilidadesEnotario.rellenarCerosDelante(infoEnotarioVO.getPeriodicidadAmortizacionNumPeriodo().toString(),3)));
+		datosGenerales.setPeriodicidadLiquidacion(infoEnotarioVO.getUnidadPeriodoLiquidacion().concat(UtilidadesEnotario.rellenarCerosDelante(infoEnotarioVO.getNumeroPeriodoLiquidacion().toString(),3)));
+		datosGenerales.setPlazo(infoEnotarioVO.getNumeroPlazo());
+		
+		datosGenerales.setTae(infoEnotarioVO.getTae());
+		datosGenerales.setTipoInteres(infoEnotarioVO.getTipoInteres());
+		//20160812 Nos piden que en caso de recibir una "P" se persista un "01" como ocurre en PMOS
+		if(null != tipoExpediente) 
+		{
+			if("P".equalsIgnoreCase(tipoExpediente.trim())) 
+			{
+				datosGenerales.setTipoPrestamo("01");
+			}
+			else 
+			{
+				datosGenerales.setTipoPrestamo(tipoExpediente);
+				
+			}
+		}
+			
+		datosGenerales.setUltimaTaeCalculada(datosGenerales.getUltimaTaeCalculada());
+		datosGenerales.setUltimoCodigoDeError(CTE_INICIALIZACION_STRING);
+		datosGenerales.setUltimoCodigoDeRetorno(CTE_INICIALIZACION_STRING);
+		datosGenerales.setUltimoTextoDeError(CTE_INICIALIZACION_STRING);
+			
+		return datosGenerales;
+	}
+	
+	/**
+	 * Actualiza los datos en AN40TB01 para una versión previamente generada.
+	 * @param datosSolicitudC
+	 * @param strHoraFormalizacion
+	 * @param strFechaFormalizacion
+	 */
+	public DatosgeneralesC actualizaDatosPreformalizacionEnotario(DatosgeneralesC datosGenerales,String strHoraFormalizacion,String strFechaFormalizacion){
+		
+		
+		final DatosgeneralesEng dao = new DatosgeneralesEng();
+		
+		datosGenerales.setEstado(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_PENDIENTE_ENVIO);	// Estado 00: Pendiente de Enviar.
+		
+		datosGenerales.setFechaCaducidad(DateUtils.toSQLDate( DateUtils.dateAmount( DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO), Calendar.DAY_OF_MONTH,recuperaDiasVigencia())));
+		
+		datosGenerales.setFechaPrevistaFirma(DateUtils.toSQLDate( DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO)));
+		datosGenerales.setFechaUltimoPdf(DateUtils.toSQLDate( DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO)));
+		if (strHoraFormalizacion.trim().length() == 4) {
+			datosGenerales.setHoraPrevista(DateUtils.parseTime(strHoraFormalizacion, DateUtils.FORMATO_HORA_SIMPLE));
+		}else if	(strHoraFormalizacion.trim().length() == 5 ) {
+			datosGenerales.setHoraPrevista(DateUtils.parseTime(strHoraFormalizacion, DateUtils.FORMATO_HORA_PUNTOS));
+		}
+		
+		datosGenerales.setImporteHonorarios(CTE_INICIALIZACION_BIGD);
+
+		
+		dao.update(datosGenerales, true);
+		
+		return datosGenerales; 
+	}
+	
+	/**
+	 * Rellena el contexto con la informacion necesaria para E-Notario
+	 * @param solicitud
+	 * @param tipoExpediente
+	 * @param descripcion
+	 * @return
+	 */
+	public InformacionEnotarioVO rellenarInformacionEnotarioVO(DatosSolicitudC solicitud,String tipoExpediente,IContexto[] descripcion) {
+		
+		InformacionEnotarioVO informacionEnotarioVO = new InformacionEnotarioVO();
+		
+		informacionEnotarioVO.setTipoPrestamo(tipoExpediente);
+		informacionEnotarioVO.setImporteNominal(solicitud.getImporteTotal());
+		informacionEnotarioVO.setMoneda(solicitud.getMonedaImporteTotal());
+		informacionEnotarioVO.setNumeroPlazo(solicitud.getPlazoTotal());
+		informacionEnotarioVO.setUnidadPlazo(solicitud.getUnidadPlazo());
+		informacionEnotarioVO.setEstado(solicitud.getEstadoSolicitud());
+		
+		
+		
+		
+		//datosGenerales.setFechaCaducidad(DateUtils.toSQLDate( DateUtils.dateAmount( DateUtils.parseDate(fechaPrevista, DateUtils.FORMATO_FECHA_CORTO), Calendar.DAY_OF_MONTH,CTE_CADUCIDAD)));
+		informacionEnotarioVO.setFechaValidez(null);
+		
+		//Recuperar el sistema de amortizacion
+		List<CondicionCapitalC>  condicionesCapital = solicitud.getCondicionesCapital();
+		if(null!=condicionesCapital) {
+			//
+			final int sizeCC = condicionesCapital.size();
+			
+			for(int i=0;i<sizeCC;i++) {
+				//Unidad de la periodicidad
+				informacionEnotarioVO.setUnidadPeriodoLiquidacion(condicionesCapital.get(i).getStrPeriodicidadUnidadPeriodo());
+				informacionEnotarioVO.setNumeroPeriodoLiquidacion(condicionesCapital.get(i).getIntPeriodicidadNumPeriodo());
+				informacionEnotarioVO.setTipoPeriodoAmortizacion(condicionesCapital.get(i).getIntPeriodicidadTipoPeriodo());
+				
+				if(condicionesCapital.get(i).getStrPagoUnicoVencimientoFinal().equals(Constantes.CTE_STR_1)){
+					informacionEnotarioVO.setLiteralPeriodicidadAmortizacionCapital("Pago único vencimiento final.");
+				}else{
+					//Literal descripcion completa amortizacion interes
+					informacionEnotarioVO.setLiteralPeriodicidadAmortizacionCapital
+					(UtilidadesComun.getDescripcionElementoListaValores(new BigDecimal(642), 
+						informacionEnotarioVO.getNumeroPeriodoLiquidacion().toString().trim().
+							concat(informacionEnotarioVO.getUnidadPeriodoLiquidacion().trim().
+									concat(informacionEnotarioVO.getTipoPeriodoAmortizacion().toString().trim()))));
+				}
+				
+				
+				//Plan de amortizacion
+				Integer planAmortizacion = condicionesCapital.get(i).getIntModalidadDeAmortizacion();
+				
+				informacionEnotarioVO.setPlanAmortizacion(new BigDecimal(planAmortizacion.toString()));
+				
+				//La descripcion del plan de amortizacion tenemos que recuperarlo de la tabla de parametros
+				//Invocamos al servicio de consulta
+				if(descripcion!=null && BigDecimal.ZERO.intValue()<descripcion.length) {
+					
+					for(int j = 0;j<descripcion.length;j++) {
+						if(descripcion[j].getString(CTE_ANPMN011020_CTX).equals(StringUtils.leftPad(planAmortizacion.toString(), 4,'0')) &&
+								descripcion[j].getString(CTE_ANPMN011010_CTX).equals("MDA")){
+							informacionEnotarioVO.setDescripcionPlanAmortizacion(descripcion[j].getString(CTE_ANPMN011030_CTX));
+						}
+					}
+				}
+				
+				
+			}
+		}
+		
+		// Carga de parametros para el rendondeo.
+		IDatosEntradaTx datosEntradaConsultaParametrosSrv = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+				IConstantesEnotario.CTE_CC_CONSULTA_PARAMETROS,IConstantesEnotario.CTE_CO_CONSULTA_PARAMETROSC_CG32);
+		datosEntradaConsultaParametrosSrv.addCampo(IConstantesEnotario.CTE_NOMBRE_PARAMETRO_OPERACION, "ENT");
+
+		//Invocar al srv ANPM_180
+		IContexto[] salidaSrvParamNombre = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaConsultaParametrosSrv);
+
+		List<CondicionesInteresC> condicionesInteres = solicitud.getCondicionesInteres();
+		if(null!=condicionesInteres) {
+			//07/07/2017 - Inicializar campos de diferencial y interes
+			//Tipo interés
+			informacionEnotarioVO.setTipoInteres(BigDecimal.ZERO);
+			//Diferencial
+			informacionEnotarioVO.setDiferencial(BigDecimal.ZERO);
+			
+			//Tamaño condiciones de interés
+			final int sizeCI = condicionesInteres.size();
+
+			for(int i=0;i<sizeCI;i++) {
+				if(condicionesInteres.get(i).getCondicionesInteresKey().getIntTipoCondicion() == 0){
+					//Con el tipo de referencia obtenido tenemos que ir a la CG32
+					Integer tipoReferencia = condicionesInteres.get(i).getIntTipoReferencia();
+
+					GestionParametros gp = new GestionParametros();
+					informacionEnotarioVO.setIndiceReferencia(gp.obtenerDescripcionTipoReferencia(tipoReferencia));
+
+					//Periodicidad numero de periodos de periodicidad
+					informacionEnotarioVO.setPeriodicidadAmortizacionNumPeriodo(condicionesInteres.get(i).getIntPeriodicidadNumPeriodo());
+
+					//Periodicidad unidad de periodicidad
+					informacionEnotarioVO.setPeriodicidadAmortizacionUnidad(condicionesInteres.get(i).getStrPeriodicidadUnidadPeriodo());
+
+					//Tipo periodo amortizacion
+					informacionEnotarioVO.setTipoPeriodoAmortizacion(condicionesInteres.get(i).getIntPeriodicidadTipoPeriodo());
+
+
+					if(condicionesInteres.get(i).getStrPagoUnicoVencimientoFinal().equals(Constantes.CTE_STR_1)){
+						informacionEnotarioVO.setLiteralPeriodicidadInteres("Pago único vencimiento final.");
+					}else{
+						//Literal descripcion completa amortizacion interes
+						informacionEnotarioVO.setLiteralPeriodicidadInteres
+						(UtilidadesComun.getDescripcionElementoListaValores(new BigDecimal(642),
+								informacionEnotarioVO.getPeriodicidadAmortizacionNumPeriodo().toString().trim().
+								concat(informacionEnotarioVO.getPeriodicidadAmortizacionUnidad().trim().
+										concat(informacionEnotarioVO.getTipoPeriodoAmortizacion().toString().trim()))));
+					}
+
+					if(UtilidadesComun.isTramoFijo(condicionesInteres.get(i))){
+						//Tipo interés
+						informacionEnotarioVO.setTipoInteres(condicionesInteres.get(i).getIntInteres());
+					}else{
+						//Diferencial
+						informacionEnotarioVO.setDiferencial(condicionesInteres.get(i).getIntDif());
+					}
+
+					//Tipo interés de demora
+					informacionEnotarioVO.setInteresDemora(condicionesInteres.get(i).getIntPorDemoraSobreCapital());
+
+					// Redondeo
+					informacionEnotarioVO.setRedondeo(condicionesInteres.get(i).getIntTipoRedondeo().toString());
+
+					//Descripcion Redondeo
+					// Busca el valor correspondiente en la lista de valores del parametro.
+					if(!UtilidadesEnotario.isBlankOrNull(salidaSrvParamNombre))
+					{
+						for(IContexto parametro:salidaSrvParamNombre)
+						{
+							if(null != parametro.getString("ANPMN011010") &&
+									parametro.getString("ANPMN011010").equals(IConstantesEnotario.COD_CLAVE_TIPO_REDONDEO))
+							{
+								if(UtilidadesEnotario.rellenarCerosDelante(condicionesInteres.get(i).getIntTipoRedondeo().toString(),4).equals(parametro.getString("ANPMN011020")))
+								{
+									informacionEnotarioVO.setDescripcionRedondeo(parametro.getString("ANPMN011030").substring(2));
+								}
+							}
+						}
+
+					}
+				}
+			}
+
+		}
+		
+		//TAE
+		informacionEnotarioVO.setTae(solicitud.getTAE());
+		
+		
+		return informacionEnotarioVO;
+		
+	}
+	
+		public DatosgeneralesC ultimaVersionDatosgenerales(BigDecimal oficinaSolicitud, BigDecimal numSolicitud , BigDecimal versionSolicitud, BigDecimal nucExpediente) {
+			
+			LOGGER.error("GestionDatosGeneralesEnotario.ultimaVersionDatosgenerales() - Inicio");
+		
+				
+			DatosgeneralesEng dao = new DatosgeneralesEng();
+			
+			DatosgeneralesC datosGeneralesEnotario = new DatosgeneralesC();
+			datosGeneralesEnotario = dao.buscarDatosGenerales(oficinaSolicitud, numSolicitud, versionSolicitud, nucExpediente);
+			
+			
+			LOGGER.error("GestionDatosGeneralesEnotario.ultimaVersionDatosgenerales() - Fin");
+		
+		return datosGeneralesEnotario;
+		}
+		
+	/**
+	 * Método que devuelve el DatosgeneralesC asociado a un nuc concreto.
+	 * @param nucSolicitud
+	 * @param version
+	 * @return resultado objeto DatosgeneralesC. Si el nuc no es válido devuelve null.
+	 */
+	public DatosgeneralesC obtenerDatosGeneralesPorNucVersion(BigDecimal nucSolicitud, BigDecimal version)
+	{
+		DatosgeneralesC datosGeneralesC = null;
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		datosGeneralesC = datosGeneralesDao.obtenerDatosGeneralesPorNucVersion(nucSolicitud, version);
+		return datosGeneralesC;
+	}
+	
+	/**
+	 * Lanza una consulta por nuc para saber si alguna versión ha sido enviada.
+	 * @param nuc
+	 * @return
+	 */
+	public boolean existeVersionEnviada(BigDecimal nuc){
+		DatosgeneralesEng dao = new DatosgeneralesEng();
+		return dao.existeVersionEnviada(nuc);
+	}
+
+	
+	/**
+	 * Lanza una consulta por nuc para saber si alguna version ha sido enviada.
+	 * Se considera que existe alguna version enviada si existe alguna version
+	 * anterior en estados 01, 02 o 03.
+	 * 
+	 * Esta funcion se llamara solo para comprobaciones al cancelar.
+	 *  
+	 * @param nuc NUC de la solicitud
+	 * @return true si existe alguna version anterior enviada, false en caso
+	 *         contrario.
+	 */
+	public boolean existeVersionEnviadaCancelar(BigDecimal nuc)
+	{
+		DatosgeneralesEng dao = new DatosgeneralesEng();
+		return dao.existeVersionEnviadaCancelar(nuc);
+	}
+	
+	/**
+	 * Comprueba si la version actual esta ya cancelada en algun momento.
+	 * @param nuc
+	 * @return
+	 */
+	public boolean estaEnvioCancelado(BigDecimal nuc){
+		DatosgeneralesEng dao= new DatosgeneralesEng();
+		List<DatosgeneralesC> listaDatosGeneralesParaNuc = dao.obtenerDatosGeneralesPorNuc(nuc);
+		BigDecimal maximaVersionCancelada = BigDecimal.ZERO;
+		boolean estaCancelado = true;
+		
+		//Primero buscamos la maxima versión cancelada (si existe)
+		for(DatosgeneralesC datoGeneral:listaDatosGeneralesParaNuc){
+			if(datoGeneral.getEstado().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SOLIC_CANCEL)){
+				if(0 < datoGeneral.getId().getVersionSolicitud().compareTo(maximaVersionCancelada)){
+					//Esto significa que hay una version posterior cancelada
+					//Actualizamos
+					maximaVersionCancelada = datoGeneral.getId().getVersionSolicitud();
+				}
+			}
+		}
+		
+		//Buscamos la maxima version enviada posterior a la cancelacion
+		for(DatosgeneralesC datoGeneral:listaDatosGeneralesParaNuc){
+			//Si existe una version posterior a la cancelacion 
+			if(0 < datoGeneral.getId().getVersionSolicitud().compareTo(maximaVersionCancelada)){
+				//Para ir a cualquiera de los otros estados primero tiene que pasar por alguno de estos dos.
+				//Si no existe la maxima version cancelada es cero y devuelve siempre false
+				if(datoGeneral.getEstado().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO) ||
+						datoGeneral.getEstado().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO) ||
+						datoGeneral.getEstado().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA)){
+					estaCancelado = false;
+				}
+			}
+		}
+		
+		return estaCancelado;
+	}
+	
+	
+	/**
+	 * Método equivalente a ACTUALIZAR_PME1TB01
+	 *en principio void, iré viendo despues lo que tiene que devolver. 
+	 */
+	public void actualizarDatosGeneralesError(String estado, String codigoRetorno,
+			String codigoError, String textoError, DatosgeneralesC datosGeneralesActualizar)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		DateHelper dateHelper = DateHelper.getInstance();
+		Timestamp timestamp = dateHelper.askTimestampFromDB2();
+		if (null != datosGeneralesActualizar && !estado.equals(datosGeneralesActualizar.getEstado()))
+		{
+			if (! Helper.isNullOrEmpty(estado))
+			{
+				datosGeneralesActualizar.setEstado(estado); //PME10260 = :PME10260
+			}
+			datosGeneralesActualizar.setTimestamp(timestamp); //PME10090 = CURRENT_TIMESTAMP
+			datosGeneralesActualizar.setUltimoCodigoDeRetorno(codigoRetorno); //PME10370 = :PME10370
+			datosGeneralesActualizar.setUltimoCodigoDeError(codigoError); //PME10380 = :PME10380
+			
+			if ((! StringUtils.EMPTY.equals(codigoError)) ||
+				(! StringUtils.EMPTY.equals(textoError)))
+			{
+				datosGeneralesActualizar.setUltimoTextoDeError(textoError); //PME10390 = :PME10390
+			}
+			datosGeneralesDao.update(datosGeneralesActualizar,true);
+			//datosGeneralesActualizar.persist();
+			
+		}
+	}
+	
+	
+	/**
+	 * Método equivalente a ACTUALIZAR_PME1TB01
+	 *en principio void, iré viendo despues lo que tiene que devolver. 
+	 */
+	public void actualizarDatosGeneralesEstado(String estado, DatosgeneralesC datosGeneralesActualizar)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		
+		DateHelper dateHelper = DateHelper.getInstance();
+		Timestamp timestamp = dateHelper.askTimestampFromDB2();
+		
+		DatosgeneralesC datosGeneralesNuevo = datosGeneralesDao.createNewObject();
+		datosGeneralesNuevo.copiar(datosGeneralesActualizar);
+		if (null != datosGeneralesActualizar && !estado.equals(datosGeneralesActualizar.getEstado()))
+		{
+			if (! Helper.isNullOrEmpty(estado))
+			{
+				datosGeneralesNuevo.setEstado(estado);
+			}
+			datosGeneralesNuevo.setTimestamp(timestamp); 
+	
+			
+			//datosGeneralesDao.update(datosGeneralesNuevo,true);
+			datosGeneralesNuevo.persist();
+			
+		}
+	}
+	
+	/**
+	 * 
+	 * @param datosGeneralesC
+	 * @param colegiadoTitularActualizar
+	 * @param nifColegiadoFirmanteActualizar
+	 * @param numeroProtocoloActualizar
+	 */
+	public void actualizarDatosNotario(DatosgeneralesC datosGeneralesC,
+			String colegiadoTitularActualizar, String nifColegiadoFirmanteActualizar,
+			String numeroProtocoloActualizar)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		DateHelper dateHelper = DateHelper.getInstance();
+		Timestamp timestamp = dateHelper.askTimestampFromDB2();
+
+		if (null != datosGeneralesC)
+		{
+			datosGeneralesC.setTimestamp(timestamp);
+			datosGeneralesC.setClaveNotario(colegiadoTitularActualizar);
+			datosGeneralesC.setCodigoNotaria(nifColegiadoFirmanteActualizar);
+			datosGeneralesC.setUltimoTextoDeError(numeroProtocoloActualizar);
+			datosGeneralesDao.update(datosGeneralesC);
+			datosGeneralesC.persist();
+
+		}
+	}
+	
+	/**
+	 * 
+	 * @param versionSolicitud
+	 * @param bidNuc
+	 * @param numSolicitud
+	 */
+	public void finalizarDatosGenerales(BigDecimal versionSolicitud, BigDecimal bidNuc,
+			BigDecimal numSolicitud){
+		
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();		
+		DatosgeneralesC datosGeneralesC = datosGeneralesDao.obtenerDatosGeneralesPorNucVersion(bidNuc, versionSolicitud);		
+		DatosgeneralesC datosGeneralesNew = datosGeneralesDao.createNewObject();
+			
+		datosGeneralesNew.copiar(datosGeneralesC);
+		
+//		if (datosGeneralesC.getId().getNumero().equals(numSolicitud){
+//			
+//		}
+		datosGeneralesC.markForDelete();
+		datosGeneralesC.persist();
+		
+		datosGeneralesNew.getId().setNumeroSolicitud(numSolicitud);		
+		datosGeneralesDao.persist(datosGeneralesNew);		
+		
+	}
+
+	/**
+	 * 
+	 * @param nucSolicitud
+	 */
+	public void eliminarDatosEnotarioIncompletos(BigDecimal nucSolicitud)
+	{
+		final DatosgeneralesEng dao = new DatosgeneralesEng();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("eliminarDatosEnotarioIncompletos() - Inicio.");
+		}
+		
+		if (!UtilidadesEnotario.isBlankOrNull(nucSolicitud))
+		{
+			// Buscamos las solicitudes incompletas para el usuario
+			final List<DatosgeneralesC> listaDatosGenerales = dao.buscarDatosGeneralesIncompletos(nucSolicitud);
+			if(listaDatosGenerales.size() > 0) {
+				// Marcamos para borrado todas las solicitudes incompletas encontradas
+				for (DatosgeneralesC datosGenerales : listaDatosGenerales)
+				{
+					datosGenerales.markForDelete();
+					datosGenerales.persist();
+				}
+				dao.flush();
+			}
+			
+		}
+	
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("eliminarDatosEnotarioIncompletos() - Fin.");
+		}
+		
+	}
+
+	/**
+	 * Método que devuelve el DatosgeneralesC asociado a una oficina, num. solicitud
+	 * y versión concreta. Si la versión no está informada se devuelve la última.
+	 * @param nuc
+	 * @return resultado objeto DatosgeneralesC. Si los identificadores 
+	 * no son válidos devuelve null.
+	 */
+	public DatosgeneralesC obtenerDatosGeneralesPorOficinaNumSolVersion(
+			BigDecimal codigoOficina, BigDecimal numeroSolicitud, BigDecimal version)
+	{
+		DatosgeneralesC datosGeneralesC = null;
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		datosGeneralesC = datosGeneralesDao.obtenerDatosGeneralesPorOficinaNumSolVersion(
+				codigoOficina, numeroSolicitud, version);
+		return datosGeneralesC;
+	}
+
+	/**
+	 * 
+	 * @param codigoOficina
+	 * @param numeroSolicitud
+	 */
+	public void borrarDatosGeneralesPorOficinaSolicitudVersion(BigDecimal codigoOficina,
+			BigDecimal numeroSolicitud, BigDecimal version)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		DatosgeneralesC datosGenerales = datosGeneralesDao.obtenerDatosGeneralesPorOficinaNumSolVersion(
+			codigoOficina, numeroSolicitud, version);
+		if (null != datosGenerales)
+		{
+			datosGenerales.markForDelete();
+			datosGenerales.persist();
+		}
+
+	}
+
+	/**
+	 * Borra todos los objetos datosGeneralesC con el mismo NUC.
+	 * @param nucSolicitud
+	 */
+	public void borrarDatosGeneralesPorNuc(BigDecimal nucSolicitud)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		List<DatosgeneralesC> listaDatosGenerales = datosGeneralesDao.obtenerDatosGeneralesPorNuc(nucSolicitud);
+		//En la tabla de datos generales sólo va a haber la última versión de cada solicitud,
+		//es decir sólo una fila por cada NUC.
+		if (! UtilidadesEnotario.isBlankOrNull(listaDatosGenerales))
+		{
+			for (DatosgeneralesC datosGenerales : listaDatosGenerales)
+			{
+				datosGenerales.markForDelete();
+				datosGenerales.persist();
+			}
+		}
+	}
+	
+	/**
+	 * Devuelve el numero de dias de validez de la fecha de preformalizacion parametrizados en la tabla AN82TB01
+	 * @return
+	 */
+	public int recuperaDiasVigencia() {
+		
+		String numeroDiasValidez = null;
+		//Completamos los datos de entada del servicio de negocio de consulta de parametros
+		IDatosEntradaTx datosEntradaConsultaParametrosSrv = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+				IConstantesEnotario.CTE_CC_CONSULTA_PARAMETROS,IConstantesEnotario.CTE_CO_CONSULTA_PARAMETROS);
+				datosEntradaConsultaParametrosSrv.addCampo(IConstantesEnotario.CTE_NOMBRE_PARAMETRO_AGRUPACION,IConstantesEnotario.CTE_NOMBRE_AGRUPACION_ENOTARIO );
+				
+		//Invocar al srv ANPM_180
+		IContexto[] salidaSrvParamNombre = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaConsultaParametrosSrv);
+		for(IContexto contexto:salidaSrvParamNombre) {
+			if(contexto.getString(IConstantesEnotario.CTE_NOMBRE_PARAMETRO).equals(IConstantesEnotario.CTE_NOMBRE_PARAMETRO_FECHA_VALIDEZ)) {
+						numeroDiasValidez = contexto.getString(IConstantesEnotario.CTE_VALOR_PARAMETRO);
+			}
+		}
+		
+	return new BigDecimal(numeroDiasValidez).intValue();
+	}
+	
+	/**
+	 * Metodo que devuelve todos los datosGenerales para ese numero de solicitud ,numeroOficina y version
+	 * 
+	 * @param numeroSolicitud
+	 * @param numeroOficina
+	 * @param version
+	 * @return
+	 */
+	public DatosgeneralesC obtenerDatosGeneralesNumeroSolicitud(String numeroSolicitud, String numeroOficina, BigDecimal version)
+	{
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		DatosgeneralesC datosGenerales	= datosGeneralesDao.obtenerDatosGeneralesPorNumeroSolicitud(numeroSolicitud, numeroOficina, version);
+		
+		return datosGenerales;
+	}
+	
+	
+	/**
+	 * 
+	 * Metodo para guardar los datos generales de una solicitud.
+	 * 
+	 * @param datosGenerales
+	 */
+	public void guardarDatosGenerales(DatosgeneralesC datoGeneral)
+	{
+		DatosgeneralesEng dao = new DatosgeneralesEng(CTE_JNDI_DATASOURCE);
+		
+		dao.persist(datoGeneral);
+		
+		
+	}
+
+	
+	/**
+	 * Metodo que obtiene los datos generales por NUC y estado.
+	 * 
+	 * @param nuc NUC para el que se realizara la busqueda.
+	 * @param estado estado para el que se realizara la busqueda.
+	 * @return lista de datos generales para el NUC y el estado recibidos como entrada.
+	 */
+	public List<DatosgeneralesC> obtenerDatosGeneralesPorNucEstado(BigDecimal nuc, String estado)
+	{
+		List<DatosgeneralesC> listaDatosGeneralesC = null;
+		DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+		
+		listaDatosGeneralesC = datosGeneralesDao.obtenerDatosGeneralesPorNucEstado(nuc, estado);
+		
+		return listaDatosGeneralesC;
+	}
+	
+}

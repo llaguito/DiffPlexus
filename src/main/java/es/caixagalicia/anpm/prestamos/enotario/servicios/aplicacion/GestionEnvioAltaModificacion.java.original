@@ -1,0 +1,827 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.titularesavalistas.TitularesavalistasC;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoEntradaOperacionAltaBiztalk;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoEnvMsjEnotarioAltaModif2;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoEnvaltaModificacionError;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.AvalistasVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.ComisionesVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioEntradaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DocumentoVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.EnvioEnotarioAltaModificacionVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.TitularesVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * @author V361732
+ *
+ */
+public class GestionEnvioAltaModificacion
+{	
+	private static final String CTE_CTX_ID_ENTRDA_ALTA_MODIF = "RegistroEntrada";
+
+	private static final String CTE_CTX_CODIGO_DE_RETORNO10 = "ANPMN087560";
+	private static final String CTE_CTX_CODIGO_DE_ERROR10 = "ANPMN087565";
+	private static final String CTE_CTX_TEXTO_DE_ERROR10 = "ANPMN087570";
+	
+	private static final String CTE_CTX_CODIGO_RETORNO601 = "ANPMN601120";
+	private static final String CTE_CTX_CODIGO_ERROR601 = "ANPMN601130";
+	private static final String CTE_CTX_TEXTO_ERROR601 = "ANPMN601140";
+	
+	private static final String CTE_COP_SERVICIO = "ANPM_465";
+	
+	String codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0;
+	String codigoError = "";
+	String textoError = "";
+	
+	private DatosSolicitudC datosSolicitud;
+	private DatosgeneralesC datosGenerales;
+	
+	DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO;
+	
+	/**
+	 * 	Constructor vacio
+	 */
+	public GestionEnvioAltaModificacion()
+	{
+	}
+	
+	/**
+	 * Se actualiza el contador de envíos (AN400080) en la tabla CAG.AN40TB01.
+	 * 
+	 * @param oficinaSolicitud
+	 * @param numSolicitud
+	 * @param division
+	 * @param subDivision
+	 * @param contadorFilas
+	 */
+	public void actualizarContadorFilasDatosGenerales(BigDecimal oficinaSolicitud, BigDecimal numSolicitud,
+			BigDecimal division, BigDecimal subDivision, int contadorFilas)
+	{
+		
+		
+		DatosgeneralesEng dgEng = new DatosgeneralesEng();
+		List<DatosgeneralesC> datosGenerales = dgEng.getDetalleDatosGenerales(oficinaSolicitud, 
+				numSolicitud, division, subDivision);
+		
+		for (DatosgeneralesC dg : datosGenerales)
+		{
+			dg.setContador(new BigDecimal(contadorFilas));
+			dgEng.update(dg);
+			dgEng.persist(dg);
+		}	
+		
+	
+	}
+	
+	
+	/**
+	 * Metodo que administra la llamada a Ancert Biztalk
+	 * 
+	 * @param codigoOperacion
+	 * @param oficinaSolicitud
+	 * @param numeroSolicitud
+	 * @param versionSolicitud
+	 * @param nucExpediente
+	 * @return
+	 */
+	public IContexto[] llamadaAncertBiztalk(String codigoOperacion, BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud,
+									BigDecimal versionSolicitud, BigDecimal nucExpediente) 
+	{
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		
+		distrEnotarioEntradaVO = new DistribuidorEnotarioEntradaVO();
+		
+		BigDecimal bidCodigoTarea = ConstantesComun.CTE_CODIGO_PROCESO_PREFORM_ENOT;
+		datosSolicitud = gds.getUltimaVersion(nucExpediente);
+		//Se coge la unica tupla de datos generales asociada a la version.
+		datosGenerales = gdge.obtenerDatosGeneralesPorNucVersion(nucExpediente, datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+		
+		String contratoIBAN = UtilidadesEnotario.getContratoIban(datosSolicitud);
+		String codigoBIC 	= UtilidadesComun.obtenerCodigoBic();
+		
+		IContexto contextoSalida = ContextoEnvMsjEnotarioAltaModif2.obtenerCtxVacio();
+		IContexto contextoSalidaError = null;
+		IContexto[] salida = new IContexto[2];
+		
+		boolean enviado = gdge.existeVersionEnviada(nucExpediente);
+		
+		/**Comprobaciones sobre la operacion a realizar**/
+		if(null != datosGenerales && null != datosSolicitud){
+			//Si el contador de envios esta a cero siempre será una alta
+			//Podria haber fallado el envio y quedar en estado pendiente
+			if(0 == datosGenerales.getContador().compareTo(BigDecimal.ZERO) || !enviado){
+				codigoOperacion = IConstantesEnotario.CTE_OP_E_NOTARIO_ALTA;				
+			}else if(compruebaPosteriorAcancelacion(datosSolicitud)){
+				codigoOperacion = IConstantesEnotario.CTE_OP_E_NOTARIO_ALTA;
+			}else{
+				codigoOperacion = IConstantesEnotario.CTE_OP_E_NOTARIO_MODIFICACION;
+			}
+		}
+		
+		
+		/*Validaciones previas:*/
+		if ((null != datosSolicitud) &&
+			(null != datosGenerales))
+		{
+			if ((!UtilidadesEnotario.isBlankOrNull(contratoIBAN)) &&
+				(!UtilidadesEnotario.contratoIbanEsValido(contratoIBAN, datosSolicitud)))
+			{
+			/* Si el contrato IBAN no es valido para la solicitud.*/
+					codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+					codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_CONTRATO_NO_VALIDO;
+					textoError = IConstantesEnotario.CTE_TEXTO_ERROR_CONTRATO_NO_VALIDO;
+			}
+			else if (null == codigoOperacion)
+			{
+				//operación no válida.
+				codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+				codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_OP_NO_VALIDA;
+				textoError = "Operación ".concat(codigoOperacion).concat(" no válida.");
+			}
+		}
+		else
+		{
+			codigoRetorno = IConstantesEnotario.CTE_CODIGO_RETORNO_NK;
+			codigoError = IConstantesEnotario.CTE_CODIGO_ERROR_100;
+			textoError = IConstantesEnotario.CTE_LIT_NO_EXISTE_PRESTAMO_CON_OFICINA.concat(
+				oficinaSolicitud.toString()).concat(IConstantesEnotario.CTE_LIT_NUM_SOL).concat(
+					numeroSolicitud.toString().concat(IConstantesEnotario.CTE_LIT_VERSION_SOL).concat(
+						versionSolicitud.toString()));
+		}
+		
+		
+		if ((IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno))||
+			(IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno)))
+		{
+			//Llamamos previamente a la generacion de la poliza de este modo si falla la generación
+			// no se llama ya al envio
+			generarPoliza(oficinaSolicitud, numeroSolicitud, versionSolicitud, nucExpediente);
+			
+			// Carga los datos necesarios para hacer la llamada a Biztalk.
+			contextoSalida = buscarDatosVO(codigoOperacion, codigoBIC, contratoIBAN, versionSolicitud);
+			/*hay que tener en cuenta que pudo fallar la operación, en ese caso se informa
+			 * el campo de salida codigoError.*/
+
+			if (!IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacion))
+			{
+				if (null != contextoSalida)
+				{
+					codigoRetorno = contextoSalida.getString(CTE_CTX_CODIGO_DE_RETORNO10);
+					codigoError = contextoSalida.getString(CTE_CTX_CODIGO_DE_ERROR10);
+					textoError = contextoSalida.getString(CTE_CTX_TEXTO_DE_ERROR10);
+				}
+				/*compruebo el codigoRetorno sacado del contexto de salida por si
+				 * hubo algun fallo a la hora de realizar la petición a Ancert*/
+				if ((IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno))||
+					(IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno)))
+				{
+					// Se actualiza el contador de envíos (AN400080) en la tabla CAG.AN40TB01.
+					 
+					//int contadorFilas = gme.contarFilasComunicacionesEnotario(oficinaSolicitud,
+					//		numeroSolicitud, datosGenerales.getDivision(), datosGenerales.getSubdivision());
+									
+					//contadorFilas++;
+					
+					//geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+		
+					/*this.actualizarContadorFilasDatosGenerales(oficinaSolicitud,
+							numeroSolicitud, datosGenerales.getDivision(), datosGenerales.getSubdivision(), contadorFilas);*/
+							
+					UtilidadesComun.actualizarEstadoTarea(
+						datosSolicitud.getDatosSolicitudKey().getNucExpediente(),
+						bidCodigoTarea,
+						"F");
+					
+					//Se llama al método que genera la póliza y la guarda en la ruta del servidor
+					//generarPoliza(oficinaSolicitud, numeroSolicitud, versionSolicitud, nucExpediente);
+					
+				}
+				//else //fallo en ancert, pero ya está informado codigoError.
+				distrEnotarioEntradaVO.setDescripcion(textoError);				
+			}
+		}
+		
+		/*si despues de las validaciones previas y despues de realizar la operación hubo fallo: 
+		 * (no vale hacer un else porque pudo cambiar el resultado de la condicion dentro de la rama if)*/
+		if ((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno)) &&
+			(! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno)))
+		{
+			contextoSalida = ContextoEnvMsjEnotarioAltaModif2.rellenarContextoError(
+					codigoRetorno, codigoError, textoError, contextoSalida);
+			
+			//geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+		}
+		
+		contextoSalidaError = ContextoEnvaltaModificacionError.rellenarContexto(contextoSalida);
+		
+		salida[0] = contextoSalida;
+		salida[1] = contextoSalidaError;
+		
+		return salida;
+	}
+	
+	/**
+	 * Devuelve verdadero si viene de una cancelacion y esta pendiente de envio.
+	 * @param datosSolicitud
+	 * @return un boolean
+	 */
+	public boolean compruebaPosteriorAcancelacion(DatosSolicitudC datosSolicitud){
+
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		//Se envia posteriormente a cancelar
+		boolean nuevoEnvio = false;
+		
+		if(null != datosSolicitud){
+			DatosSolicitudC solicitudVersionAterior = gds.buscarVersionAnterior(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+					datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), 
+					datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+
+			//Si la version antual esta cancelada y la actual esta pendiente de envio
+			if(null!=datosSolicitud.getDatosGeneralesEnotario() 
+					&& null != datosSolicitud.getDatosGeneralesEnotario()
+					&& datosSolicitud.getDatosGeneralesEnotario().size() > 0
+					&& null!= solicitudVersionAterior 
+					&& null!= solicitudVersionAterior.getDatosGeneralesEnotario()
+					&& solicitudVersionAterior.getDatosGeneralesEnotario().size()>0){
+				DatosgeneralesC datosGeneralesVersionAnterior = solicitudVersionAterior.getDatosGeneralesEnotario().get(0);
+				DatosgeneralesC datosGenerales = datosSolicitud.getDatosGeneralesEnotario().get(0);
+				//Si en la versión actual tenemos un pendiente de envio y en la actual una cancelacion
+				if(datosGenerales.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_PENDIENTE_ENVIO) &&
+						datosGeneralesVersionAnterior.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SOLIC_CANCEL) ){
+					nuevoEnvio = true;
+				}
+			}
+			
+			//Si solo hay una version y esa versión esta rechazada
+			if(!nuevoEnvio){
+				if(null!=datosSolicitud.getDatosGeneralesEnotario() 
+						&& null != datosSolicitud.getDatosGeneralesEnotario()
+						&& datosSolicitud.getDatosGeneralesEnotario().size() > 0
+						&& null == solicitudVersionAterior ){
+					DatosgeneralesC datosGenerales = datosSolicitud.getDatosGeneralesEnotario().get(0);
+					if(datosGenerales.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SOLIC_CANCEL)){
+						nuevoEnvio = true;
+					}
+				}
+			}
+			
+			//Si se ha modificado posteriormente a ser cancelado y no se ha enviado
+			//En este punto si todavia no hay que hacer nuevo envio nuevoEnvio = false 
+			//Comprobaciones adicionales de cancelaciones intermedias
+			if(!nuevoEnvio){
+				if(ultimaCancelacion(datosSolicitud)){
+					nuevoEnvio =true;
+				}
+				
+			}
+			
+		}
+
+		return nuevoEnvio;
+	}
+	
+	/**
+	 * Comprueba si despues de la cancelación se ha vuelto a enviar 
+	 * @param datosSolicitudC
+	 * @return
+	 */
+	public boolean ultimaCancelacion(DatosSolicitudC datosSolicitudC){
+		
+		boolean nuevoEnvio = true;
+		DatosgeneralesEng dao = new DatosgeneralesEng();
+		
+		//Comprobar si existe alguna cancelacion
+		DatosgeneralesC datosGenerales = dao.ultimaCancelacion(datosSolicitudC.getDatosSolicitudKey().getNucExpediente(),datosSolicitudC.getDatosSolicitudKey().getOficinaSolicitud());
+		if(null != datosGenerales){
+			datosGenerales = dao.existeEnvioPosteriorCancelacion(datosGenerales.getId().getNucExpediente(),
+																	datosGenerales.getId().getOficinaSolicitud(), 
+																	datosGenerales.getId().getVersionSolicitud());
+			if(null != datosGenerales){
+				//Si existe una tupla que cumpla esas condiciones quiere decir que se ha vuelto a enviar
+				nuevoEnvio = false;
+			}
+		}else{
+			//No hay una cancelacion
+			nuevoEnvio = false;
+		}
+		return nuevoEnvio;
+	}
+	
+	/**
+	 * Devuelve verdadero si viene de una cancelacion y esta pendiente de envio.
+	 * @param datosSolicitud
+	 * @return
+	 */
+	public boolean compruebaPosteriorAsuspensionRechazo(DatosSolicitudC datosSolicitud){
+
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+
+		if(null != datosSolicitud){
+			DatosSolicitudC solicitudVersionAterior = gds.buscarVersionAnterior(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+					datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), 
+					datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+
+			if(null!=datosSolicitud.getDatosGeneralesEnotario() && null!= solicitudVersionAterior 
+					&& null!= solicitudVersionAterior.getDatosGeneralesEnotario()){
+				DatosgeneralesC datosGeneralesVersionAnterior = solicitudVersionAterior.getDatosGeneralesEnotario().get(0);
+				DatosgeneralesC datosGenerales = datosSolicitud.getDatosGeneralesEnotario().get(0);
+				//Si en la versión actual tenemos un pendiente de envio y en la actual una cancelacion
+				if(datosGenerales.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_PENDIENTE_ENVIO) &&
+						(datosGeneralesVersionAnterior.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SUSPENDIDO)
+						|| datosGeneralesVersionAnterior.getEstado().trim().equals(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_RECHAZADO))){
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+	
+	/**
+	 * Método que genera la póliza al llamar al servicio ANPM_249
+	 * 
+	 * @param oficinaSolicitud
+	 * @param numeroSolicitud
+	 * @param versionSolicitud
+	 * @param nucExpediente
+	 * @return 
+	 */
+	private IContexto[] generarPoliza(BigDecimal oficinaSolicitud,
+			BigDecimal numeroSolicitud, BigDecimal versionSolicitud,
+			BigDecimal nucExpediente)
+	{
+		IContexto[] resultadoGenerarPoliza = new IContexto[0];
+		
+		//Se genera la póliza (Servicio ANPM_249) al enviar
+		IDatosEntradaTx datosEntradaGenerarPoliza = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(),
+				IConstantesEnotario.CTE_CC_GENERAR_POLIZA,
+				IConstantesEnotario.CTE_CO_GENERAR_POLIZA);
+		datosEntradaGenerarPoliza.addCampo(
+				IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_OFICINA_SOLICITUD, oficinaSolicitud);
+		datosEntradaGenerarPoliza.addCampo(
+				IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_NUMERO_SOLICITUD, numeroSolicitud);
+		datosEntradaGenerarPoliza.addCampo(
+				IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_VERSION_SOLICITUD, versionSolicitud);
+		datosEntradaGenerarPoliza.addCampo(
+				IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_NUC_EXPEDIENTE, nucExpediente);
+		datosEntradaGenerarPoliza.addCampo(
+				IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_PANTALLA_ORIGEN, "1"); // 1 Preformalizacion, y 2 Formalizacion
+		datosEntradaGenerarPoliza.addCampo(IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_IND_SOLO_GENERAR, 
+				"2");// Se le pasa un "2", que implica guardar únicamente en la ruta del servidor
+					
+		resultadoGenerarPoliza = ServicioNegocio.invocarServicio(
+					ServicioNegocio.getContexto(), datosEntradaGenerarPoliza);
+		
+		return resultadoGenerarPoliza;
+	}
+
+
+	/**
+	 * Devuelve la lista de titulares de una solicitud, los titulares tienen codigo de relacion 1
+	 * @param titularesAvalistasC
+	 * @return
+	 */
+	public List<TitularesavalistasC> getTitulares(List<TitularesavalistasC> titularesAvalistasC){
+		
+		List<TitularesavalistasC> listaTitulares = new ArrayList<TitularesavalistasC>();
+		
+		for(TitularesavalistasC titular:titularesAvalistasC){
+			if(0 == titular.getRelacion().compareTo(BigDecimal.ONE)){
+				listaTitulares.add(titular);
+			}
+		}
+		
+		return listaTitulares;
+	}
+	
+	/**
+	 * Devuelve la lista de avalistas de una solicitud, los avalistas tienen codigo de relacion 2
+	 * @param titularesAvalistasC
+	 * @return
+	 */
+	public List<TitularesavalistasC> getAvalistas(List<TitularesavalistasC> titularesAvalistasC){
+		
+		List<TitularesavalistasC> listaAvalistas = new ArrayList<TitularesavalistasC>();
+		for(TitularesavalistasC avalista:titularesAvalistasC){
+			if(0 == avalista.getRelacion().compareTo(new BigDecimal(3))){
+				listaAvalistas.add(avalista);
+			}
+		}
+		
+		return listaAvalistas;
+	}
+	
+	/**
+	 * 	Metodo que rellena los datos necesarios en el VO correspondiente
+	 * 
+	 * @param codigoOperacion
+	 * @param codigoBIC
+	 * @param contratoIBAN
+	 * @return
+	 */
+	public IContexto buscarDatosVO(String codigoOperacion, String codigoBIC, String contratoIBAN, BigDecimal version)
+	{
+		IContexto contextoSalida = null;
+		
+		List<TitularesavalistasC> titulares = null;
+		List<TitularesavalistasC> avalistas = null;
+		List<ComisionesgastosC> comisiones = null;
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		
+		String codigoOperacionEnotario = null;
+		
+		BigDecimal oficinaSolicitud = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud();
+		BigDecimal numeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+		BigDecimal nucExpediente = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+		
+		String contratoPrestamo = null;
+
+		String literalDivisa = null;
+		
+		titulares =  this.getTitulares(datosGenerales.getTitularesAvalistas()); 
+		avalistas = this.getAvalistas(datosGenerales.getTitularesAvalistas());
+		comisiones = datosSolicitud.getDatosGeneralesEnotario().get(0).getComisionesYgastos();
+		
+		String codigoOficina = datosGenerales.getId().getOficinaSolicitud().toString();
+		String telefonoEntidad = UtilidadesEnotario.obtenerTlfEntidad(codigoOficina);
+		
+		EnvioEnotarioAltaModificacionVO vo = new EnvioEnotarioAltaModificacionVO();
+		
+		vo.setCodigoAplicacion(IConstantesEnotario.CTE_CODIGO_APLICACION);
+		vo.setCodigoOperacion(codigoOperacion);
+		vo.setNodoReemisor(IConstantesEnotario.CTE_NODO_HOST);
+		vo.setNodoOriginal(IConstantesEnotario.CTE_NODO_HOST);
+		vo.setTipoOperacion(IConstantesEnotario.CTE_TIPO_OPERACION_REQUEST);
+		vo.setPais(IConstantesEnotario.CTE_CODIGO_PAIS);
+		vo.setEntidad(datosSolicitud.getEntidad());
+		vo.setTipoPrestamo(IConstantesEnotario.CTE_TIPO_PRESTAMO_PERSONAL);
+		
+		codigoOperacionEnotario = UtilidadesEnotario.obtenerCodigoOperacionEnotario(codigoOperacion);
+
+		if (IConstantesEnotario.CTE_OP_E_NOTARIO_CHEQUEO_SISTEMA.equals(codigoOperacionEnotario))
+		{
+			//CCC dummy.
+			contratoPrestamo = new String();
+			contratoPrestamo = contratoPrestamo.concat(datosSolicitud.getEntidad());
+			contratoPrestamo = contratoPrestamo.concat("9999");
+			contratoPrestamo = contratoPrestamo.concat("99");
+			contratoPrestamo = contratoPrestamo.concat("999");
+			contratoPrestamo = contratoPrestamo.concat("999999");
+			contratoPrestamo = contratoPrestamo.concat("9");
+		}
+		else
+		{
+			contratoPrestamo = UtilidadesEnotario.getContratoPrestamo(datosSolicitud);
+		}
+		if (StringUtils.isBlank(contratoPrestamo) || (IConstantesEnotario.CTE_INT_35 < contratoPrestamo.length()))
+		{
+			// TODO: Prueba?
+			UtilidadesTramitacion.enviarCorreo(
+					IConstantesEnotario.CTE_ERROR_CONTRATO_PRESTAMO_NO_VALIDO,
+					datosSolicitud);
+			ServicioNegocio.rollback(IConstantesEnotario.CTE_ERROR_CONTRATO_PRESTAMO_NO_VALIDO, null, null, null);
+		}
+		vo.setContratoPrestamo(UtilidadesEnotario.comprobarDatoNull(contratoPrestamo));
+		
+		vo.setCodBIC(codigoBIC);
+		vo.setContratoIBAN(contratoIBAN);
+		
+		// Rellenar las listas de titulares avalistas
+		vo.rellenarDatosTitularesVoEnotario(titulares, vo);
+		vo.rellenarDatosAvalistasVoEnotario(avalistas, vo);
+		
+		Date fechaValidez = datosGenerales.getFechaCaducidad();
+		String fechaValidezSTR = DateUtils.formatDate(fechaValidez, DateUtils.FORMATO_CHECHA_ABREVIADO);
+		vo.setFechaValidez(fechaValidezSTR);
+		
+		vo.setCodigoImporteProductos(IConstantesEnotario.CTE_CODIGO_IMPORTE);
+		vo.setDescripcionImporteProductos(IConstantesEnotario.CTE_DESC_IMPORTE);
+		vo.setValorImporteProductos(datosSolicitud.getImporteTotal().toString());
+		
+		// Rellenar la lista de Comisiones
+		vo.rellenarDatosComisionVoEnotario(comisiones, vo);
+		
+		// Telefonos
+		vo.setTelefonoEntidadFinal(telefonoEntidad);
+		vo.setTelefonoCallCenter(IConstantesEnotario.CTE_TELEFONO_CALL_CENTER);
+		
+		vo.setCopServicio(CTE_COP_SERVICIO);
+		vo.setDescripcion(IConstantesEnotario.CTE_LIT_ALTA_ENVIADA);
+		
+		vo = gdge.obtenerDescripcionesEnotario(vo, datosGenerales);
+		
+		
+		if ((null != vo) && (UtilidadesEnotario.isBlankOrNull(codigoError)))
+		{
+			// Llamada a ANPM_476
+			GestionEnvioMensajesEnotario comunicacion = new GestionEnvioMensajesEnotario();
+			String restoBloques = restoBloquesPrevio(
+												vo,
+												datosGenerales,
+												literalDivisa);
+			comunicacion.registrarComunicacionEnotarioPrevio(
+													oficinaSolicitud, 
+													numeroSolicitud, 
+													datosGenerales.getDigito(),
+													nucExpediente, 
+													version,
+													vo,
+													restoBloques);
+
+			// Llamada a Ancert Biztalk 
+			IContexto contextoSalidaDistrAltaModif = llamadaAncertBiztalk(vo);
+			
+			// Comprobacion de si ha ocurrido algun error en la llamada al servicio de Ancert Biztalk.
+			if(null != contextoSalidaDistrAltaModif)
+			{
+				// Si el codigo es distinto de "0" hay un ERROR en la llamada a Biztalk.
+				codigoRetorno = contextoSalidaDistrAltaModif.getString(CTE_CTX_CODIGO_RETORNO601).trim();
+				if ((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno)) &&
+						((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000.equals(codigoRetorno))))
+				{
+					codigoError = contextoSalidaDistrAltaModif.getString(CTE_CTX_CODIGO_ERROR601);
+					textoError = contextoSalidaDistrAltaModif.getString(CTE_CTX_TEXTO_ERROR601);
+					
+					vo.rellenarCamposError(codigoRetorno, codigoError, textoError);
+					vo.setDescripcion(textoError);
+					
+					// Copia los datos en el objeto para poder grabar el log.
+					distrEnotarioEntradaVO.copyEnvioAltaVO(vo, datosSolicitud);
+				}
+				else
+				{
+					//En el envio cambiamos el estado enviado por confirmado 01 por 02
+					//Se solicita desde el departamento de BO ya que los estan cambiando a mano.
+					gdge.actualizarDatosGeneralesError(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO,
+							codigoRetorno, codigoError, textoError, datosGenerales);
+				}
+			}
+			
+			// Genera el contexto de salida del servicio de negocio.
+			contextoSalida = ContextoEnvMsjEnotarioAltaModif2
+					.rellenarContextoEnvioEnotarioAltaModif(vo, datosGenerales, literalDivisa, telefonoEntidad,
+															codigoRetorno, codigoError, textoError);
+			
+			// Llamada a ANPM_476
+			restoBloques = new GestionEnvioMensajesEnotario().restoBloquesGeneralPosterior(
+																					codigoRetorno, 
+																					codigoError, 
+																					textoError);
+			comunicacion.registrarComunicacionEnotarioPosterior(
+														oficinaSolicitud, 
+														numeroSolicitud, 
+														datosGenerales.getDigito(), 
+														nucExpediente,
+														version,
+														CTE_COP_SERVICIO,
+														contextoSalida,
+														restoBloques);
+			
+			// Actualiza la tabla AN40TB01 y volcado a PMOS
+			comunicacion.actualizaDatosGenerales(
+										datosGenerales, 
+										datosSolicitud);
+		}
+		else
+		{
+			contextoSalida = ContextoEnvMsjEnotarioAltaModif2.rellenarContextoError(codigoRetorno, codigoError, textoError, contextoSalida);
+		}
+		
+		return contextoSalida;
+	}
+	
+	
+	/**
+	 * Metodo que hace la llamada a Biztalk
+	 * 
+	 * @param vo
+	 * @return
+	 */
+	public IContexto llamadaAncertBiztalk(EnvioEnotarioAltaModificacionVO vo)
+	{	
+		IContexto[] resultadoDistrAltaModif = null;
+		IContexto contextoDistrAltaModif = null;
+
+		String literalDivisa = null;
+		
+		// Copia los datos en el objeto para poder grabar el log.
+		distrEnotarioEntradaVO.copyEnvioAltaVO(vo, datosSolicitud);
+		
+		// Llamada al ANPM_600 para hacer la llamada a BIZTALK.
+		IDatosEntradaTx datosEntradaDistrAltaModif = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(),
+			IConstantesEnotario.CTE_CC_DISTR_ALTA_MODIF,
+			IConstantesEnotario.CTE_CO_ALTA_PETICION_ANCERT);
+		
+		// Rellena el contexto de entrada del servicio ANPM_600 con los datos del VO de enotario.
+		IContexto contextoEntrada = ContextoEntradaOperacionAltaBiztalk.rellenarContextoEntrada(
+																						vo, 
+																						datosGenerales,
+																						literalDivisa);
+		
+		datosEntradaDistrAltaModif.addCampo(CTE_CTX_ID_ENTRDA_ALTA_MODIF, contextoEntrada);
+		
+		resultadoDistrAltaModif = ServicioNegocio.invocarServicio(
+			ServicioNegocio.getContexto(), datosEntradaDistrAltaModif);
+		
+		if ((null != resultadoDistrAltaModif)
+		&& (IConstantesEnotario.CTE_CERO_INT < resultadoDistrAltaModif.length))
+		{
+			contextoDistrAltaModif = resultadoDistrAltaModif[0];
+		}
+		
+		return contextoDistrAltaModif;
+		
+	}
+	
+	/**
+	 * Método que formatea el campo restoBloques para la llamada al ANPM_476 previa a la ejecución del presente servicio
+	 * según el formato presente en el NOOP10 del PMNOTCOM
+	 * 
+	 * @param vo
+	 * @param datosGenerales
+	 * @param literalDivisa
+	 */
+	private String restoBloquesPrevio(
+								EnvioEnotarioAltaModificacionVO vo,
+								DatosgeneralesC dg,
+								String literalDivisa)
+	{
+		String cadena = StringUtils.EMPTY;
+
+		// Se formatea el bloque de titulares
+		for(TitularesVO titular:vo.getTitularesPrestamo())
+		{
+			cadena += StringUtils.rightPad(titular.getNif(), 10).substring(0, 10)
+					+ StringUtils.rightPad(titular.getNombreTitular(), 20).substring(0, 20)
+					+ StringUtils.rightPad(titular.getApellidoUnoTitular(), 20).substring(0, 20)
+					+ StringUtils.rightPad(titular.getApellidoDosTitular(), 20).substring(0, 20)
+					+ StringUtils.rightPad(titular.getNumeroTelefonoTitular(), 24).substring(0, 24)
+					+ StringUtils.rightPad(titular.getCorreoElectronicoTitular(), 105).substring(0, 105)
+					+ StringUtils.rightPad(titular.getCodigoIneTitular(), 9).substring(0, 9);
+		}
+
+		// Se añade el bloque de avalistas:
+		for(AvalistasVO avalista:vo.getAvalistasPrestamo())
+		{
+			cadena += StringUtils.rightPad(avalista.getNifAvalista(), 10).substring(0, 10);
+		}
+		
+		// Se añaden código colegiado, fecha de caducidad, código importe producto,
+		// descripción importe producto, valor importe producto
+		cadena += StringUtils.rightPad(StringUtils.EMPTY, 15) // Código colegiado
+				+ StringUtils.rightPad(vo.getFechaValidez(), 8).substring(0, 8)
+				+ StringUtils.rightPad(vo.getCodigoImporteProductos(), 10).substring(0, 10)
+				+ StringUtils.rightPad(vo.getDescripcionImporteProductos(), 20).substring(0, 20)
+				+ StringUtils.rightPad(vo.getValorImporteProductos(), 10).substring(0, 10);
+		
+		// Rellena los registros del bloque de elementos DET:
+		if(!StringUtils.isBlank(dg.getCodigoDivisa())) {
+			cadena += formatoElemento(
+					"CDDIVISS", "DIVISA", dg.getCodigoDivisa());
+		}
+	
+		if(!StringUtils.isBlank(literalDivisa)) {
+			cadena += formatoElemento(
+					"NBDIVIC", "LITERAL DIVISA", literalDivisa);
+		}
+		
+		if(!StringUtils.isBlank(dg.getPeriodicidadAmortizacion())) {
+			cadena += formatoElemento(
+					"TPPERCAP", "PERIODICIDAD AMORTIZACION", dg.getPeriodicidadAmortizacion());
+		}
+		
+		if(!StringUtils.isBlank(dg.getPeriodicidadLiquidacion())) {
+			cadena += formatoElemento(
+					"TPPERINT", "PERIODICIDAD LIQUIDACION", dg.getPeriodicidadLiquidacion());
+		}
+		
+		if(null != dg.getPlazo()) {
+			cadena += formatoElemento(
+					"PZOPERACP", "PLAZO", dg.getPlazo().toString());
+		}
+		
+		if(null != dg.getTipoInteres()) {
+			cadena += formatoElemento(
+					"TPINTER", "TIPO INTERES", dg.getTipoInteres().toString());
+		}
+		
+		if(null != dg.getIndiceReferencia()) {
+			cadena += formatoElemento(
+					"CDTPREF", 
+					"INDICE REFERENCIA", 
+					UtilidadesEnotario.rellenarCerosDelante(dg.getIndiceReferencia().toString(), 4));
+		}
+		
+		if(!StringUtils.isBlank(vo.getLiteralTipoReferencia())){
+			cadena += formatoElemento(
+					"TEXTREF", "LITERAL IND. REFERENCIA", vo.getLiteralTipoReferencia());
+		}
+
+		if(null != dg.getDiferencial()) {
+			cadena += formatoElemento(
+					"TPDIFER", "DIFERENCIAL", dg.getDiferencial().toString());
+		}
+
+		if(!StringUtils.isBlank(dg.getCodigoDeRedondeo())) {
+			cadena += formatoElemento(
+					"PMCDREDO", "CODIGO REDONDEO", dg.getCodigoDeRedondeo());
+		}
+		
+		if(!StringUtils.isBlank(vo.getLiteralRedondeo())) {
+			cadena += formatoElemento(
+					"TEXTREDO", "LITERAL COD.REDONDEO", vo.getLiteralRedondeo());
+		}
+		
+		if(null != dg.getInteresDemora()) {
+			cadena += formatoElemento(
+					"POTPINMR", "INTERES DEMORA", dg.getInteresDemora().toString());
+		}
+		
+		if(null != dg.getTae()) {
+			cadena += formatoElemento(
+					"TAE", "TAE", dg.getTae().toString());
+		}
+		
+		if(null != dg.getCodigoAmortizacion()) {
+			cadena += formatoElemento(
+					"CDTPAMOR", "COD. TIPO AMORTIZACION", dg.getCodigoAmortizacion().toString());
+		}
+		
+		if(!StringUtils.isBlank(vo.getLiteralTipoAmortizacion())){
+			cadena += formatoElemento(
+					"TPAMOR", "LIT. TIPO AMORTIZACION", vo.getLiteralTipoAmortizacion());
+		}
+		
+		// Rellena el bloque de las comisiones:
+		for(ComisionesVO comision:vo.getComisiones())
+		{
+			cadena += StringUtils.rightPad(comision.getCodigoComision(), 3).substring(0, 3)
+					+ StringUtils.rightPad(comision.getDescripcionComision(), 19).substring(0, 19)
+					+ StringUtils.rightPad(comision.getTipoComision(), 5).substring(0, 5)
+					+ StringUtils.rightPad(comision.getValorComision(), 15).substring(0, 15);
+		}
+		
+		// Rellena los teléfonos
+		cadena += StringUtils.rightPad(vo.getTelefonoEntidadFinal(), 24).substring(0, 24)
+				+ StringUtils.rightPad(vo.getTelefonoCallCenter(), 24).substring(0, 24);
+		
+
+		// Rellena los registros  de los documentos:
+		if(null != vo.getDocumentos())
+		{
+			for(DocumentoVO documento:vo.getDocumentos())
+			{
+				cadena += StringUtils.rightPad(documento.getCodigoDocumento(), 3).substring(0, 3)
+						+ StringUtils.rightPad(documento.getDescripcionDocumento(), 80).substring(0, 80);
+			}
+		}
+		else
+		{
+			cadena += StringUtils.rightPad(StringUtils.EMPTY, 3)
+					+ StringUtils.rightPad(StringUtils.EMPTY, 80);
+		}
+		
+		return cadena;
+	}
+	
+	/**
+	 * Formatea los tres campos del registro elementosDet del NOOP10 del PMNOTCOM con las longitudes adecuadas
+	 *  
+	 * @param titulares
+	 * @return
+	 */
+	private String formatoElemento(
+								String codigo, 
+								String descripcion, 
+								String valor)
+	{
+		return StringUtils.rightPad(codigo, 10).substring(0, 10)
+			 + StringUtils.rightPad(descripcion, 20).substring(0, 20) 
+			 + StringUtils.rightPad(valor, 15).substring(0, 15);
+	}
+}

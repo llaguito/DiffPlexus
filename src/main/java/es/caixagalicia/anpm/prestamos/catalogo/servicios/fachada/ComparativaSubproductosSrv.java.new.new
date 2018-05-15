@@ -1,0 +1,563 @@
+/**
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Vector;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.busqueda.ComparativaSubProductoObj;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.comisiones.ComisionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.datEconomicos.DatEcoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.interes.InteresC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.interes.TechosSuelosDifeC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.ProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionClausulasRestringuidas;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionComisiones;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionDatEco;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionInteres;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionProducto;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionSubProducto;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionTechosSuelosDife;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextoComparativaSubProductos;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.UtilidadesComision;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * @author U7336
+ */
+public class ComparativaSubproductosSrv extends ServicioNegocio {
+
+    // oBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO_1 = 0;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO_1 = 1;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_VERSION_SUB_1 = 2;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_COLECTIVO_1 = 3;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO_2 = 4;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO_2 = 5;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_VERSION_SUB_2 = 6;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_COLECTIVO_2 = 7;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO_3 = 8;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO_3 = 9;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_VERSION_SUB_3 = 10;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_COLECTIVO_3 = 11;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO_4 = 12;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO_4 = 13;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_VERSION_SUB_4 = 14;
+
+    // Optativo
+    private static final int CTE_POSICION_TIRA_ID_COLECTIVO_4 = 15;
+
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(BusquedaProductoSrv.class);
+
+    /**
+     */
+    public ComparativaSubproductosSrv() {
+        super();
+    // TODO Auto-generated constructor stub
+    }
+
+    /* (non-Javadoc)
+	 * @see es.caixagalicia.ifrt.core.ServicioNegocio#ejecutar(es.caixagalicia.ifrt.core.IContextoEjecucion, es.caixagalicia.ifrt.core.IDatosEntradaTx)
+	 */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada) {
+        // TODO Auto-generated method stub
+        final long lInicio = System.currentTimeMillis();
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM049: Comparativa subproductos.");
+        }
+        contexto.setDiarioElectronico(new DiarioElectronico(Constantes.CTE_OPERACION_AC, Integer.valueOf(0), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, BigDecimal.ZERO, BigDecimal.ZERO, Integer.valueOf(0)));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        // primera fila de la comparativa
+        // obligatorio
+        BigDecimal bidIdProducto_1 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO_1);
+        Integer idprod_1 = null;
+        if (bidIdProducto_1 != null && !bidIdProducto_1.equals(new BigDecimal(0)))
+            idprod_1 = new Integer(bidIdProducto_1.intValue());
+        // obligatorio
+        BigDecimal bidIdSubproducto_1 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO_1);
+        Integer idsub_1 = null;
+        if (bidIdSubproducto_1 != null && !bidIdSubproducto_1.equals(new BigDecimal(0)))
+            idsub_1 = new Integer(bidIdSubproducto_1.intValue());
+        // obligatorio
+        BigDecimal bidIdVersion_1 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VERSION_SUB_1);
+        Integer idvers_1 = null;
+        if (bidIdVersion_1 != null && !bidIdVersion_1.equals(new BigDecimal(0)))
+            idvers_1 = new Integer(bidIdVersion_1.intValue());
+        // El colectivo SI puede ser 0
+        // optativo
+        BigDecimal bidCodColectivo_1 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_COLECTIVO_1);
+        Integer codColectivo_1 = null;
+        if (bidCodColectivo_1 != null)
+            codColectivo_1 = new Integer(bidCodColectivo_1.intValue());
+        // segunda fila de la comparativa
+        // optativo
+        BigDecimal bidIdProducto_2 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO_2);
+        Integer idprod_2 = null;
+        if (bidIdProducto_2 != null && !bidIdProducto_2.equals(new BigDecimal(0)))
+            idprod_2 = new Integer(bidIdProducto_2.intValue());
+        // optativo
+        BigDecimal bidIdSubproducto_2 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO_2);
+        Integer idsub_2 = null;
+        if (bidIdSubproducto_2 != null && !bidIdSubproducto_2.equals(new BigDecimal(0)))
+            idsub_2 = new Integer(bidIdSubproducto_2.intValue());
+        // optativo
+        BigDecimal bidIdVersion_2 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VERSION_SUB_2);
+        Integer idvers_2 = null;
+        if (bidIdVersion_2 != null && !bidIdVersion_2.equals(new BigDecimal(0)))
+            idvers_2 = new Integer(bidIdVersion_2.intValue());
+        // optativo
+        BigDecimal bidCodColectivo_2 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_COLECTIVO_2);
+        Integer codColectivo_2 = null;
+        if (bidCodColectivo_2 != null)
+            codColectivo_2 = new Integer(bidCodColectivo_2.intValue());
+        // tercera fila de la comparativa
+        // optativo
+        BigDecimal bidIdProducto_3 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO_3);
+        Integer idprod_3 = null;
+        if (bidIdProducto_3 != null && !bidIdProducto_3.equals(new BigDecimal(0)))
+            idprod_3 = new Integer(bidIdProducto_3.intValue());
+        // optativo
+        BigDecimal bidIdSubproducto_3 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO_3);
+        Integer idsub_3 = null;
+        if (bidIdSubproducto_3 != null && !bidIdSubproducto_3.equals(new BigDecimal(0)))
+            idsub_3 = new Integer(bidIdSubproducto_3.intValue());
+        // optativo
+        BigDecimal bidIdVersion_3 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VERSION_SUB_3);
+        Integer idvers_3 = null;
+        if (bidIdVersion_3 != null && !bidIdVersion_3.equals(new BigDecimal(0)))
+            idvers_3 = new Integer(bidIdVersion_3.intValue());
+        // optativo
+        BigDecimal bidCodColectivo_3 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_COLECTIVO_3);
+        Integer codColectivo_3 = null;
+        if (bidCodColectivo_3 != null)
+            codColectivo_3 = new Integer(bidCodColectivo_3.intValue());
+        // cuarta fila de la comparativa
+        // optativo
+        BigDecimal bidIdProducto_4 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO_4);
+        Integer idprod_4 = null;
+        if (bidIdProducto_4 != null && !bidIdProducto_4.equals(new BigDecimal(0)))
+            idprod_4 = new Integer(bidIdProducto_4.intValue());
+        // optativo
+        BigDecimal bidIdSubproducto_4 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO_4);
+        Integer idsub_4 = null;
+        if (bidIdSubproducto_4 != null && !bidIdSubproducto_4.equals(new BigDecimal(0)))
+            idsub_4 = new Integer(bidIdSubproducto_4.intValue());
+        // optativo
+        BigDecimal bidIdVersion_4 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VERSION_SUB_4);
+        Integer idvers_4 = null;
+        if (bidIdVersion_4 != null && !bidIdVersion_4.equals(new BigDecimal(0)))
+            idvers_4 = new Integer(bidIdVersion_4.intValue());
+        // optativo
+        BigDecimal bidCodColectivo_4 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_COLECTIVO_4);
+        Integer codColectivo_4 = null;
+        if (bidCodColectivo_4 != null)
+            codColectivo_4 = new Integer(bidCodColectivo_4.intValue());
+        IContexto[] contextoSalida = getComparativaSubproductos(idprod_1, idsub_1, idvers_1, codColectivo_1, idprod_2, idsub_2, idvers_2, codColectivo_2, idprod_3, idsub_3, idvers_3, codColectivo_3, idprod_4, idsub_4, idvers_4, codColectivo_4);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN SNANPM049: Comparativa subproductos. " + "***********             Tiempo total: " + (System.currentTimeMillis() - lInicio) + "ms                   ***********");
+        }
+        return contextoSalida;
+    }
+
+    public IContexto[] getComparativaSubproductos(Integer idprod_1, Integer idsub_1, Integer idvers_1, Integer codColectivo_1, Integer idprod_2, Integer idsub_2, Integer idvers_2, Integer codColectivo_2, Integer idprod_3, Integer idsub_3, Integer idvers_3, Integer codColectivo_3, Integer idprod_4, Integer idsub_4, Integer idvers_4, Integer codColectivo_4) {
+        Vector<ComparativaSubProductoObj> salida = new Vector<ComparativaSubProductoObj>();
+        VersionesC version1 = GestionVersiones.obtenerVersion(idprod_1, idsub_1, idvers_1, codColectivo_1);
+        if (Constantes.SI.equals(version1.getIndEnCurso())) {
+            ServicioNegocio.rollback(CodigosError.COMPARATIVA_NO_EN_MODIFICACION.intValue(), null, null, null);
+        }
+        salida.add(getSubProducto(version1));
+        if (!Utilidades.isBlankOrNull(idprod_2)) {
+            VersionesC version2 = GestionVersiones.obtenerVersion(idprod_2, idsub_2, idvers_2, codColectivo_2);
+            if (Constantes.SI.equals(version2.getIndEnCurso())) {
+                ServicioNegocio.rollback(CodigosError.COMPARATIVA_NO_EN_MODIFICACION.intValue(), null, null, null);
+            }
+            salida.add(getSubProducto(version2));
+        }
+        if (!Utilidades.isBlankOrNull(idprod_3)) {
+            VersionesC version3 = GestionVersiones.obtenerVersion(idprod_3, idsub_3, idvers_3, codColectivo_3);
+            if (Constantes.SI.equals(version3.getIndEnCurso())) {
+                ServicioNegocio.rollback(CodigosError.COMPARATIVA_NO_EN_MODIFICACION.intValue(), null, null, null);
+            }
+            salida.add(getSubProducto(version3));
+        }
+        if (!Utilidades.isBlankOrNull(idprod_4)) {
+            VersionesC version4 = GestionVersiones.obtenerVersion(idprod_4, idsub_4, idvers_4, codColectivo_4);
+            if (Constantes.SI.equals(version4.getIndEnCurso())) {
+                ServicioNegocio.rollback(CodigosError.COMPARATIVA_NO_EN_MODIFICACION.intValue(), null, null, null);
+            }
+            salida.add(getSubProducto(version4));
+        }
+        final IContexto[] contextoSalida = ContextoComparativaSubProductos.rellenarDatosContexto(salida);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Se ha buscado el producto corerctamente");
+        }
+        return contextoSalida;
+    }
+
+    public ComparativaSubProductoObj getSubProducto(VersionesC version) {
+        GestionInteres gint = new GestionInteres();
+        ComparativaSubProductoObj obj = new ComparativaSubProductoObj();
+        SubProductoC subprod = GestionSubProducto.obtenerSubProductoVersion(version.getVersionKey().getIdProducto(), version.getVersionKey().getIdSubProducto(), version.getAn02tb01());
+        ProductoC prod = GestionProducto.obtenerProductoVersion(version.getVersionKey().getIdProducto(), version.getAn01tb01());
+        obj.setDescripcionProducto(version.getVersionKey().getIdProducto() + "-" + prod.getDescripcion());
+        obj.setTipo(new Integer(2));
+        obj.setIdProducto(subprod.getSubProductoKey().getIdProducto());
+        obj.setDescripcion(subprod.getSubProductoKey().getIdSubproducto() + "-" + subprod.getDescripcion());
+        obj.setFechaDesde(subprod.getFechaDesdeVigencia());
+        obj.setFechaHasta(subprod.getFechaHastaVigencia());
+        List<InteresC> intereses = gint.obtenerInteresTodosOrden(version.getVersionKey().getIdProducto(), version.getVersionKey().getIdSubProducto(), version.getAn07tb01(), version.getVersionKey().getIdColectivo());
+        List<InteresC> intereses0 = gint.obtenerInteresTodosOrden(version.getVersionKey().getIdProducto(), new Integer(0), version.getAn07tb01(), version.getVersionKey().getIdColectivo());
+        intereses.addAll(intereses0);
+        if (intereses != null) {
+            setIntereses(intereses, obj, version);
+        }
+        // Obtenemos los datos económicos teniendo el cuenta el colectivo y el nivel 0 ó 10, ya que son los valores que se
+        // muestran en la comparativa
+        GestionDatEco geco = new GestionDatEco();
+        DatEcoC datEco = geco.obtenerRegistrosVersionOficina(version.getVersionKey().getIdProducto(), version.getVersionKey().getIdSubProducto(), version.getAn03tb01(), version.getVersionKey().getIdColectivo());
+        if (datEco == null) {
+            datEco = geco.obtenerRegistrosVersionOficina(version.getVersionKey().getIdProducto(), new Integer(0), version.getAn03tb01(), version.getVersionKey().getIdColectivo());
+        }
+        if (datEco != null) {
+            if (datEco.getIndDestino().equals("3") || datEco.getIndDestino().equals("4")) {
+                obj.setDestino(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+            } else if (datEco.getIndDestino().equals("2")) {
+                obj.setDestino(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+            } else {
+                String destino = getDestinoString(datEco);
+                obj.setDestino(destino);
+            }
+            obj.setGarantía(getGarantiaString(datEco));
+            obj.setSubdestino(getSubdestinoString(datEco));
+            Integer splazo = getPlazo(datEco);
+            obj.setPlazoTotal(splazo);
+            obj.setPlazoDiferimiento(datEco.getPlazoDifer());
+            obj.setPlazoDesembolso(datEco.getPlazoDesem());
+            obj.setPlazoCarencia(datEco.getPlazoCarencia());
+        } else {
+            obj.setDestino("");
+            obj.setGarantía("");
+            obj.setSubdestino("");
+        }
+        setComisiones(version, obj);
+        return obj;
+    }
+
+    /**
+     * @param version
+     * @return
+     */
+    private Integer getPlazo(DatEcoC dat) {
+        // TODO Auto-generated method stub
+        return dat.getPlazo();
+    }
+
+    /**
+     * @param version
+     * @return
+     */
+    private String getDestinoString(DatEcoC datEco) {
+        // TODO Auto-generated method stub
+        String destino = null;
+        GestionClausulasRestringuidas gclausulas = new GestionClausulasRestringuidas();
+        ParametrosC param = gclausulas.obtenerDestinoBusquedaProducto(datEco.getDestinoDefecto());
+        if (param != null) {
+            destino = param.getCG320030();
+        }
+        return destino;
+    }
+
+    private String getGarantiaString(DatEcoC datEco) {
+        // TODO Auto-generated method stub
+        String garantia = null;
+        GestionClausulasRestringuidas gclausulas = new GestionClausulasRestringuidas();
+        ParametrosC param = gclausulas.obtenerGarantiaBusquedaProducto(datEco.getGarantiaDefecto());
+        if (param != null) {
+            garantia = param.getCG320040();
+        }
+        return garantia;
+    }
+
+    private String getSubdestinoString(DatEcoC datEco) {
+        // TODO Auto-generated method stub
+        String subdestino = null;
+        ParametrosC param = GestionClausulasRestringuidas.obtenerSubdestinoBusquedaProducto(datEco.getSubDestino());
+        if (param != null) {
+            subdestino = param.getCG320030();
+        }
+        return subdestino;
+    }
+
+    /**
+     * @param intereses
+     * @return
+     */
+    private void setIntereses(List<InteresC> intereses, ComparativaSubProductoObj obj, VersionesC version) {
+        // TODO Auto-generated method stub
+        int num = intereses.size();
+        int x = 0;
+        switch(num) {
+            case 0:
+                obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), INTERES_1958062730).toString());
+                break;
+            case 1:
+                InteresC interes = intereses.get(0);
+                if (interes.getTipo().equals("00")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_3142984).toString());
+                } else if (interes.getTipo().equals("01")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_CAMPA_AS_1121213115).toString());
+                } else if (interes.getTipo().equals("02")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_1249586564).toString());
+                }
+                x = setInteresesINI(interes, obj, version);
+                // setIntereses2(interes, obj, version);
+                break;
+            case 2:
+                InteresC interes1 = intereses.get(0);
+                InteresC interes2 = intereses.get(1);
+                x = setInteresesINI(interes1, obj, version);
+                setInteresesSEC(interes2, obj, version, x);
+                if (interes1.getTipo().equals("00") && interes2.getTipo().equals("02")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_TRAMO_INICIAL_FIJO_519048334).toString());
+                } else {
+                    InteresC mayor = getInteresMayorPlazo(intereses);
+                    if (mayor.getTipo().equals("00")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_3142984).toString());
+                    } else if (mayor.getTipo().equals("01")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_CAMPA_AS_1121213115).toString());
+                    } else if (mayor.getTipo().equals("02")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_1249586564).toString());
+                    } else if (mayor.getTipo().equals("03")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_BONIFICABLE_1858709010).toString());
+                    } else if (mayor.getTipo().equals("04")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_PENALIZABLE_712625771).toString());
+                    } else if (mayor.getTipo().equals("05")) {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_CAMPA_AS_1368594439).toString());
+                    } else {
+                        obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_REFERENCIADO_2130014933).toString());
+                    }
+                // return "Variable con tramo inicial fijo";
+                }
+                break;
+            default:
+                x = setInteresesINI(intereses.get(0), obj, version);
+                setInteresesSEC(intereses.get(1), obj, version, x);
+                InteresC mayor = getInteresMayorPlazo(intereses);
+                if (mayor.getTipo().equals("00")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_3142984).toString());
+                } else if (mayor.getTipo().equals("01")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_CAMPA_AS_1121213115).toString());
+                } else if (mayor.getTipo().equals("02")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_1249586564).toString());
+                } else if (mayor.getTipo().equals("03")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_BONIFICABLE_1858709010).toString());
+                } else if (mayor.getTipo().equals("04")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_PENALIZABLE_712625771).toString());
+                } else if (mayor.getTipo().equals("05")) {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), VARIABLE_CAMPA_AS_1368594439).toString());
+                } else {
+                    obj.setInteresDesc(new Mensaje(ServicioNegocio.getContexto(), FIJO_REFERENCIADO_2130014933).toString());
+                }
+                break;
+        }
+    }
+
+    private int setInteresesINI(InteresC interes, ComparativaSubProductoObj obj, VersionesC version) {
+        if (interes.getTipo().equals("01")) {
+            obj.setInteresInicial(interes.getInteres());
+            obj.setTipoReferenciaIni(new Mensaje(ServicioNegocio.getContexto(), _0001_FIJO_REFERENCIADO_128896253).toString());
+            return 1;
+        } else if (interes.getTipo().equals("00")) {
+            obj.setInteresInicial(interes.getInteres());
+            obj.setTipoReferenciaIni(new Mensaje(ServicioNegocio.getContexto(), _0000_FIJO_348629637).toString());
+            return 1;
+        } else {
+            List<TechosSuelosDifeC> difInt;
+            difInt = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(0), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_CERO);
+            if (difInt != null && difInt.size() == 0) {
+                difInt = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(10), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_CERO);
+            }
+            List<TechosSuelosDifeC> difSus;
+            difSus = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(0), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_UNO);
+            if (difSus != null && difSus.size() == 0) {
+                difSus = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(10), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_UNO);
+            }
+            if (difSus != null && difSus.size() != 0) {
+                TechosSuelosDifeC tmp1 = difSus.get(0);
+                obj.setDiferencialSustIni(tmp1.getDiferencial());
+                if (!tmp1.getTipoRef().equals(new Integer(0)))
+                    obj.setTipoReferenciaSustIni(tmp1.getTipoRef() + "-" + getTipoRef(tmp1.getTipoRef()));
+            }
+            if (difInt != null && difInt.size() != 0) {
+                TechosSuelosDifeC tmp1 = difInt.get(0);
+                obj.setDiferencialIni(tmp1.getDiferencial());
+                if (!tmp1.getTipoRef().equals(new Integer(0)))
+                    obj.setTipoReferenciaIni(tmp1.getTipoRef() + "-" + getTipoRef(tmp1.getTipoRef()));
+                obj.setInteresMax(tmp1.getTecho());
+                obj.setInteresMin(tmp1.getSuelo());
+                obj.setDiferencialBonif(tmp1.getDiferencialBonificado());
+                return 0;
+            }
+        }
+        return 1;
+    }
+
+    private void setInteresesSEC(InteresC interes, ComparativaSubProductoObj obj, VersionesC version, int tipo) {
+        if (interes.getTipo().equals("01")) {
+            obj.setInteresSec(interes.getInteres());
+            obj.setTipoReferenciaSec(new Mensaje(ServicioNegocio.getContexto(), _0001_FIJO_REFERENCIADO_128896253).toString());
+        } else if (interes.getTipo().equals("00")) {
+            obj.setInteresSec(interes.getInteres());
+            obj.setTipoReferenciaSec(new Mensaje(ServicioNegocio.getContexto(), _0000_FIJO_348629637).toString());
+        } else {
+            List<TechosSuelosDifeC> difInt;
+            difInt = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(0), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_CERO);
+            if (difInt != null && difInt.size() == 0) {
+                difInt = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(10), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_CERO);
+            }
+            List<TechosSuelosDifeC> difSus;
+            difSus = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(0), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_UNO);
+            if (difSus != null && difSus.size() == 0) {
+                difSus = GestionTechosSuelosDife.obtenerTechosSuelosPrioridadUnoComparativa(interes.getInteresKey().getIdProducto(), interes.getInteresKey().getIdSubProducto(), new Integer(10), interes.getInteresKey().getOrden(), interes.getInteresKey().getColectivo(), version.getAn08tb01(), Constantes.CTE_UNO);
+            }
+            if (difInt != null && difInt.size() != 0) {
+                TechosSuelosDifeC tmp1 = difInt.get(0);
+                obj.setDiferencialSec(tmp1.getDiferencial());
+                if (!tmp1.getTipoRef().equals(new Integer(0)))
+                    obj.setTipoReferenciaSec(tmp1.getTipoRef() + "-" + getTipoRef(tmp1.getTipoRef()));
+                if (tipo != 0) {
+                    obj.setInteresMax(tmp1.getTecho());
+                    obj.setInteresMin(tmp1.getSuelo());
+                    obj.setDiferencialBonif(tmp1.getDiferencialBonificado());
+                }
+            }
+            if (difSus != null && difSus.size() != 0) {
+                TechosSuelosDifeC tmp1 = difSus.get(0);
+                obj.setDiferencialSustSec(tmp1.getDiferencial());
+                if (!tmp1.getTipoRef().equals(new Integer(0)))
+                    obj.setTipoReferenciaSustSec(tmp1.getTipoRef() + "-" + getTipoRef(tmp1.getTipoRef()));
+            }
+        }
+    }
+
+    private String getTipoRef(Integer tipo) {
+        String garantia = null;
+        GestionClausulasRestringuidas gclausulas = new GestionClausulasRestringuidas();
+        ParametrosC param = gclausulas.obtenerTipoRefBusquedaProducto(tipo);
+        if (param != null) {
+            garantia = param.getCG320030();
+        }
+        return garantia;
+    }
+
+    private InteresC getInteresMayorPlazo(List<InteresC> intereses) {
+        InteresC salida = intereses.get(0);
+        Integer plazo = new Integer(0);
+        for (int i = 0; i < intereses.size(); i++) {
+            InteresC tmp = intereses.get(i);
+            Integer tmpPlazo = tmp.getPlazo();
+            if (tmpPlazo.intValue() > plazo.intValue()) {
+                plazo = tmpPlazo;
+                salida = tmp;
+            }
+        }
+        return salida;
+    }
+
+    private void setComisiones(VersionesC version, ComparativaSubProductoObj obj) {
+        // TODO Auto-generated method stub
+        GestionComisiones gcom = new GestionComisiones();
+        Integer[] tiposComision = UtilidadesComision.CTE_COMIS_COMPARATIVA;
+        for (int i = 0; i < tiposComision.length; i++) {
+            Integer tipoComis = tiposComision[i];
+            ComisionesC comisTMP = (ComisionesC) gcom.obtenerVersionComparativa(version.getVersionKey().getIdProducto(), version.getVersionKey().getIdSubProducto(), version.getAn06(tipoComis), new Integer(1), true, true, new Integer(10), version.getVersionKey().getIdColectivo(), tipoComis);
+            if (comisTMP != null) {
+                obj.setPorcentaje(tipoComis, new BigDecimal(comisTMP.getIntPorcentajeEstandarComision().doubleValue()));
+                obj.setImporteMin(tipoComis, new BigDecimal(comisTMP.getIntImporteMinimoEstandarComision().doubleValue()));
+            } else {
+                // Comision Apertura
+                ComisionesC comisTMP2 = (ComisionesC) gcom.obtenerVersionComparativa(version.getVersionKey().getIdProducto(), version.getVersionKey().getIdSubProducto(), version.getAn06(tipoComis), new Integer(1), true, true, new Integer(0), version.getVersionKey().getIdColectivo(), tipoComis);
+                if (comisTMP2 != null) {
+                    obj.setPorcentaje(tipoComis, new BigDecimal(comisTMP2.getIntPorcentajeEstandarComision().doubleValue()));
+                    obj.setImporteMin(tipoComis, new BigDecimal(comisTMP2.getIntImporteMinimoEstandarComision().doubleValue()));
+                } else {
+                    obj.setPorcentaje(tipoComis, new BigDecimal(0.000));
+                    obj.setImporteMin(tipoComis, new BigDecimal(0.000));
+                }
+            }
+        }
+    }
+
+    private static final String CUALQUIERA_661124844 = "CUALQUIERA_661124844";
+
+    private static final String VARIABLE_1249586564 = "VARIABLE_1249586564";
+
+    private static final String FIJO_3142984 = "FIJO_3142984";
+
+    private static final String FIJO_REFERENCIADO_2130014933 = "FIJO_REFERENCIADO_2130014933";
+
+    private static final String INTERES_1958062730 = "INTERES_1958062730";
+
+    private static final String LISTA_RESTRINGIDA_1005653765 = "LISTA_RESTRINGIDA_1005653765";
+
+    private static final String _0000_FIJO_348629637 = "_0000_FIJO_348629637";
+
+    private static final String VARIABLE_BONIFICABLE_1858709010 = "VARIABLE_BONIFICABLE_1858709010";
+
+    private static final String VARIABLE_PENALIZABLE_712625771 = "VARIABLE_PENALIZABLE_712625771";
+
+    private static final String FIJO_CAMPA_AS_1121213115 = "FIJO_CAMPA_AS_1121213115";
+
+    private static final String _0001_FIJO_REFERENCIADO_128896253 = "_0001_FIJO_REFERENCIADO_128896253";
+
+    private static final String VARIABLE_CAMPA_AS_1368594439 = "VARIABLE_CAMPA_AS_1368594439";
+
+    private static final String VARIABLE_TRAMO_INICIAL_FIJO_519048334 = "VARIABLE_TRAMO_INICIAL_FIJO_519048334";
+}

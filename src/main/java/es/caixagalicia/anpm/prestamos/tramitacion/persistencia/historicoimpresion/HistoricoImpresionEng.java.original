@@ -1,0 +1,237 @@
+/**
+*
+*/
+package es.caixagalicia.anpm.prestamos.tramitacion.persistencia.historicoimpresion;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.Order;
+import org.hibernate.criterion.Restrictions;
+
+import es.caixagalicia.anpm.prestamos.comun.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionHistoricoImpresion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.persistencia.eccv02.EngEcc;
+
+public class HistoricoImpresionEng extends EngEcc<HistoricoImpresionC>
+{
+	
+	private static final String CTE_ATTR_OFICINA = "id.oficina";
+	private static final String CTE_ATTR_NUMERO = "id.numero";
+	private static final String CTE_ATTR_VERSION = "id.version";
+	private static final String CTE_ATTR_NUC = "id.nuc";
+	private static final String CTE_ATTR_COD_OPERATORIA = "id.codOperatoria"; //TIPO DOCUMENTO
+	private static final String CTE_ATTR_TIMESTAMP = "id.timestamp";
+	
+	/**
+	* Constructor por defecto
+	*/
+	public HistoricoImpresionEng()
+	{
+		super();
+	}
+	
+	
+	public void guardarHistoricoImpresion(BigDecimal oficina,BigDecimal numero,BigDecimal version,BigDecimal nuc,String codOperatoria,BigDecimal interesInicial,
+			BigDecimal valorTipoReferencia,BigDecimal oficinaTramitadora, Date fechaMaximaValidez, BigDecimal taeNoBonificada, BigDecimal taeBonificada,
+			BigDecimal plazo, BigDecimal difNoBonificado, BigDecimal difBonifMaxima, BigDecimal impComisionApertura, BigDecimal impGastosEstudio,
+			BigDecimal impSeguroHogar, BigDecimal tasacion, BigDecimal registro, BigDecimal notaSimple, BigDecimal gestoria, BigDecimal importeIAJD,
+			BigDecimal tarjeta, BigDecimal importeSeguroVida, BigDecimal impProtPagos5Anhos, BigDecimal impProtPagosAnual,BigDecimal notaria, BigDecimal interes)
+	{
+		HistoricoImpresionC historicoImpresion = this.createNewObject();
+		HistoricoImpresionKey historicoImpresionKey = new HistoricoImpresionKey();
+		
+		historicoImpresionKey.setOficina(oficina);
+		historicoImpresionKey.setNumero(numero);
+		historicoImpresionKey.setVersion(version);
+		historicoImpresionKey.setNuc(nuc);
+		historicoImpresionKey.setCodOperatoria(codOperatoria);
+		//historicoImpresionKey.setTimestamp(DateHelper.getInstance().askTimestampFromDB2());
+		
+		historicoImpresion.setId(historicoImpresionKey);
+		
+		historicoImpresion.setInteresInicial(interesInicial);
+		historicoImpresion.setValorTipoReferencia(valorTipoReferencia);
+		historicoImpresion.setOficinaTramitadora(oficinaTramitadora);
+		
+		if (null != fechaMaximaValidez)
+		{
+			//20151119 Se comenta temporalmente debido a que la tabla aún no tiene la columna nueva en explotación.
+			historicoImpresion.setFechaMaximaValidez(fechaMaximaValidez);
+		}
+		
+		historicoImpresion.setTaeNoBonificada(taeNoBonificada);
+		historicoImpresion.setTaeBonificada(taeBonificada);
+		historicoImpresion.setPlazo(plazo);
+		historicoImpresion.setDiferencialNoBonificado(difNoBonificado);
+		historicoImpresion.setDiferencialBonifMaxima(difBonifMaxima);
+		historicoImpresion.setImporteComisionApertura(impComisionApertura);
+		historicoImpresion.setImporteGastosEstudio(impGastosEstudio);
+		historicoImpresion.setImporteSeguroHogar(impSeguroHogar);
+		historicoImpresion.setTasacion(tasacion);
+		historicoImpresion.setRegistro(registro);
+		historicoImpresion.setNotaSimple(notaSimple);
+		historicoImpresion.setGestoria(gestoria);
+		historicoImpresion.setIajd(importeIAJD);
+		historicoImpresion.setTarjeta(tarjeta);
+		historicoImpresion.setImporteSeguroVida(importeSeguroVida);
+		historicoImpresion.setImpProteccionPagos5Anh(impProtPagos5Anhos);
+		historicoImpresion.setImpProteccionPagosAnual(impProtPagosAnual);
+		historicoImpresion.setInteres(interes);
+		historicoImpresion.setNotaria(notaria);
+		historicoImpresion.setImporte2(BigDecimal.ZERO);
+		historicoImpresion.setIndicador1(Constantes.CTE_STRING_EMPTY);
+		historicoImpresion.setIndicador2(Constantes.CTE_STRING_EMPTY);
+		java.sql.Date dateMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO));
+		historicoImpresion.setFecha1(dateMinima);
+		
+		this.persist(historicoImpresion);
+	}
+	
+	/**
+	 * Método que busca el historico por oficina, numero, version, nuc y tipoDocumento.
+	 * 
+	 * @param oficina
+	 * @param numero
+	 * @param version
+	 * @param nuc
+	 * @param codOperatoria
+	 * @return
+	 */
+	public HistoricoImpresionC consultarHistoricoImpresion(BigDecimal oficina,
+		BigDecimal numero,
+		BigDecimal version,
+		BigDecimal nuc,
+		String codOperatoria)
+	{
+		List<Criterion> criterios = new ArrayList<Criterion>(1);
+		HistoricoImpresionC historico = null;
+		
+		
+		criterios.add(Restrictions.eq(CTE_ATTR_OFICINA, oficina));
+		criterios.add(Restrictions.eq(CTE_ATTR_NUMERO, numero));
+		criterios.add(Restrictions.eq(CTE_ATTR_VERSION, version));
+		criterios.add(Restrictions.eq(CTE_ATTR_NUC, nuc));
+		criterios.add(Restrictions.eq(CTE_ATTR_COD_OPERATORIA, codOperatoria));
+		
+		historico = this.findByCriteriaUniqueResult(criterios);
+		
+		return historico;
+	}
+	
+	/**
+	 * Método que busca el histórico por oficina, numero, nuc y tipoDocumento y devuelve el registro más reciente.
+	 * 
+	 * @param oficina
+	 * @param numero
+	 * @param nuc
+	 * @param codOperatoria
+	 * @return
+	 */
+	public HistoricoImpresionC consultarHistoricoImpresionFechaMasReciente(BigDecimal oficina,
+		BigDecimal numero,
+		BigDecimal nuc,
+		String codOperatoria)
+	{
+		List<Criterion> criterios = new ArrayList<Criterion>(1);
+		List<Order> orden = new ArrayList<Order>(1);
+		
+		HistoricoImpresionC historico = null;
+		List<HistoricoImpresionC> listaHistorico = null;
+		
+		criterios.add(Restrictions.eq(CTE_ATTR_OFICINA, oficina));
+		criterios.add(Restrictions.eq(CTE_ATTR_NUMERO, numero));
+		criterios.add(Restrictions.eq(CTE_ATTR_NUC, nuc));
+		criterios.add(Restrictions.eq(CTE_ATTR_COD_OPERATORIA, codOperatoria));
+		
+		orden.add(Order.desc(CTE_ATTR_TIMESTAMP));
+		
+		listaHistorico = this.findByCriteria(1, criterios, orden);
+		
+		if (! UtilidadesTramitacion.isBlankOrNull(listaHistorico))
+		{
+			historico = listaHistorico.get(0);
+		}
+		
+		return historico;
+	}
+	
+	/**
+	 * Método que devuelve la última impresión de la Fiper realizada para un nuc antes del plazo indicado. 
+	 * 
+	 * @param nuc
+	 * @param dias
+	 * @param oficina
+	 * @return
+	 */
+	public HistoricoImpresionC consultaUltimaFiperEnPlazo(
+														BigDecimal nuc,
+														Date fechaFormalizacion,
+														BigDecimal plazo,
+														BigDecimal oficina)
+	{
+		HistoricoImpresionC impresion = null;
+		List<HistoricoImpresionC> impresiones = null;
+		
+		List<Criterion> criterios = new ArrayList<Criterion>(1);
+		List<Order> orden = new ArrayList<Order>(1);
+		
+		criterios.add(Restrictions.eq(CTE_ATTR_NUC, nuc));
+		criterios.add(Restrictions.eq(CTE_ATTR_COD_OPERATORIA, "FI"));
+		//criterios.add(Restrictions.lt(CTE_ATTR_TIMESTAMP, new TimeStamp(DateUtils.calcularDiasHabiles(DateUtils.dateNow(), BigDecimal.ZERO.subtract(plazo), oficina))));
+		//java.util.Date fecha = new SimpleDateFormat("dd-MM-yyyy", new Locale("ES", "ES")).parse(DateUtils.calcularDiasHabiles(DateUtils.dateNow(), BigDecimal.ZERO.subtract(plazo), oficina), new ParsePosition(0));
+		java.util.Date fecha = new SimpleDateFormat("dd-MM-yyyy", new Locale("ES", "ES")).parse(DateUtils.calcularDiasHabiles(fechaFormalizacion, BigDecimal.ZERO.subtract(plazo), oficina), new ParsePosition(0));
+		criterios.add(Restrictions.lt(CTE_ATTR_TIMESTAMP, new Timestamp(fecha.getTime())));
+		
+		orden.add(Order.desc(CTE_ATTR_TIMESTAMP));
+		
+		impresiones = this.findByCriteria(1, criterios, orden);
+		
+		if(null != impresiones
+		&& 0 < impresiones.size()
+		&& null != impresiones.get(0))
+		{
+			impresion = impresiones.get(0);
+		}
+		
+		return impresion;
+	}
+	
+	
+	/**
+	 * Método que mod el histórico por oficina, numero, nuc y tipoDocumento y devuelve el registro más reciente.
+	 * 
+	 * @param oficina
+	 * @param numero
+	 * @param nuc
+	 * @param codOperatoria
+	 * @param impComisionApertura
+	 * @param impComisionGastosEstudio
+	 * @return
+	 */
+	public void modificarComisiones(BigDecimal oficina,BigDecimal numero,BigDecimal nuc,			
+			String codOperatoria,BigDecimal impComisionApertura, BigDecimal impComisionGastosEstudio){
+		
+		HistoricoImpresionC historicoImpresionFiper = GestionHistoricoImpresion.consultarHistoricoImpresionFechaMasReciente(
+				oficina,numero,nuc,codOperatoria);
+		
+		if (null!=impComisionApertura){
+			historicoImpresionFiper.setImporteComisionApertura(impComisionApertura);
+		}
+		if (null!=impComisionGastosEstudio){
+			historicoImpresionFiper.setImporteGastosEstudio(impComisionGastosEstudio);
+		}
+				
+		this.update(historicoImpresionFiper);
+	}
+}
+	

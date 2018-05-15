@@ -1,0 +1,377 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.util.Calendar;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.parametros.Configuracion;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ *	Clase gestora de Alta, Consulta Modificación y borrado de citas con Agencia Comercial
+ *
+ * Aplicacion: MKTG
+ *
+ * @author V360144
+ */
+public class GestionCitaAgendaGestor {
+
+    private static final Integer CTE_SN_CC_MKTG = new Integer(1);
+
+    // MKTG_190
+    private static final Integer CTE_SN_CO_ALTA_CITAS = new Integer(190);
+
+    // MKTG_191
+    private static final Integer CTE_SN_CO_BORRADO_CITAS = new Integer(191);
+
+    /*Campos de entrada*/
+    private static final String CTE_OPERACION = "OPERACION";
+
+    private static final String CTE_OFICINA = "OFICINA";
+
+    private static final String CTE_GESTOR = "GESTOR";
+
+    private static final String CTE_MEDIO = "MEDIO";
+
+    private static final String CTE_FECHA_ALTA = "FECHA_ALTA";
+
+    private static final String CTE_FECHA_CITA = "FECHA_CITA";
+
+    private static final String CTE_HORA_INICIO = "HORA_INICIO";
+
+    private static final String CTE_HORA_FIN = "HORA_FIN";
+
+    private static final String CTE_CLAVE_TEMA = "CLAVE_TEMA";
+
+    private static final String CTE_COMENTARIOS = "COMENTARIOS";
+
+    private static final String CTE_NUM_CLIENTE = "NUM_CLIENTE";
+
+    private static final String CTE_IND_REAL_POTENCIAL = "IND_REAL_POTENCIAL";
+
+    private static final String CTE_ESTADO_RESOLUCION = "ESTADO_RESOLUCION";
+
+    private static final String CTE_MOTIVO_CIERRE = "MOTIVO_CIERRE";
+
+    private static final String CTE_COMENTARIOS_CIERRE = "COMENTARIOS_CIERRE";
+
+    private static final String CTE_APELLIDO1 = "APELLIDO1";
+
+    private static final String CTE_APELLIDO2 = "APELLIDO2";
+
+    private static final String CTE_NOMBRE = "NOMBRE";
+
+    private static final String CTE_TELEFONO = "TELEFONO";
+
+    private static final String CTE_MAIL = "MAIL";
+
+    private static final String CTE_IND_CITA_NMC = "IND_CITA_NMC";
+
+    private static final String CTE_IND_VALIDA = "IND_VALIDA";
+
+    private static final String CTE_ACCION_GESTOR = "ACCION_GESTOR";
+
+    private static final String CTE_PASO_ID = "PASO_ID";
+
+    /*Agrupación y nombre del parámetro de la AN82TB01 para la duración de la cita*/
+    private static final String CTE_DURACION_CITA_AGRUPACION = "GESTFIRMA";
+
+    private static final String CTE_DURACION_CITA_NOMBRE = "DURCITA";
+
+    /*Parámetro de configuración ANPMCFG_GESTORCOMERCIAL_CLAVE_TEMA*/
+    private static final String CTE_PARAM_CONF_CLAVE_TEMA_AP = "ANPM";
+
+    private static final String CTE_PARAM_CONF_CLAVE_TEMA_GRUPO = "GESTORCOMERCIAL";
+
+    private static final String CTE_PARAM_CONF_CLAVE_TEMA_PARAM = "CLAVE_TEMA";
+
+    /*Parámetro de configuración ANPMCFG_GESTORCOMERCIAL_PASOID*/
+    private static final String CTE_PARAM_CONF_PASOID_AP = "ANPM";
+
+    private static final String CTE_PARAM_CONF_PASOID_GRUPO = "GESTORCOMERCIAL";
+
+    private static final String CTE_PARAM_CONF_PASOID_PARAM = "PASOID";
+
+    // $NON-NL-1$
+    private static final String CTE_MENSAJE_ALTA_CITA = "ALTA_AVISOS_PREFORMALIZACI_N_1627110726";
+
+    /*Valores posibles de los campos de entrada*/
+    private static final String CTE_OPERACION_ALTA = "G";
+
+    private static final String CTE_IND_VALIDA_CONTROL = "C";
+
+    private static final String CTE_IND_VALIDA_OPERACION = "O";
+
+    private static final String CTE_IND_REAL_POTENCIAL_REAL = "R";
+
+    private static final String CTE_ALTA_CITAS_SAL_COD_ERROR = "MKTGN566010";
+
+    private static final String CTE_ALTA_CITAS_SAL_DESCR_ERROR = "MKTGN566020";
+
+    private static final String CTE_ALTA_CITAS_SAL_SOL_ERROR = "MKTGN566030";
+
+    private static final String CTE_ALTA_CITAS_SAL_EXISTE_SOLAP = "MKTGN566040";
+
+    private static final String CTE_ALTA_CITAS_SAL_MENSAJE_SOLAP = "MKTGN566050";
+
+    private static final String CTE_ALTA_CITAS_SAL_TIPO_SOLAP = "MKTGN566060";
+
+    // private static final String CTE_ALTA_CITAS_SAL_FECHA_ALTA_CITA = 	"MKTGN566070";
+    private static final String CTE_ALTA_CITAS_SAL_COD_ERROR_LINK = "MKTGN566080";
+
+    /*Campos de salida del servicio de borrado de citas, MKTG_191*/
+    private static final String CTE_BORRADO_CITAS_SAL_COD_ERROR = "MKTGN567010";
+
+    private static final String CTE_BORRADO_CITAS_SAL_SQL_CODE = "MKTGN567020";
+
+    private static final String CTE_BORRADO_CITAS_SAL_TIT_ERROR = "MKTGN567030";
+
+    private static final String CTE_BORRADO_CITAS_SAL_DESCR_ERROR = "MKTGN567040";
+
+    private static final String CTE_BORRADO_CITAS_SAL_SOL_ERROR = "MKTGN567050";
+
+    /**
+     * Método que llama al servicio MKTG_190 para dar de alta una cita comercial.
+     */
+    /**
+     * @param nuc nuc del expediente
+     * @param fechaFormalizacionUtilDate fecha formalización en java.util.Date
+     * @param horaInicio hora inicio formalización (cita)
+     * @param usuarioApoderado usuario apoderado
+     *
+     * @return salidaAltaCita resultado del alta de cita, los posibles valores son:
+     * 0: el alta de cita se realizó correctamente.
+     * 1: no se realizó la cita porque el cliente ya está resuelto en el tema.
+     */
+    public static int altaCita(BigDecimal nuc, java.util.Date fechaFormalizacionUtilDate, String horaInicio, String usuarioApoderado, String observaciones) {
+        IDatosEntradaTx datosEntrada = null;
+        IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+        IContexto[] resultado = null;
+        BigDecimal numCliente = null;
+        String horaFin = null;
+        Date fechaFormalizacion = null;
+        DateHelper dateHelper = DateHelper.getInstance();
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC datosSolicitud = null;
+        // fecha formalización = fecha cita en la agenda del gestor comercial.
+        String fechaCitaStr = null;
+        String claveTema = null;
+        Timestamp timestampAltaCita = null;
+        int salidaAltaCita = Constantes.CTE_SALIDA_ALTA_CITA_CORRECTA;
+        // String fechaAltaCitaStr = null; //Timestamp del alta de la cita para posteriores modificaciones, suponiendo
+        // que utilizaramos el servicio de modificacion, que no es el caso.
+        // Para modificar borraremos la cita anterior y daremos de alta una nueva.
+        /*Obtenemos la clave del tema del parámetro de configuración ANPMCFG_GESTORCOMERCIAL_CLAVE_TEMA*/
+        claveTema = Configuracion.getInstance().getValor(CTE_PARAM_CONF_CLAVE_TEMA_AP, CTE_PARAM_CONF_CLAVE_TEMA_GRUPO, CTE_PARAM_CONF_CLAVE_TEMA_PARAM).trim();
+        fechaFormalizacion = new Date(fechaFormalizacionUtilDate.getTime());
+        fechaCitaStr = DateHelper.sqlDateToString(fechaFormalizacion, DateHelper.FORMATO_YYYY_MM_DD_GUION);
+        fechaFormalizacion = new Date(fechaFormalizacionUtilDate.getTime());
+        /*Se le cambia el formato, de HH:MM pasa a a ser HHMM*/
+        horaInicio = dateHelper.formatearFecha(DateUtils.CTE_FORMATO_HORA, DateUtils.FORMATO_HORA_SIMPLE, horaInicio);
+        timestampAltaCita = obtenerTimestampInicioCita(fechaCitaStr, horaInicio);
+        horaFin = obtenerHoraFin(timestampAltaCita);
+        datosSolicitud = gds.getUltimaVersionCompleta(nuc);
+        /*Invocamos el MKTG_190*/
+        datosEntrada = ServicioNegocio.getPrograma(contextoEjecucion, CTE_SN_CC_MKTG, CTE_SN_CO_ALTA_CITAS);
+        numCliente = UtilidadesTramitacion.obtenerNumeroClientePrimerTitular(nuc);
+        datosEntrada.addCampo(CTE_OPERACION, CTE_OPERACION_ALTA);
+        datosEntrada.addCampo(CTE_OFICINA, datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud());
+        datosEntrada.addCampo(CTE_GESTOR, usuarioApoderado);
+        datosEntrada.addCampo(CTE_MEDIO, Constantes.CTE_STR_2);
+        datosEntrada.addCampo(CTE_FECHA_CITA, fechaCitaStr);
+        datosEntrada.addCampo(CTE_HORA_INICIO, horaInicio);
+        datosEntrada.addCampo(CTE_HORA_FIN, horaFin);
+        datosEntrada.addCampo(CTE_CLAVE_TEMA, claveTema);
+        datosEntrada.addCampo(CTE_COMENTARIOS, new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_ALTA_CITA).toString().concat(observaciones));
+        datosEntrada.addCampo(CTE_NUM_CLIENTE, numCliente);
+        datosEntrada.addCampo(CTE_IND_REAL_POTENCIAL, CTE_IND_REAL_POTENCIAL_REAL);
+        datosEntrada.addCampo(CTE_IND_CITA_NMC, Constantes.CTE_STR_N);
+        datosEntrada.addCampo(CTE_IND_VALIDA, CTE_IND_VALIDA_CONTROL);
+        datosEntrada.addCampo(CTE_ACCION_GESTOR, Constantes.CTE_STR_2);
+        resultado = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntrada);
+        if (UtilidadesTramitacion.isBlankOrNull(resultado)) {
+            ServicioNegocio.rollback(CodigosError.CTE_ERROR_ALTA_CITAS_NO_HAY_CONTEXTO, null, new String[] { nuc.toString() }, null);
+        } else if (!Constantes.CTE_STR_0.equals(resultado[0].getString(CTE_ALTA_CITAS_SAL_COD_ERROR))) {
+            /*20150520 En este caso puede ocurrir que el código de error sea distinto de 0 porque el
+			 * cliente ya está resuelto en el tema, es decir que ya existe una cita dada de alta con
+			 * ese mismo apoderado interno.
+			 * */
+            if ((Constantes.CTE_STR_1.equals(resultado[0].getString(CTE_ALTA_CITAS_SAL_COD_ERROR))) && (0 == Constantes.CTE_BID_34.compareTo(resultado[0].getBigDecimal(CTE_ALTA_CITAS_SAL_COD_ERROR_LINK)))) {
+                salidaAltaCita = Constantes.CTE_SALIDA_ALTA_CITA_NO_ALTA_CLIENTE_RESUELTO_EN_TEMA;
+            } else {
+                /*Codigo error distinto de cero, lanzamos rollback*/
+                ServicioNegocio.rollback(CodigosError.CTE_ERROR_ALTA_CITAS_ERROR, null, new String[] { nuc.toString(), numCliente.toString(), horaInicio, usuarioApoderado }, new String[] { resultado[0].getString(CTE_ALTA_CITAS_SAL_COD_ERROR), resultado[0].getString(CTE_ALTA_CITAS_SAL_DESCR_ERROR), resultado[0].getString(CTE_ALTA_CITAS_SAL_EXISTE_SOLAP), resultado[0].getString(CTE_ALTA_CITAS_SAL_MENSAJE_SOLAP), resultado[0].getString(CTE_ALTA_CITAS_SAL_TIPO_SOLAP), resultado[0].getString(CTE_ALTA_CITAS_SAL_SOL_ERROR) });
+            }
+        }
+        /*
+		else
+		{
+			fechaAltaCitaStr = UtilidadesTramitacion.comprobarDatoNull(
+				resultado[0].getString(CTE_ALTA_CITAS_SAL_FECHA_ALTA_CITA));
+			if (! StringUtils.isBlank(fechaAltaCitaStr))
+			{
+				fechaAltaCita = DateHelper.stringASqlDate(fechaAltaCitaStr, DateHelper.FORMATO_YYYY_MM_DD_GUION);
+				//La guardamos en la tabla de apoderados AN45TB01
+				 * la fecha de alta cita no la necesitamos, lo que necesitamos es la 
+				 * fecha de cita que es la fecha de formalización, AN250940.
+			}
+		}
+*/
+        return salidaAltaCita;
+    }
+
+    /**
+     * Borra una cita llamando al servicio MKTG_191.
+     *
+     * @param nucExpediente
+     */
+    public static void borradoCita(DatosSolicitudC datosSolicitud) {
+        // GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        IDatosEntradaTx datosEntrada = null;
+        IContexto[] resultado = null;
+        IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+        String pasoId = null;
+        // la fecha de la cita es la fecha de formalización.
+        String fechaCita = null;
+        Timestamp horaFormalizacion = null;
+        // la hora de inicio de la cita es la hora de la formalización. Formato HHMM.
+        String horaInicio = null;
+        // la hora de fin es la hora de inicio + duración, parametrizada en la AN82TB01, DURCITA. Formato HHMM.
+        String horaFin = null;
+        BigDecimal nucExpediente = null;
+        // DatosSolicitudC datosSolicitudAnterior = null;
+        BigDecimal numCliente = null;
+        fechaCita = DateHelper.sqlDateToString(datosSolicitud.getFechaFormalizacion(), DateHelper.FORMATO_DB2_DATE);
+        nucExpediente = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        /*Si la fecha de formalización está informada quiere decir que es una modificación 
+		 * de preformalización y por lo tanto hay que borrar la cita anterior*/
+        if (!DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaCita)) {
+            /*Obtenemos la clave del tema del parámetro de configuración ANPMCFG_GESTORCOMERCIAL_PASOID*/
+            pasoId = Configuracion.getInstance().getValor(CTE_PARAM_CONF_PASOID_AP, CTE_PARAM_CONF_PASOID_GRUPO, CTE_PARAM_CONF_PASOID_PARAM).trim();
+            /*
+ * 20150529 Ahora pillamos la fecha de formalización de la versión actual, porque borramos la cita antes de generar versión.
+ * 
+			datosSolicitudAnterior = gds.buscarVersionAnterior(
+			datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+			null,
+			datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(),
+			datosSolicitud.getDatosSolicitudKey().getNucExpediente());	
+*/
+            horaFormalizacion = datosSolicitud.getHoraFormalizacion();
+            horaInicio = obtenerHoraInicio(horaFormalizacion);
+            /*Solamente intentaremos borrar la cita si la hora de inicio está informada, es decir, si es diferente de 0000 en formato HHmm
+			 * porque puede ocurrir que sea una modificación de preformalización, es decir, que la fecha de formalización AN250940 esté informada
+			 * pero que no esté informada la hora de formalización, AN251370.
+			 * 
+			 * */
+            if (!Constantes.CTE_STR_0000.equals(horaInicio)) {
+                horaFin = obtenerHoraFin(horaFormalizacion);
+                numCliente = UtilidadesTramitacion.obtenerNumeroClientePrimerTitular(nucExpediente);
+                datosEntrada = ServicioNegocio.getPrograma(contextoEjecucion, CTE_SN_CC_MKTG, CTE_SN_CO_BORRADO_CITAS);
+                datosEntrada.addCampo(CTE_NUM_CLIENTE, numCliente);
+                datosEntrada.addCampo(CTE_PASO_ID, pasoId);
+                datosEntrada.addCampo(CTE_FECHA_CITA, fechaCita);
+                datosEntrada.addCampo(CTE_HORA_INICIO, horaInicio);
+                datosEntrada.addCampo(CTE_HORA_FIN, horaFin);
+                resultado = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntrada);
+                if (UtilidadesTramitacion.isBlankOrNull(resultado)) {
+                    ServicioNegocio.rollback(CodigosError.CTE_ERROR_BORRADO_CITAS_NO_HAY_CONTEXTO, null, null, null);
+                } else if (Constantes.CTE_STR_0.equals(resultado[0].getString(CTE_BORRADO_CITAS_SAL_COD_ERROR))) {
+                // acabó bien
+                } else // MKTGN567 10 = 3, 20 = 100
+                if ((Constantes.CTE_STR_3.equals(resultado[0].getString(CTE_BORRADO_CITAS_SAL_COD_ERROR))) && (0 == Constantes.CTE_BID_100.compareTo(resultado[0].getBigDecimal(CTE_BORRADO_CITAS_SAL_SQL_CODE)))) {
+                // no existe la cita, no hay nada que borrar, continuamos.
+                } else {
+                    /*Codigo error distinto de cero, lanzamos rollback*/
+                    ServicioNegocio.rollback(CodigosError.CTE_ERROR_BORRADO_CITAS_ERROR, null, new String[] { nucExpediente.toString(), numCliente.toString(), horaInicio, horaFin }, new String[] { resultado[0].getString(CTE_BORRADO_CITAS_SAL_COD_ERROR), resultado[0].getString(CTE_BORRADO_CITAS_SAL_SQL_CODE), resultado[0].getString(CTE_BORRADO_CITAS_SAL_TIT_ERROR), resultado[0].getString(CTE_BORRADO_CITAS_SAL_DESCR_ERROR), resultado[0].getString(CTE_BORRADO_CITAS_SAL_SOL_ERROR) });
+                }
+            }
+        }
+    }
+
+    /**
+     * horaInicio: formato HHmm
+     * fechaCita: formato AAAA-MM-DD
+     *
+     * @param fechaCitaStr
+     * @param horaInicio
+     * @return
+     */
+    private static Timestamp obtenerTimestampInicioCita(String fechaCitaStr, String horaInicio) {
+        String timestampAltaCitaStr = null;
+        DateHelper dateHelper = DateHelper.getInstance();
+        Timestamp timestamp = null;
+        java.util.Date horaFormalizUtilDate = dateHelper.formatearFecha(DateUtils.FORMATO_HORA_SIMPLE, horaInicio);
+        timestampAltaCitaStr = fechaCitaStr.concat("-".concat(DateHelper.dateToString(horaFormalizUtilDate, "HH.mm.ss.SSSSSS")));
+        timestamp = DateHelper.stringASqlTimestamp(timestampAltaCitaStr, DateHelper.FORMATO_DB2_TIMESTAMP);
+        return timestamp;
+    }
+
+    /**
+     * Se calcula la fecha fin añadiendo la duración a la fecha de inicio.
+     * Para ello se "construye" el timestamp de inicio y se le suma la duración, que se obtiene
+     * de un parámetro de la AN82TB01, agrupación GESTFIRMA y nombre DURCITA.
+     *
+     * @param fechaInicio
+     * @param horaInicio
+     * @return
+     */
+    private static String obtenerHoraFin(Timestamp timestamp) {
+        /*La horaFin es X horas más que la hora de inicio, siendo X un valor parametrizado en la AN82TB01*/
+        String duracionCitaStr = null;
+        Integer duracionCita = null;
+        java.util.Date fechaFinUtilDate = null;
+        Date fechaFinSqlDate = null;
+        String horaFin = null;
+        /*Obtenemos la duración de la cita.*/
+        duracionCitaStr = UtilidadesTramitacion.obtenerValorParametroUnico(CTE_DURACION_CITA_AGRUPACION, CTE_DURACION_CITA_NOMBRE);
+        if (StringUtils.isBlank(duracionCitaStr)) {
+            ServicioNegocio.rollback(CodigosError.CTE_ERROR_PARAMETRO_ANPM_NO_EXISTE, null, new String[] { CTE_DURACION_CITA_AGRUPACION, CTE_DURACION_CITA_NOMBRE }, null);
+        }
+        duracionCita = new Integer(duracionCitaStr);
+        /*Para calcular la hora de fin le sumamos la duración a la hora de inicio.
+		 * Con la fecha de inicio y la hora de inicio construimos el "timestamp de inicio", despues le sumamos 
+		 * la duración y posteriormente obtenemos la hora de fin.
+		 * */
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timestamp.getTime());
+        calendar.add(Calendar.HOUR, duracionCita);
+        fechaFinUtilDate = calendar.getTime();
+        fechaFinSqlDate = new Date(fechaFinUtilDate.getTime());
+        horaFin = DateHelper.dateToString(fechaFinSqlDate, DateUtils.FORMATO_HORA_SIMPLE);
+        return horaFin;
+    }
+
+    /**
+     * Se calcula la fecha fin añadiendo la duración a la fecha de inicio.
+     * Para ello se "construye" el timestamp de inicio y se le suma la duración, que se obtiene
+     * de un parámetro de la AN82TB01, agrupación GESTFIRMA y nombre DURCITA.
+     *
+     * @param fechaInicio
+     * @param horaInicio
+     * @return
+     */
+    private static String obtenerHoraInicio(Timestamp timestamp) {
+        java.util.Date fechaFinUtilDate = null;
+        Date fechaFinSqlDate = null;
+        String horaFin = null;
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timestamp.getTime());
+        fechaFinUtilDate = calendar.getTime();
+        fechaFinSqlDate = new Date(fechaFinUtilDate.getTime());
+        horaFin = DateHelper.dateToString(fechaFinSqlDate, DateUtils.FORMATO_HORA_SIMPLE);
+        return horaFin;
+    }
+}

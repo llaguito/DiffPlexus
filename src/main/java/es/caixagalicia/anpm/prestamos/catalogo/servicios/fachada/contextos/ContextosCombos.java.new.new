@@ -1,0 +1,583 @@
+/**
+ * Aplicacion de Activo
+ * Caixa Galicia © 2009-2010
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos;
+
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * @author Pablo González
+ */
+public final class ContextosCombos {
+
+    /*
+	 * Contexto para los datos de todos combos
+	 */
+    private static final String CTE_CBO_ID_CTX = "ANPMN003";
+
+    private static final String CTE_CBO_PROP_NOMBRE_COMBO = "ANPMN003010";
+
+    private static final String CTE_CBO_PROP_ID = "ANPMN003020";
+
+    private static final String CTE_COB_PROP_NOMBRE = "ANPMN003030";
+
+    private static final String CTE_TEXTO_CBO_ENTIDAD = "cboEntidad";
+
+    private static final String CTE_TEXTO_CBO_PAIS = "cboPais";
+
+    private static final String CTE_TEXTO_CBO_ESPECIALIDAD = "cboEspecialidad";
+
+    private static final String CTE_TEXTO_CBO_MONEDA = "cboMoneda";
+
+    private static final String CTE_TEXTO_CBO_MODALIDAD_INTERES = "cboModInteres";
+
+    private static final String CTE_TEXTO_CBO_ORDEN_PAGO = "cboOrdenPago";
+
+    private static final String CTE_TEXTO_CBO_LINEA_PRESTAMO = "cboPrestamo";
+
+    private static final String CTE_TEXTO_CBO_LINEA_REVOLVING = "cboRevolving";
+
+    private static final String CTE_TEXTO_CBO_FECHA_PAGO = "cboFechaPago";
+
+    private static final String CTE_TEXTO_CBO_PERIODO_PAGO = "cboPeriodoPago";
+
+    private static final String CTE_TEXTO_CBO_INDICADORES = "cboIndicador";
+
+    private static final String CTE_TEXTO_CBO_CUADRO = "cboCuadro";
+
+    private static final String CTE_TEXTO_CBO_AMORTIZACION_IRREGULAR = "cboAmorIrregular";
+
+    private static final String CTE_TEXTO_CBO_INTERES_DEMORA = "cboInteresDemora";
+
+    private static final String CTE_TEXTO_CBO_INTERES_ADELANTO = "cboInteresAdelanto";
+
+    private static final String CTE_TEXTO_CBO_DIAS = "cboDias";
+
+    private static final String CTE_TEXTO_CBO_IND_DEPO = "cboIndDepo";
+
+    private static final String CTE_TEXTO_CBO_FUNC_DEPO = "cboFuncDepo";
+
+    private static final String CTE_TEXTO_CBO_BOOLEAN = "cboBoolean";
+
+    private static final String CTE_TEXTO_CBO_COND_DESEM = "cboCondDepo";
+
+    private static final String CTE_TEXTO_CBO_TIPO_DIFERIMIENTO = "cboTipoDifer";
+
+    public ContextosCombos() {
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los tipos de entidades
+     */
+    public static IContexto[] rellenarDatosComboEntidad() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[1];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_ENTIDAD);
+        datos.put(CTE_CBO_PROP_ID, new String("091"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), CAIXA_GALICIA_644595368).toString());
+        salida[0] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los paises
+     */
+    public static IContexto[] rellenarDatosComboPais() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[1];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_PAIS);
+        datos.put(CTE_CBO_PROP_ID, new String("017"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), ESPA_A_1293780753).toString());
+        salida[0] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los tipos de especialidades
+     */
+    public static IContexto[] rellenarDatosEspecialidad() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[4];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_ESPECIALIDAD);
+        datos.put(CTE_CBO_PROP_ID, "S");
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), ESPECIALIDAD_719341262).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, "V");
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), VIVIENDA_1670122636).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, "D");
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DIVISA_1331462586).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, "M");
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), MEDIACI_N_2140898981).toString());
+        salida[3] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene las monedas
+     */
+    public static IContexto[] rellenarDatosMoneda() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[1];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_MONEDA);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, ServicioNegocio.getContexto().getCodigoContable());
+        salida[0] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene las modalidades de interés
+     */
+    public static IContexto[] rellenarDatosModalidadInteres() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_MODALIDAD_INTERES);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), INTERESES_SALDOS_DISPUESTO_543015854).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), INTERESES_PAGADOS_INICIO_1875507856).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene las ordenes de pago
+     */
+    public static IContexto[] rellenarOrdenPagos() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[3];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_ORDEN_PAGO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), CONCEPTO_ANTIGUEDAD_1655066398).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), ANTIGUEDAD_CONCEPTO_603436339).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), ANTIGUEDAD_CONCEPTO_COMISIONES_1468964588).toString());
+        salida[2] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los tipos de linea de préstamo
+     */
+    public static IContexto[] rellenarDatosLineaPrestamo() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_LINEA_PRESTAMO);
+        datos.put(CTE_CBO_PROP_ID, new String("S"));
+        datos.put(CTE_COB_PROP_NOMBRE, "Si");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("N"));
+        datos.put(CTE_COB_PROP_NOMBRE, "No");
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los tipos de líne de revolving
+     */
+    public static IContexto[] rellenarDatosLineaRevolving() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_LINEA_REVOLVING);
+        datos.put(CTE_CBO_PROP_ID, new String("S"));
+        datos.put(CTE_COB_PROP_NOMBRE, "Sí");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("N"));
+        datos.put(CTE_COB_PROP_NOMBRE, "No");
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los tipos de fecha de pago
+     */
+    public static IContexto[] rellenarFechaPago() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[4];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_FECHA_PAGO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PRIMER_D_A_PERIODO_SIGUIENTE_780517768).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), D_A_EQUIVALENTE_1997420653).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), D_A_O_MES_CONCRETO_288072685).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), _LTIMO_D_A_PERIODO_291673585).toString());
+        salida[3] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los días incluidos en pago
+     */
+    public static IContexto[] rellenarDiasIncluidos() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_PERIODO_PAGO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), INCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_EXCLUYE_D_A_1015972166).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), EXCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_E_INCLUYE_D_2028879765).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los indicadores posibles
+     */
+    public static IContexto[] rellenarIndicadores() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[5];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_INDICADORES);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, " ");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, "1");
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, "2");
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, "3");
+        salida[3] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("4"));
+        datos.put(CTE_COB_PROP_NOMBRE, "4");
+        salida[4] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles del cuadro
+     * del cuadro de amortización
+     */
+    public static IContexto[] rellenarCuadroAmortizacion() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_CUADRO);
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PRINCIPAL_1812041682).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), CANTIDAD_DISPUESTA_1273137744).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles para
+     * permitir o no la amortización irregular.
+     */
+    public static IContexto[] rellenarAmortizacionIrregular() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_AMORTIZACION_IRREGULAR);
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PERMITE_678625366).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PERMITE_678625366).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores de un combo de tipo
+     * cierto/falso
+     */
+    public static IContexto[] rellenarBoolean() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_BOOLEAN);
+        datos.put(CTE_CBO_PROP_ID, new String("S"));
+        datos.put(CTE_COB_PROP_NOMBRE, "Si");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("N"));
+        datos.put(CTE_COB_PROP_NOMBRE, "No");
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles del interés
+     * de demora.
+     */
+    public static IContexto[] rellenarInteresDemora() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_INTERES_DEMORA);
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PR_XIMA_LIQUIDACI_N_2126024380).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), CAPITAL_ADEUDADO_607943699).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles del interés
+     * de adelanto.
+     */
+    public static IContexto[] rellenarInteresAdelanto() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[2];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_INTERES_ADELANTO);
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PR_XIMA_LIQUIDACI_N_2126024380).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), ADELANTO_1195750798).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles de los
+     * días para el pago
+     */
+    public static IContexto[] rellenarDias() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[3];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_DIAS);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), APLICA_1411183798).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), D_A_ANTERIOR_730455712).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), D_A_SIGUIENTE_1965828137).toString());
+        salida[1] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles para
+     * el indicador del depósito
+     */
+    public static IContexto[] rellenarIndicadorDepo() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[4];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_IND_DEPO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DEP_SITO_1065344021).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DEP_SITO_1065344021).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), MODIFICAR_DEP_SITO_AUTORIZACI_N_44496509).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), MODIFICAR_DEP_SITO_AUTORIZACI_N_44496509).toString());
+        salida[2] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles para
+     * el funcionamiento del deposito.
+     */
+    public static IContexto[] rellenarFuncionamientoDepo() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[4];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_FUNC_DEPO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, " ");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), _ESPECIFICADO_1391058128).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PRINCIPAL_GASTOS_766256868).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DEPENDIENTE_OBRA_311170069).toString());
+        salida[3] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles para
+     * las condiciones de desembolso.
+     */
+    public static IContexto[] rellenarCondicionesDesembolso() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[5];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_COND_DESEM);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, " ");
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), LIBRE_102966136).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PROMOTOR_AUTOPROMOTOR_1021294242).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), MORATORIO_ICO_1124089985).toString());
+        salida[3] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("4"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), PRESENTACI_N_FACTURAS_2132648756).toString());
+        salida[4] = datos;
+        return salida;
+    }
+
+    /**
+     * @return <code>IContexto[]</code> que contiene los valores posibles para
+     * los tipos de diferimiento.
+     */
+    public static IContexto[] rellenarTipoDeDiferimiento() {
+        IContexto[] salida = null;
+        // no ha existido error
+        salida = new IContexto[4];
+        IContexto datos = ContextoFactory.getInstance().getContexto(CTE_CBO_ID_CTX);
+        datos.put(CTE_CBO_PROP_NOMBRE_COMBO, CTE_TEXTO_CBO_TIPO_DIFERIMIENTO);
+        datos.put(CTE_CBO_PROP_ID, new String("0"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DIFERIMIENTO_1675590277).toString());
+        salida[0] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("1"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DIFERIMIENTO_TOTAL_1220095071).toString());
+        salida[1] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("2"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DIFERIMIENTO_PARCIAL_327648653).toString());
+        salida[2] = datos;
+        datos.put(CTE_CBO_PROP_ID, new String("3"));
+        datos.put(CTE_COB_PROP_NOMBRE, new Mensaje(ServicioNegocio.getContexto(), DIFERIMIENTO_CAPITALIZACI_N_1726951662).toString());
+        salida[3] = datos;
+        return salida;
+    }
+
+    private static final String VIVIENDA_1670122636 = "VIVIENDA_1670122636";
+
+    private static final String ESPA_A_1293780753 = "ESPA_A_1293780753";
+
+    private static final String DIVISA_1331462586 = "DIVISA_1331462586";
+
+    private static final String MEDIACI_N_2140898981 = "MEDIACI_N_2140898981";
+
+    private static final String LIBRE_102966136 = "LIBRE_102966136";
+
+    private static final String ANTIGUEDAD_CONCEPTO_COMISIONES_1468964588 = "ANTIGUEDAD_CONCEPTO_COMISIONES_1468964588";
+
+    private static final String PERMITE_678625366 = "PERMITE_678625366";
+
+    private static final String DIFERIMIENTO_TOTAL_1220095071 = "DIFERIMIENTO_TOTAL_1220095071";
+
+    private static final String CAIXA_GALICIA_644595368 = "CAIXA_GALICIA_644595368";
+
+    private static final String _ESPECIFICADO_1391058128 = "_ESPECIFICADO_1391058128";
+
+    private static final String D_A_SIGUIENTE_1965828137 = "D_A_SIGUIENTE_1965828137";
+
+    private static final String D_A_ANTERIOR_730455712 = "D_A_ANTERIOR_730455712";
+
+    private static final String D_A_EQUIVALENTE_1997420653 = "D_A_EQUIVALENTE_1997420653";
+
+    private static final String CONCEPTO_ANTIGUEDAD_1655066398 = "CONCEPTO_ANTIGUEDAD_1655066398";
+
+    private static final String MORATORIO_ICO_1124089985 = "MORATORIO_ICO_1124089985";
+
+    private static final String PRINCIPAL_GASTOS_766256868 = "PRINCIPAL_GASTOS_766256868";
+
+    private static final String DIFERIMIENTO_PARCIAL_327648653 = "DIFERIMIENTO_PARCIAL_327648653";
+
+    private static final String APLICA_1411183798 = "APLICA_1411183798";
+
+    private static final String D_A_O_MES_CONCRETO_288072685 = "D_A_O_MES_CONCRETO_288072685";
+
+    private static final String DEP_SITO_1065344021 = "DEP_SITO_1065344021";
+
+    private static final String ESPECIALIDAD_719341262 = "ESPECIALIDAD_719341262";
+
+    private static final String ANTIGUEDAD_CONCEPTO_603436339 = "ANTIGUEDAD_CONCEPTO_603436339";
+
+    private static final String PROMOTOR_AUTOPROMOTOR_1021294242 = "PROMOTOR_AUTOPROMOTOR_1021294242";
+
+    private static final String PRINCIPAL_1812041682 = "PRINCIPAL_1812041682";
+
+    private static final String MODIFICAR_DEP_SITO_AUTORIZACI_N_44496509 = "MODIFICAR_DEP_SITO_AUTORIZACI_N_44496509";
+
+    private static final String INCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_EXCLUYE_D_A_1015972166 = "INCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_EXCLUYE_D_A_1015972166";
+
+    private static final String ADELANTO_1195750798 = "ADELANTO_1195750798";
+
+    private static final String PRESENTACI_N_FACTURAS_2132648756 = "PRESENTACI_N_FACTURAS_2132648756";
+
+    private static final String DEPENDIENTE_OBRA_311170069 = "DEPENDIENTE_OBRA_311170069";
+
+    private static final String INTERESES_PAGADOS_INICIO_1875507856 = "INTERESES_PAGADOS_INICIO_1875507856";
+
+    private static final String _LTIMO_D_A_PERIODO_291673585 = "_LTIMO_D_A_PERIODO_291673585";
+
+    private static final String PRIMER_D_A_PERIODO_SIGUIENTE_780517768 = "PRIMER_D_A_PERIODO_SIGUIENTE_780517768";
+
+    private static final String CAPITAL_ADEUDADO_607943699 = "CAPITAL_ADEUDADO_607943699";
+
+    private static final String DIFERIMIENTO_1675590277 = "DIFERIMIENTO_1675590277";
+
+    private static final String PR_XIMA_LIQUIDACI_N_2126024380 = "PR_XIMA_LIQUIDACI_N_2126024380";
+
+    private static final String CANTIDAD_DISPUESTA_1273137744 = "CANTIDAD_DISPUESTA_1273137744";
+
+    private static final String EXCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_E_INCLUYE_D_2028879765 = "EXCLUYE_D_A_FORMALIZACI_N_DISPOSICI_N_E_INCLUYE_D_2028879765";
+
+    private static final String DIFERIMIENTO_CAPITALIZACI_N_1726951662 = "DIFERIMIENTO_CAPITALIZACI_N_1726951662";
+
+    private static final String INTERESES_SALDOS_DISPUESTO_543015854 = "INTERESES_SALDOS_DISPUESTO_543015854";
+}

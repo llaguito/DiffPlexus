@@ -1,0 +1,223 @@
+/**
+ */
+package es.caixagalicia.anpm.prestamos.sindicados.persistencia.condeconomicas;
+
+import java.io.Serializable;
+import java.math.BigDecimal;
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.LengthConstants;
+import es.caixagalicia.ifrt.contextosconversion.annotations.Contexto;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+@Embeddable
+public class CondicionesInteresPactadasKey implements Serializable {
+
+    private static final long serialVersionUID = 0L;
+
+    @Column(name = "AN540001", nullable = false, length = LengthConstants.LENGTH_0015)
+    @Contexto(name = "ANPMN309", field = "ANPMN309540")
+    private BigDecimal bidNucExpedienteMatriz;
+
+    @Column(name = "AN540003", nullable = false, length = LengthConstants.LENGTH_0015)
+    @Contexto(name = "ANPMN309", field = "ANPMN309550")
+    private BigDecimal bidNucExpedienteTramo;
+
+    @Column(name = "AN540005", nullable = false, length = LengthConstants.LENGTH_0007)
+    @Contexto(name = "ANPMN309", field = "ANPMN309560")
+    private BigDecimal bidVersionCondicion;
+
+    @Column(name = "AN540010", nullable = false, length = LengthConstants.LENGTH_0004)
+    @Contexto(name = "ANPMN309", field = "ANPMN309010")
+    private BigDecimal bidOficina;
+
+    @Column(name = "AN540020", nullable = false, length = LengthConstants.LENGTH_0006)
+    @Contexto(name = "ANPMN309", field = "ANPMN309020")
+    private BigDecimal bidNumero;
+
+    @Column(name = "AN540030", nullable = false, length = LengthConstants.LENGTH_0003)
+    @Contexto(name = "ANPMN309", field = "ANPMN309030")
+    private BigDecimal bidTramo;
+
+    @Column(name = "AN540050", nullable = false, length = 1)
+    @Contexto(name = "ANPMN309", field = "ANPMN309050")
+    private BigDecimal // 0-GENERALES,1-INT.NORMALES, 2-INT.DEMORA S/CAP.E INT
+    bidIdTipoIntereses;
+
+    @Column(name = "AN540060", nullable = false, length = 2)
+    @Contexto(name = "ANPMN309", field = "ANPMN309060")
+    private BigDecimal bidIdNumCondicion;
+
+    @Column(name = "AN540070", nullable = false, length = 2)
+    @Contexto(name = "ANPMN309", field = "ANPMN309070")
+    private BigDecimal // 10-PRINCIPAL,20-SUSTITUTIVOS Y 30-OPTATIVOS
+    bidIdTipoCondicion;
+
+    @Column(name = "AN540080", nullable = false, length = 1)
+    @Contexto(name = "ANPMN309", field = "ANPMN309080")
+    private BigDecimal bidIdOrden;
+
+    @Transient
+    @Contexto(name = "ANPMN309", field = "ANPMN309055")
+    private String // 0-GENERALES,1-INT.NORMALES, 2-INT.DEMORA S/CAP.E INT
+    descTipoIntereses;
+
+    @Transient
+    @Contexto(name = "ANPMN309", field = "ANPMN309075")
+    private String // 10-PRINCIPAL,20-SUSTITUTIVOS Y 30-OPTATIVOS
+    descTipoCondicion;
+
+    /**
+     * Constructor por defecto
+     */
+    public CondicionesInteresPactadasKey() {
+        super();
+    }
+
+    public CondicionesInteresPactadasKey(BigDecimal nucExpedienteMatriz, BigDecimal nucExpedienteTramo, BigDecimal version, BigDecimal oficina, BigDecimal numero, BigDecimal tramo, BigDecimal tipoIntereses, BigDecimal numCondicion, BigDecimal tipoCondicion, BigDecimal orden) {
+        this.bidNucExpedienteMatriz = nucExpedienteMatriz;
+        this.bidNucExpedienteTramo = nucExpedienteTramo;
+        this.bidVersionCondicion = version;
+        this.bidOficina = oficina;
+        this.bidNumero = numero;
+        this.bidTramo = tramo;
+        this.bidIdTipoIntereses = tipoIntereses;
+        this.bidIdNumCondicion = numCondicion;
+        this.bidIdTipoCondicion = tipoCondicion;
+        this.bidIdOrden = orden;
+    }
+
+    public BigDecimal getBidIdTipoIntereses() {
+        return bidIdTipoIntereses;
+    }
+
+    public void setBidIdTipoIntereses(BigDecimal bidIdTipoIntereses) {
+        this.bidIdTipoIntereses = bidIdTipoIntereses;
+    }
+
+    public BigDecimal getBidIdNumCondicion() {
+        return bidIdNumCondicion;
+    }
+
+    public void setBidIdNumCondicion(BigDecimal bidIdNumCondicion) {
+        this.bidIdNumCondicion = bidIdNumCondicion;
+    }
+
+    public BigDecimal getBidIdTipoCondicion() {
+        return bidIdTipoCondicion;
+    }
+
+    public void setBidIdTipoCondicion(BigDecimal intTipoCondicion) {
+        this.bidIdTipoCondicion = intTipoCondicion;
+    }
+
+    public BigDecimal getBidIdOrden() {
+        return bidIdOrden;
+    }
+
+    public void setBidIdOrden(BigDecimal intOrden) {
+        this.bidIdOrden = intOrden;
+    }
+
+    /**
+     * @return the descTipoIntereses
+     */
+    public String getDescTipoIntereses() {
+        if (!StringUtils.EMPTY.equalsIgnoreCase(getBidIdTipoIntereses().toString())) {
+            if (BigDecimal.ZERO.compareTo(getBidIdTipoIntereses()) == 0) {
+                descTipoIntereses = new Mensaje(ServicioNegocio.getContexto(), GENERALES_286948246).toString();
+            } else if (BigDecimal.ONE.compareTo(getBidIdTipoIntereses()) == 0) {
+                descTipoIntereses = new Mensaje(ServicioNegocio.getContexto(), INT_NORMALES_1656690870).toString();
+            } else if (BigDecimal.valueOf(2).compareTo(getBidIdTipoIntereses()) == 0) {
+                descTipoIntereses = new Mensaje(ServicioNegocio.getContexto(), INT_DEMORA_805490803).toString();
+            }
+        }
+        return descTipoIntereses;
+    }
+
+    /**
+     * @param descTipoIntereses the descTipoIntereses to set
+     */
+    public void setDescTipoIntereses(String descTipoIntereses) {
+        this.descTipoIntereses = descTipoIntereses;
+    }
+
+    /**
+     * @return the descTipoCondicion
+     */
+    public String getDescTipoCondicion() {
+        return descTipoCondicion;
+    }
+
+    /**
+     * @param descTipoCondicion the descTipoCondicion to set
+     */
+    public void setDescTipoCondicion(String descTipoCondicion) {
+        this.descTipoCondicion = descTipoCondicion;
+    }
+
+    public BigDecimal getBidOficina() {
+        return bidOficina;
+    }
+
+    public void setBidOficina(BigDecimal bidOficina) {
+        this.bidOficina = bidOficina;
+    }
+
+    public BigDecimal getBidNumero() {
+        return bidNumero;
+    }
+
+    public void setBidNumero(BigDecimal bidSolicitud) {
+        this.bidNumero = bidSolicitud;
+    }
+
+    public BigDecimal getBidVersion() {
+        return bidVersionCondicion;
+    }
+
+    public void setBidVersion(BigDecimal bidVersion) {
+        this.bidVersionCondicion = bidVersion;
+    }
+
+    public BigDecimal getBidNucExpedienteTramo() {
+        return bidNucExpedienteTramo;
+    }
+
+    public void setBidNucExpedienteTramo(BigDecimal bidNucExpediente) {
+        this.bidNucExpedienteTramo = bidNucExpediente;
+    }
+
+    public BigDecimal getBidTramo() {
+        return bidTramo;
+    }
+
+    public void setBidTramo(BigDecimal bidTramo) {
+        this.bidTramo = bidTramo;
+    }
+
+    public BigDecimal getBidNucExpedienteMatriz() {
+        return bidNucExpedienteMatriz;
+    }
+
+    public void setBidNucExpedienteMatriz(BigDecimal bidNucExpedienteMatriz) {
+        this.bidNucExpedienteMatriz = bidNucExpedienteMatriz;
+    }
+
+    public BigDecimal getBidVersionCondicion() {
+        return bidVersionCondicion;
+    }
+
+    public void setBidVersionCondicion(BigDecimal bidVersionCondicion) {
+        this.bidVersionCondicion = bidVersionCondicion;
+    }
+
+    private static final String GENERALES_286948246 = "GENERALES_286948246";
+
+    private static final String INT_DEMORA_805490803 = "INT_DEMORA_805490803";
+
+    private static final String INT_NORMALES_1656690870 = "INT_NORMALES_1656690870";
+}

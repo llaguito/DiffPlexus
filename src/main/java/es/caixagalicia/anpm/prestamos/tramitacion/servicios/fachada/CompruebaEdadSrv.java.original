@@ -1,0 +1,61 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos.ContextoComprobacionEdad;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * @author V361466
+ *
+ */
+public class CompruebaEdadSrv extends ServicioNegocio
+{
+
+	/* 
+	 * Transacción: ANVO
+	 * Contexto: ANPMN271
+	 * Cod_Operación: ANPM_271
+	 */
+	private static final String CTE_COMPROBACION = "La edad del cliente no es adecuada para la contratación"; 
+	private static final String CTE_NUC = "NUC"; 
+	private static final String CTE_PLAZO = "PLAZO"; 
+	private static final String CTE_INDICADOR = "INDICADOR_TITULAR"; 
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		BigDecimal nuc = null;
+		BigDecimal plazo=null;
+		BigDecimal indicador=null;
+		IContexto[] salida = new IContexto[1];
+		boolean edadMaximaSuperada = false;
+		// Set diario Electrónico
+		contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_CONSULTA));
+		//Datos de entrada
+		nuc = datosEntrada.getDecimal(CTE_NUC);
+		plazo = datosEntrada.getDecimal(CTE_PLAZO);
+		indicador = datosEntrada.getDecimal(CTE_INDICADOR);
+		
+		BigDecimal numeroMeses= UtilidadesTramitacion.recuperarNumeroMeses(nuc, plazo, indicador);
+		
+		edadMaximaSuperada = UtilidadesTramitacion.esEdadMaxima(numeroMeses);
+		
+		if (edadMaximaSuperada)
+		{
+			salida[0] = ContextoComprobacionEdad.contextoComprobarEdad(CTE_COMPROBACION);
+		}
+		else
+		{
+			salida[0] = null;
+		}
+		return salida;
+	}
+}

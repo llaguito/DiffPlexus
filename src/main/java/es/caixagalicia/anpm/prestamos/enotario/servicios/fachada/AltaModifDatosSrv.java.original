@@ -1,0 +1,393 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.enotario.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionComisionesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionDatosGeneralesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionDatosTitulares;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionEnvioMensajesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoDistribuidorEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioEntradaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioSalidaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.util.Helper;
+/**
+ * Operación 527 (Alta/Modificación de datos) del distribuidor de E-Notario.
+ * Código de operación: ANPM_189
+ * Cuenta contable: 507
+ * Contexto: ANPMN189
+ * 
+ * Sentido de la operacion ANPM -> ANCERT
+ * 
+ * Este servicio invoca al ANPM_187 que realiza el envio de los datos.
+ * 
+ * Esta operación no se va a implementar en el distribuidor, su funcionalidad
+ * se utilizará en el servicio EnvioAltaModificacionSrv (ANPM_187)
+ * 
+ * @author V360144
+ *
+ */
+public class AltaModifDatosSrv extends ServicioNegocio
+{
+	private static final String CTE_ENTRADA_CODIGO_APLICACION = "CODIGO_APLICACION";
+	//2
+	private static final String CTE_ENTRADA_CODIGO_OPERACION_E_NOTARIO = "CODIGO_OPERACION_E_NOTARIO";
+	//2
+	private static final String CTE_ENTRADA_NODO_RE_EMISOR = "NODO_RE_EMISOR";
+	//1
+	private static final String CTE_ENTRADA_NODO_ORIGINAL = "NODO_ORIGINAL";
+	//1
+	private static final String CTE_ENTRADA_TIPO_OPERACION = "TIPO_OPERACION";
+	//1
+	
+	private static final String CTE_ENTRADA_CODIGO_PAIS = "CODIGO_PAIS";
+	//3
+	private static final String CTE_ENTRADA_CODIGO_ENTIDAD = "CODIGO_ENTIDAD";
+	//4
+	private static final String CTE_ENTRADA_TIPO_PRESTAMO = "TIPO_PRESTAMO";
+	//2
+	private static final String CTE_ENTRADA_CONTRATO_PRESTAMO = "CONTRATO_PRESTAMO";
+	//20
+	private static final String CTE_ENTRADA_DESCRIPCION = "DESCRIPCION";
+	//255
+	
+	private static final String CTE_ENTRADA_CODIGO_RETORNO = "CODIGO_RETORNO";
+	//4
+	private static final String CTE_ENTRADA_CODIGO_ERROR = "CODIGO_ERROR";
+	//8
+	private static final String CTE_ENTRADA_TEXTO_ERROR = "TEXTO_ERROR";
+	//60
+
+	private static final String CTE_ENTRADA_CONTRATO_IBAN = "CONTRATO_IBAN";
+	//24
+	private static final String CTE_ENTRADA_CODIGO_BIC = "CODIGO_BIC";
+	//11
+	
+	/**
+	 * @param contextoEjecucion Contexto de ejecución.
+	 * @param datosEntrada Datos de entrada del servicio de negocio (en él se encuentran 
+	 *   los campos de entrada del código de operación).
+	 *   
+	 * @return arrayContextos Array de contextos, aunque sólo se devolverá uno.
+	 */
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion,
+			IDatosEntradaTx datosEntrada)
+	{
+		
+		//enviarCorreoError("asunto: error E-notario", "texto: error E-notario");
+		contextoEjecucion.setDiarioElectronico(
+				new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+		IContexto[] arrayContextos = new IContexto[IConstantesEnotario.CTE_TAM_INICIAL_ARRAYS];
+		List<IContexto> listaContextos = new ArrayList<IContexto>(IConstantesEnotario.CTE_TAM_INICIAL_ARRAYS);
+
+		String codigoAplicacion = datosEntrada.getString(CTE_ENTRADA_CODIGO_APLICACION);
+		String codigoOperacionEnotario = datosEntrada.getString(CTE_ENTRADA_CODIGO_OPERACION_E_NOTARIO);
+		String nodoReEmisor = datosEntrada.getString(CTE_ENTRADA_NODO_RE_EMISOR);
+		String nodoOriginal = datosEntrada.getString(CTE_ENTRADA_NODO_ORIGINAL);
+		String tipoOperacion = datosEntrada.getString(CTE_ENTRADA_TIPO_OPERACION);
+		
+		String codigoPais = datosEntrada.getString(CTE_ENTRADA_CODIGO_PAIS);
+		String codigoEntidadEntrada = datosEntrada.getString(CTE_ENTRADA_CODIGO_ENTIDAD);
+		String tipoPrestamo = datosEntrada.getString(CTE_ENTRADA_TIPO_PRESTAMO);
+		String contratoPrestamo = datosEntrada.getString(CTE_ENTRADA_CONTRATO_PRESTAMO);
+		String descripcion = datosEntrada.getString(CTE_ENTRADA_DESCRIPCION);
+		
+		String codigoRetorno = datosEntrada.getString(CTE_ENTRADA_CODIGO_RETORNO);
+		String codigoError = datosEntrada.getString(CTE_ENTRADA_CODIGO_ERROR);
+		String textoError = datosEntrada.getString(CTE_ENTRADA_TEXTO_ERROR);
+		
+		String contratoIban = datosEntrada.getString(CTE_ENTRADA_CONTRATO_IBAN);
+		String codigoBic = datosEntrada.getString(CTE_ENTRADA_CODIGO_BIC);
+		
+		/*Validaciones previas de los campos de entrada: en principio no se hacen,
+		 * se considera que los campos obligatorios están informados.*/
+		//codigoOperacionEnotario = PMNOT020
+		//codigoOperacionDistribuidor = PMNOT002
+		if (null != descripcion)
+		{
+			descripcion = descripcion.trim();
+		}
+		if (null != textoError)
+		{
+			textoError = textoError.trim();
+		}
+/*
+		if (! IConstantesEnotario.CTE_OCHO_INT.equals(codigoErrorNoop10Reply.length()))
+		{
+			//error: codigoError debe tener ocho carácteres.
+		}
+*/
+		//Creamos el value object para los campos de entrada.
+		DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO = new DistribuidorEnotarioEntradaVO(); 
+		distrEnotarioEntradaVO.setCodigoAplicacion(codigoAplicacion);
+		distrEnotarioEntradaVO.setCodigoOperacionEnotario(codigoOperacionEnotario);
+		distrEnotarioEntradaVO.setNodoReEmisor(nodoReEmisor);
+		distrEnotarioEntradaVO.setNodoOriginal(nodoOriginal);
+		distrEnotarioEntradaVO.setTipoOperacion(tipoOperacion);
+		
+		distrEnotarioEntradaVO.setCodigoPais(codigoPais);
+		distrEnotarioEntradaVO.setCodigoEntidadEntrada(codigoEntidadEntrada);
+		distrEnotarioEntradaVO.setTipoPrestamo(tipoPrestamo);
+		distrEnotarioEntradaVO.setContratoPrestamo(contratoPrestamo);
+		distrEnotarioEntradaVO.setDescripcion(descripcion);
+		
+		distrEnotarioEntradaVO.setCodigoRetorno(codigoRetorno);
+		distrEnotarioEntradaVO.setCodigoError(codigoError);
+		distrEnotarioEntradaVO.setTextoError(textoError);
+
+		distrEnotarioEntradaVO.setContratoIban(contratoIban);
+		distrEnotarioEntradaVO.setCodigoBic(codigoBic);
+
+		/*Obtenemos los datos del préstamo a partir del contrato:
+		 *  codigoEntidad
+		 *  codigoOficina
+		 *  digitosControl
+		 *  cuentaContable
+		 *  numeroSolicitud
+		 *  digitoSolicitud
+		*/
+		distrEnotarioEntradaVO = UtilidadesEnotario.obtenerDatosPrestamo(distrEnotarioEntradaVO);
+		
+		//Creamos el value object para los campos de salida.
+		DistribuidorEnotarioSalidaVO distrEnotarioSalidaVO = new DistribuidorEnotarioSalidaVO(); 
+		distrEnotarioSalidaVO = UtilidadesEnotario.obtenerCamposSalidaIguales(
+				distrEnotarioEntradaVO, distrEnotarioSalidaVO);
+		
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		BigDecimal version = null;
+		BigDecimal codigoOficina = distrEnotarioEntradaVO.getCodigoOficina();
+		BigDecimal numeroSolicitud = distrEnotarioEntradaVO.getNumeroSolicitud();
+		
+		/*obtenemos los objetos datosGenerales y datosSolicitud a partir del
+		 * código de oficina y el número de solicitud*/
+		DatosgeneralesC datosGenerales = gdge.obtenerDatosGeneralesPorOficinaNumSolVersion(
+			codigoOficina, numeroSolicitud, version);
+		//si la version es null devuelve la ultima
+		//DatosSolicitudC datosSolicitudC = gds.getUltimaVersion(nucSolicitudE);
+		DatosSolicitudC datosSolicitud = gds.obtenerDatosSolicitudPorOficinaNumSolVersion(
+			codigoOficina, numeroSolicitud, version);
+		//ELIMINAR ESTA ACTUALIZACION DE HORA DE FORMALIZACION
+		//ESTA AQUI PARA PRUEBAS SOLO.
+		//gds.actualizarHoraFormalizacion(datosSolicitudC, "13:27", "30-01-2014");
+		if (null == datosGenerales)
+		{
+			distrEnotarioSalidaVO = UtilidadesEnotario.prevError(
+					distrEnotarioEntradaVO, distrEnotarioSalidaVO, 
+					"SELECT AN40TB01 / nuc no existe", //IConstantesEnotario.CTE_SQLCODE_ERROR_GENERICO,
+					IConstantesEnotario.CTE_CERO_STR,
+					datosGenerales);
+		}
+		else if (null == datosSolicitud)
+		{
+			distrEnotarioSalidaVO = UtilidadesEnotario.prevError(
+					distrEnotarioEntradaVO, distrEnotarioSalidaVO, 
+					"SELECT AN25TB01 / nuc no existe", //IConstantesEnotario.CTE_SQLCODE_ERROR_GENERICO,
+					IConstantesEnotario.CTE_CERO_STR,
+					datosGenerales);
+		}
+		
+//		if ((Helper.isNullOrEmpty(distrEnotarioSalidaVO.getCodigoError()))&&
+//			(Helper.isNullOrEmpty(distrEnotarioSalidaVO.getTextoError())))
+//		{
+//			distrEnotarioSalidaVO = UtilidadesEnotario.validacionesPrevias(
+//				distrEnotarioEntradaVO, distrEnotarioSalidaVO,
+//				datosGenerales, datosSolicitud, IConstantesEnotario.CTE_OP_DISTR_ALTA_MODIF
+//			);
+//		}
+
+		/*	
+		Si están informados los campos codigoError o textoError en teoria ya no se deberia seguir
+		ejecutando el servicio de negocio, así que, como no podemos hacer rollbacks,  
+		se "encauza" el flujo de ejecución del servicio para que no entre a ejecutar la
+		operación y devuelva el contexto sin hacer nada más.
+		*/
+		if ((Helper.isNullOrEmpty(distrEnotarioSalidaVO.getCodigoError()))&&
+			(Helper.isNullOrEmpty(distrEnotarioSalidaVO.getTextoError())))
+		{
+			distrEnotarioSalidaVO = opAltaModificacion(
+					distrEnotarioEntradaVO, 
+					distrEnotarioSalidaVO, 
+					datosGenerales, datosSolicitud);
+					
+/*
+			El método al que se está invocando, opAltaModificacion(..) ya no se encuentra
+			en este servicio porque no se va a llamar desde aquí, se llamará desde el
+			servicio EnvioAltaModificacionSrv, de hecho, este servicio ya no se 
+			va a invocar, pero aún no lo eliminé por si acaso.
+			EDIT 20140218: El método vuelve para aquí porque ahora se va a invocar este
+			servicio desde el servicio EnvioAltaModificacionSrv.
+*/
+		}
+		
+		listaContextos = ContextoDistribuidorEnotario.rellenarContextoDistribuidor(
+				distrEnotarioSalidaVO, IConstantesEnotario.CTE_OP_DISTR_ALTA_MODIF);
+		arrayContextos = listaContextos.toArray(new IContexto[listaContextos.size()]);
+		return arrayContextos;
+	}
+
+	/*
+	 * PMNOT002 = 527
+	 * 
+	 * ESTA OPERACION NO SE IMPLEMENTA EN EL DISTRIBUIDOR, EN PRINCIPIO.
+	 * EDIT: SE IMPLEMENTA PERO PARA LUEGO FUNDIRLA CON OTRA OPERACION, EnvioAltaModifSrv.
+	 * 
+	 * @param distrEnotarioEntradaVO
+	 * @param distrEnotarioSalidaVO
+	 * @param datosGeneralesC
+	 * @param datosSolicitudC
+	 * 
+	 * @return distrEnotarioSalidaVO Value Object que contiene los campos de salida
+	 * del servicio de negocio.
+	 */
+	public static DistribuidorEnotarioSalidaVO opAltaModificacion(
+		DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO,
+		DistribuidorEnotarioSalidaVO distrEnotarioSalidaVO,
+		DatosgeneralesC datosGeneralesC, DatosSolicitudC datosSolicitudC)
+	{
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		GestionEnvioMensajesEnotario geme = new GestionEnvioMensajesEnotario();
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario(); 
+		String codigoRetorno = distrEnotarioEntradaVO.getCodigoRetorno();
+		String codigoError = distrEnotarioEntradaVO.getCodigoError();
+		String textoError = distrEnotarioEntradaVO.getTextoError();
+		BigDecimal codigoOficina = distrEnotarioEntradaVO.getCodigoOficina();
+		BigDecimal numeroSolicitud = distrEnotarioEntradaVO.getNumeroSolicitud();
+		BigDecimal nucSolicitud = datosGeneralesC.getId().getNucExpediente();
+		BigDecimal versionSolicitud = datosSolicitudC.getDatosSolicitudKey().getVersionSolicitud();
+		String contratoPrestamo = distrEnotarioEntradaVO.getContratoPrestamo();
+		//BigDecimal version = null;
+		String codigoOperacionEnotario = distrEnotarioEntradaVO.getCodigoOperacionEnotario();
+		String descripcion = distrEnotarioEntradaVO.getDescripcion();
+		String estadoPrestamo = datosGeneralesC.getEstado();
+		
+		distrEnotarioSalidaVO.setDescripcion(descripcion);
+		//IF PME10260 = '01' 
+		// Se incluye el estado "02" en la comprobacion (equivalente al "01")
+		if (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO.equals(estadoPrestamo) || 
+				IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoPrestamo))
+		{
+			geme.grabarLog(distrEnotarioEntradaVO, datosGeneralesC);
+			String codigoErrorSubstring = codigoError.substring(0, 4);
+			if ((! IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0.equals(codigoRetorno) &&
+				(! IConstantesEnotario.CTE_COD_ERR_SUBSTR_ERROR_ALTA.equals(codigoErrorSubstring))))
+			{
+				UtilidadesEnotario.enviarCorreoError("PMNOT002 = 527, alta/modif", contratoPrestamo);
+				String codigoErrorPrimeraLetra = codigoError.substring(0,1);
+				if (((IConstantesEnotario.CTE_OP_E_NOTARIO_ALTA_01.equals(codigoOperacionEnotario)) ||
+					(IConstantesEnotario.CTE_OP_E_NOTARIO_ALTA.equals(codigoOperacionEnotario))) &&
+					(! IConstantesEnotario.CTE_LETRA_B.equals(codigoErrorPrimeraLetra)))
+				{
+					borrarDatosGenComisTitAval(nucSolicitud);
+					/*nota: ya se puede usar el NUC, en vez de codigoOficina y numeroSolicitud.
+					//lo que no se puede es obtener el NUC como campo de entrada, pero una vez que se 
+					//obtiene el datosGeneralesC a partir del código de oficina y el número de solicitud
+					 * ya se puede obtener el nuc a partir del datosGeneralesC.
+					 */
+				}
+				else
+				{
+					// Se sustituye la actualizacion de la 40 con estado "01" por estado "02"
+					//gdge.actualizarDatosGeneralesError(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_ENVIADO,
+					//		codigoRetorno, codigoError, textoError, datosGeneralesC);
+					gdge.actualizarDatosGeneralesError(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO,
+							codigoRetorno, codigoError, textoError, datosGeneralesC);
+				}
+			}
+/*
+ 			Si el estado es 2 (Confirmado)
+			NO PROGRAMA A CONDICION VEN "ELSE", NON "ELSE IF PME10260 = 2"
+			PREGUNTAR CÁL É A ADECUADA.
+			ELSE DO; */
+			else //if (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO.equals(estadoPrestamo))
+			{
+				gdge.actualizarDatosGeneralesError(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_CONFIRMADO,
+						StringUtils.EMPTY, StringUtils.EMPTY, StringUtils.EMPTY, datosGeneralesC);
+
+				/*Vai haber un servicio de negocio que haberá que chamar 
+				para generar a póliza.*/
+				
+				IDatosEntradaTx datosEntradaGenerarPoliza = ServicioNegocio.getPrograma(contextoEjecucion,
+						IConstantesEnotario.CTE_CC_GENERAR_POLIZA,
+						IConstantesEnotario.CTE_CO_GENERAR_POLIZA);
+				datosEntradaGenerarPoliza.addCampo(
+						IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_OFICINA_SOLICITUD, codigoOficina);
+				datosEntradaGenerarPoliza.addCampo(
+						IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_NUMERO_SOLICITUD, numeroSolicitud);
+				datosEntradaGenerarPoliza.addCampo(
+						IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_VERSION_SOLICITUD, versionSolicitud);
+				datosEntradaGenerarPoliza.addCampo(
+						IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_NUC_EXPEDIENTE, nucSolicitud);
+				datosEntradaGenerarPoliza.addCampo(
+						IConstantesEnotario.CAMPO_ENTRADA_GENERAR_POLIZA_PANTALLA_ORIGEN, "1"); // 1 Preformalizacion, y 2 Formalizacion
+				
+				IContexto[] resultadoGenerarPoliza = ServicioNegocio.invocarServicio(
+						contextoEjecucion, datosEntradaGenerarPoliza);
+				/*El tema es que esta invocación, si se ejecutó correctamente va a devolver nulo,
+				 * así que entiendo que si falla lanzará una excepción que gestionará Metrópolis.
+				 */
+			}
+
+		} //IF PME10260 = '01'
+		else
+		{
+			String descrEstado = UtilidadesEnotario.descripcionEstado(estadoPrestamo);
+			String msgErr = "527-NO PERMITIDO EN ESTADO:".concat(estadoPrestamo).concat(descrEstado);
+			distrEnotarioSalidaVO = UtilidadesEnotario.prevError(
+					distrEnotarioEntradaVO, distrEnotarioSalidaVO, 
+					msgErr,
+					//BigDecimal.ZERO,
+					IConstantesEnotario.CTE_CERO_STR,
+					datosGeneralesC);
+		}		
+		return distrEnotarioSalidaVO;
+	}
+	
+	
+	/**
+	 * Método equivalente al procedimiento PL/I BORRAR_DATOS.
+	 * @param codigoOficina
+	 * @param numeroSolicitud
+	 * @param version
+	 * @param nuc
+	 */
+	public static void borrarDatosGenComisTitAval(BigDecimal nucSolicitud)
+	{
+		GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+		GestionComisionesEnotario gce = new GestionComisionesEnotario();
+		GestionDatosTitulares gdt = new GestionDatosTitulares();
+		
+		//gds.borrarDatosSolicitud(nuc, version);
+		gdge.borrarDatosGeneralesPorNuc(nucSolicitud);
+		/*Se borran todas las filas de datos generales (AN40TB01) con el mismo NUC,
+		 * aunque en teoría va a haber sólo una porque en la tabla de datos generales
+		 * se almacena la última versión para cada expediente.*/
+
+		//gce.borrarComisionesGastos(nuc, version);
+		gce.borrarComisionesGastosPorNuc(nucSolicitud);
+		/*Se borran todas las filas de comisionesGastos (AN41TB01) con el mismo NUC,
+		 * es decir, del mismo expediente.*/
+		
+		//gdt.borrarTitularesAvalistasPorOficinaSolicitud(codigoOficina, numeroSolicitud);
+		gdt.borrarTitularesAvalistasPorNuc(nucSolicitud);
+		/*Se borran todas las filas de titularesAvalistas (AN42TB01) con el mismo NUC,
+		 * es decir, del mismo expediente.*/
+	}
+}

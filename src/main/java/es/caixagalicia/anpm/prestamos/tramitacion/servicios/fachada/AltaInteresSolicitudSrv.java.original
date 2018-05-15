@@ -1,0 +1,158 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionCondicionesInteres;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionConsultaDatosIntereses;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+/**
+ * Servicio de alta interés solicitud.
+ * Este servicio consulta los datos de catálogo para la versión general vigente del subproducto del expediente
+ * recibido (ANPM_048 paso 3) y los persiste a nivel de solicitud, tabla AN27TB01.
+ * 
+ * CO:  ANPM_447
+ * CTX: ANPMN447
+ * 
+ * @author V360144
+ *
+ */
+public class AltaInteresSolicitudSrv extends ServicioNegocio
+{
+	private static final String CTE_CTX = 				"ANPMN447";
+	private static final String CTE_CTX_COD_ERROR = 	"ANPMN447010";
+	private static final String CTE_CTX_DESCR_ERROR = 	"ANPMN447020";
+	
+	private static final String CTE_DESCR_ERROR_NO_ALTA_INTERES = "No se han dado de alta los tramos de interes";
+	
+	private static final String CTE_ENTRADA_NUC = "NUC";
+	
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		BigDecimal nuc = null;
+		DatosSolicitudC datosSolicitud = null;
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		GestionCondicionesInteres gci = new GestionCondicionesInteres();
+		
+		IContexto[] arrayDatosCatalogo = null;
+		
+		IContexto contextoSalida = null;
+		IContexto[] resultado = null;
+		
+		/*Establecemos diario electrónico*/
+		contextoEjecucion.setDiarioElectronico(
+			new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+		
+		/*Recuperamos entradas*/
+		nuc = datosEntrada.getDecimal(CTE_ENTRADA_NUC);
+		
+		/*Obtenemos la última versión incompleta de la solicitud*/
+		
+		datosSolicitud = gds.getUltimaVersion(nuc);
+		
+		
+		if ((null == datosSolicitud))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_SOLIC_NO_EXISTE,
+				null,
+				new String[] {nuc.toString()},
+				null);
+		}
+		/*Tiene que ser versión incompleta*/
+		if (0 != BigDecimal.ZERO.compareTo(datosSolicitud.getDatosSolicitudKey().getNumSolicitud()))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_SOLIC_NO_INCOMPLETA,
+				null,
+				new String[] {nuc.toString()},
+				null);
+		}
+		
+		/*Para llamar al ANPM_048 necesito:
+		 *  - Cod producto		(AN250080)
+		 *  - Cod subproducto	(AN250090)
+		 *  - Colectivo: 0		
+		 *  - Versión general	(AN250100)
+		 *  - Paso: 3 (sólo necesitamos contextos de interés, ANPMN014 y diferencial, ANPMN015.
+		 *  - id tarifa: 		(AN251590)
+		 *  - plazo: 			(AN250710)
+		 *  - origen: 2 (tramitacion)
+		 * */
+		//arrayDatosCatalogo = UtilidadesTramitacion.consultarDatosSubproductoCatalogo(datosSolicitud);
+		
+		/*Finalmente se va a llamar al ANPM_167, que llama al ANPM_048.*/
+		
+		//consultaObtenerDatosVersionGeneral(BigDecimal producto, BigDecimal subproducto, BigDecimal version, BigDecimal colectivo, BigDecimal paso, BigDecimal idTarifa) {
+		arrayDatosCatalogo = GestionConsultaDatosIntereses.consultaObtenerDatosVersionGeneral(
+			datosSolicitud.getProducto(),
+			datosSolicitud.getSubproducto(),
+			datosSolicitud.getVersionGeneral(),
+			BigDecimal.ZERO,
+			Constantes.CTE_PASO_3,
+			datosSolicitud.getIdTarifa(),
+			null, //BO
+			datosSolicitud.getPlazoTotal().toString(),
+			Constantes.CTE_ORIGEN_CONSULTA_TARIFA_SOLICITUD, //1: Simulacion, 2: Solicitud
+			Constantes.CTE_STR_S, //ind filtrar nivel, le enviamos una S para que nos devuelva sólo contextos de catálogo de nivel Oficina (10) o nivel Todos (0).
+			null
+		);
+		
+		/*Rellenamos los intereses de la solicitud y los guardamos en la tabla AN27TB01*/
+		gci.altaInteresSolicitud(gds, datosSolicitud, arrayDatosCatalogo);
+		
+		contextoSalida = rellenarDatosContexto(datosSolicitud);
+		
+		resultado = new IContexto[1];
+		
+		resultado[0] = contextoSalida;
+		
+		return resultado;
+	}
+
+	/**
+	 * Rellena el contexto de salida ANPMN447
+	 * 
+	 * @return
+	 */
+	private static IContexto rellenarDatosContexto(DatosSolicitudC datosSolicitud)
+	{
+		IContexto contexto = null;
+		List<CondicionesInteresC> listaInteres = null;
+		
+		contexto = ContextoFactory.getInstance().getContexto(CTE_CTX);
+		listaInteres = datosSolicitud.getCondicionesInteres();
+		
+		if (! UtilidadesTramitacion.isBlankOrNull(listaInteres))
+		{
+			//OK
+			contexto.put(CTE_CTX_COD_ERROR, BigDecimal.ZERO);
+			contexto.put(CTE_CTX_DESCR_ERROR, StringUtils.EMPTY);
+		}
+		else
+		{
+			//NK
+			contexto.put(CTE_CTX_COD_ERROR, BigDecimal.ONE);
+			contexto.put(CTE_CTX_DESCR_ERROR, CTE_DESCR_ERROR_NO_ALTA_INTERES);
+		}
+		
+		return contexto;
+	}
+	
+}

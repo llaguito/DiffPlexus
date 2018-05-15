@@ -1,0 +1,1572 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+/**
+ * 507 - 254
+ * Alta de los datos de preformalización de una solicitud
+ */
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.aplicacion.GestionDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.LogModificacionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.historicoimpresion.HistoricoImpresionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.historicoimpresion.HistoricoImpresionEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.operatoriadocumentos.OperatoriaDocumentosOficinaC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.operatoriadocumentos.OperatoriaDocumentosOficinaEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.operatoriadocumentos.OperatoriaDocumentosOficinaKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.CumplimientoAntelacionDocumentosVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionCitaAgendaGestor;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionHistoricoImpresion;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionOperatoriaDocumentos;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionPreformalizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionPreformalizacionFormalizacionComunes;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos.ContextoDatosCuentas;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.util.Helper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Servicio para el alta o modificación de los datos de preformalización
+ * @author F001443
+ */
+public class AltaPreformalizacionPrestamosDivisasSrv extends ServicioNegocio {
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_NUMERO_SOLICITUD = "NUMERO_SOLICITUD";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_EXPEDIENTE = "NUC_EXPEDIENTE";
+
+    // private static final String ENVIAR_CORREO					= "ENVIAR_CORREO";  // OPCIONAL
+    // private static final String CNTX_DIRECCIONES_CORREO         = "ANPMN260"; // OPCIONAL
+    // Campos de la Cuenta de Cargos de Divisas
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CCD_DIVISA = "CCD_DIVISA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CCD_ENTIDAD = "CCD_ENTIDAD";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CCD_OFICINA = "CCD_OFICINA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CCD_CUENTA = "CCD_CUENTA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CCD_PAIS_CUENTA = "CCD_PAIS_CUENTA";
+
+    // Campos de la Cuenta de Abono de Divisas
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CAD_DIVISA = "CAD_DIVISA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CAD_ENTIDAD = "CAD_ENTIDAD";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CAD_OFICINA = "CAD_OFICINA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CAD_CUENTA = "CAD_CUENTA";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CAD_PAIS_CUENTA = "CAD_PAIS_CUENTA";
+
+    // Campos de la Cuenta de Cargo en Euros
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CCE_DIVISA = "CCE_DIVISA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CCE_ENTIDAD = "CCE_ENTIDAD";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CCE_OFICINA = "CCE_OFICINA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CCE_CUENTA = "CCE_CUENTA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CCE_PAIS_CUENTA = "CCE_PAIS_CUENTA";
+
+    // Campos de la Cuenta de Abono en Euros
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CAE_DIVISA = "CAE_DIVISA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CAE_ENTIDAD = "CAE_ENTIDAD";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CAE_OFICINA = "CAE_OFICINA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CAE_CUENTA = "CAE_CUENTA";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_CAE_PAIS_CUENTA = "CAE_PAIS_CUENTA";
+
+    // Campos de Datos de la póliza
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_FEC_FORMALIZACION = "POLIZA_FECHA_FORMALIZACION";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_HORA_FORMALIZACION = "POLIZA_HORA_FORMALIZACION";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_DOC_FORMALIZACION = "POLIZA_DOC_FORMALIZACION";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_LOCALIZACION = "POLIZA_LOCALIZACION";
+
+    // OBLIGATORIO
+    private static final String NOMBRE_CAMPO_CORRETAJE = "POLIZA_CORRETAJE";
+
+    // Campos del servicio de modificar formalizacion solicitud
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_EDICIONSRV_FECHA = "FECHA_FORMALIZACION";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_EDICIONSRV_DOCUMENTO = "DOCUMENTO_FORMALIZACION";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_EDICIONSRV_LOCALIDAD = "LOCALIDAD_FORMALIZACION";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_EDICIONSRV_CORRETAJE = "CORRETAJE";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_EDICIONSRV_MEDIO = "MEDIO_FORMALIZACION";
+
+    private static final String NOMBRE_CAMPO_ESTADO_TAREA = "ESTADO_TAREA";
+
+    // IBANES
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_IBAN_CE = "IBAN_CE";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_IBAN_AE = "IBAN_AE";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_IBAN_CD = "IBAN_CD";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_IBAN_AD = "IBAN_AD";
+
+    // TIPOS DE CUENTA ( Interna o externa )
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_TIPO_CUENTA_CE = "TIPO_CUENTA_CE";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_TIPO_CUENTA_AE = "TIPO_CUENTA_AE";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_TIPO_CUENTA_CD = "TIPO_CUENTA_CD";
+
+    // OPCIONAL
+    private static final String NOMBRE_CAMPO_TIPO_CUENTA_AD = "TIPO_CUENTA_AD";
+
+    // DATOS DEL APODERADO
+    private static final String NOMBRE_CAMPO_TIPO_APODERADO = "TIPO_APODERADO";
+
+    private static final String NOMBRE_CAMPO_USUARIO_APODERADO = "USUARIO_APODERADO";
+
+    private static final String NOMBRE_CAMPO_NOMBRE_APODERADO = "NOMBRE_APODERADO";
+
+    private static final String NOMBRE_CAMPO_TELEF_FIJO = "TELEF_FIJO";
+
+    private static final String NOMBRE_CAMPO_TELEF_MOVIL = "TELEF_MOVIL";
+
+    private static final String NOMBRE_CAMPO_OBSERVACIONES = "OBSERVACIONES";
+
+    /*20150223 Se añade oficina contable y tipo prescriptor*/
+    private static final String NOMBRE_CAMPO_CENTRO_CONTABLE = "OFICINA_CONTABLE";
+
+    private static final String NOMBRE_CAMPO_TIPO_PRESCRIPTOR = "TIPO_PRESCRIPTOR";
+
+    private static final String NOMBRE_CAMPO_CODIGO_TAREA = "COD_TAREA";
+
+    // Codigos de error del servicio
+    private static final int ERROR_VALIDACION_CUENTAS_DIVISA = 10786;
+
+    private static final int ERROR_VALIDACION_CUENTAS_EURO = 10792;
+
+    // private static final int ERROR_FECHA_FORMALIZACION = 12180;
+    private static final String CTE_CTX_PREFORM = "ANPMN254";
+
+    private static final String CTE_CTX_PREFORM_COD_ERROR = "ANPMN254010";
+
+    private static final String CTE_CTX_PREFORM_PRIMER_MENSAJE_PREFORM = "ANPMN254020";
+
+    private static final String CTE_CTX_PREFORM_SEGUNDO_MENSAJE_PREFORM = "ANPMN254030";
+
+    private static final String CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_COD = "ANPMN254040";
+
+    private static final String CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_MENS = "ANPMN254050";
+
+    // Cuenta contable de la aplicacion .
+    private static final Integer ID_CUENTA_ANPM = Integer.valueOf(507);
+
+    // Codigo operacion del servicio de alta/mod de datos solicitud
+    private static final Integer ID_COOP_EDICION_SOLICITUD = Integer.valueOf(257);
+
+    // Codigo operacion del servicio de generacion de Documento interno para minutar: ANPM_260
+    private static final Integer ID_COOP_GENERACION_DOC_INTERNO = Integer.valueOf(260);
+
+    // Codigo operacion del servicio de generacion de la Oferta vinculante para hipotecarios: ANPM_264
+    private static final Integer ID_COOP_GENERACION_OFERTA_VINCULANTE = Integer.valueOf(264);
+
+    // private static final BigDecimal ID_ESTADO_TAREA_VALIDACION = new BigDecimal(25);
+    // Campo Origen llamada a la generacion de OV Hipotecarios
+    // 1 Boton Imprimir(->imprimir) 2 Boton Aceptar(->Guardar en Gestion Documental)
+    private static final String NOMBRE_CAMPO_ORIGEN = "BOTON_ORIGEN";
+
+    private static final String ORIGEN_BOTON_ACEPTAR = "2";
+
+    // private static final String CTE_MENSAJE_PREFORM_CORRECTA_NO_AVISO = "Se ha realizado la preformalización correctamente pero no se ha generado el aviso al usuario apoderado."; $NON-NL-1$
+    private static final String CTE_MENSAJE_PREFORM_CORRECTA_NO_AVISO = "REALIZADO_PREFORMALIZACI_N_CORRECTAMENTE_1948031452";
+
+    // $NON-NL-1$
+    private static final String CTE_MENSAJE_PREFORM_CORRECTA_AVISO = "REALIZADO_PREFORMALIZACI_N_CORRECTAMENTE_SE_ENVIAD_1796812763";
+
+    // $NON-NL-1$
+    private static final String CTE_MENSAJE_NO_ALTA_CITA_CLIENTE_RESUELTO_TEMA = "DADO_ALTA_CITA_CLIENTE_EST_RESUELTO_TEMA_FAVOR_304924071";
+
+    // private static final String CTE_MENSAJE_ALTA_CITA_CLIENTE = "Se ha dado de alta la cita con el gestor comercial correctamente."; $NON-NL-1$
+    private static final String CTE_MENSAJE_ALTA_CITA_CLIENTE = "DADO_ALTA_CITA_AGENDA_COMERCIAL_USUARIO_DESIGNADO_1310842346";
+
+    public static final String CTE_OP_E_NOTARIO_CANCEL = "06";
+
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(AltaPreformalizacionPrestamosDivisasSrv.class);
+
+    public AltaPreformalizacionPrestamosDivisasSrv() {
+        super();
+    }
+
+    /**
+     * @param contexto
+     * @param datosEntrada
+     * @return Contexto con los datos que se han modificado (solicitud y cuentas) o dado de alta (cuentas)
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada) {
+        List<IContexto> listaContextos = new ArrayList<IContexto>(1);
+        IContexto[] aContextoSalida = null;
+        // Cuentas de cargo y abornos asociadas a la solicitud tanto de divisas como de euros
+        DatosCuentasC datosCuentaCcd = null;
+        DatosCuentasC datosCuentaCad = null;
+        DatosCuentasC datosCuentaCce = null;
+        DatosCuentasC datosCuentaCae = null;
+        CumplimientoAntelacionDocumentosVO cumplimientoAntelacionDocumentosVO = null;
+        // Apoderado asociado a la solicitud
+        ApoderadoC apoderadoC = null;
+        BigDecimal centroContable = null;
+        BigDecimal tipoPrescriptor = null;
+        String strCodigoTarea = "";
+        // Se inicializa el codigo de tarea por si viene vacio.
+        BigDecimal bidCodigoTarea = Constantes.CTE_CODIGO_PROCESO_PREFORM;
+        String fechaFormAnterior = null;
+        int salidaAltaCita = Constantes.CTE_SALIDA_ALTA_CITA_NO_APLICA;
+        int salidaAltaAviso = Constantes.CTE_SALIDA_ALTA_AVISO_NO_AVISO_MISMOS_USUARIOS;
+        boolean esHipotecario = false;
+        boolean seImprimeOVHipotecaria = false;
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM254: Alta/Modificación de datos de preformalización");
+        }
+        contexto.setDiarioElectronico(new DiarioElectronico(Constantes.CTE_OPERACION_AC, Integer.valueOf(0), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, BigDecimal.ZERO, BigDecimal.ZERO, Integer.valueOf(0)));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        String estadoTareaSolicitud = null;
+        // String estadoTareaSolicitudActualizada = null;
+        BigDecimal bidOficinaSolicitud = datosEntrada.getDecimal(NOMBRE_CAMPO_OFICINA_SOLICITUD);
+        BigDecimal bidNumeroSolicitud = datosEntrada.getDecimal(NOMBRE_CAMPO_NUMERO_SOLICITUD);
+        BigDecimal bidVersionSolicitud = datosEntrada.getDecimal(NOMBRE_CAMPO_VERSION_SOLICITUD);
+        BigDecimal bidNucExpediente = datosEntrada.getDecimal(NOMBRE_CAMPO_EXPEDIENTE);
+        String strCcdDivisa = datosEntrada.getString(NOMBRE_CAMPO_CCD_DIVISA);
+        BigDecimal bidCcdEntidad = datosEntrada.getDecimal(NOMBRE_CAMPO_CCD_ENTIDAD);
+        BigDecimal bidCcdOficinaCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCD_OFICINA);
+        BigDecimal bidCcdCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCD_CUENTA);
+        BigDecimal bidCcdPaisCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCD_PAIS_CUENTA);
+        String strCadDivisa = datosEntrada.getString(NOMBRE_CAMPO_CAD_DIVISA);
+        BigDecimal bidCadEntidad = datosEntrada.getDecimal(NOMBRE_CAMPO_CAD_ENTIDAD);
+        BigDecimal bidCadOficinaCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAD_OFICINA);
+        BigDecimal bidCadCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAD_CUENTA);
+        BigDecimal bidCadPaisCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAD_PAIS_CUENTA);
+        String strCceDivisa = datosEntrada.getString(NOMBRE_CAMPO_CCE_DIVISA);
+        BigDecimal bidCceEntidad = datosEntrada.getDecimal(NOMBRE_CAMPO_CCE_ENTIDAD);
+        BigDecimal bidCceOficinaCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCE_OFICINA);
+        BigDecimal bidCceCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCE_CUENTA);
+        BigDecimal bidCcePaisCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CCE_PAIS_CUENTA);
+        String strCaeDivisa = datosEntrada.getString(NOMBRE_CAMPO_CAE_DIVISA);
+        BigDecimal bidCaeEntidad = datosEntrada.getDecimal(NOMBRE_CAMPO_CAE_ENTIDAD);
+        BigDecimal bidCaeOficinaCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAE_OFICINA);
+        BigDecimal bidCaeCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAE_CUENTA);
+        BigDecimal bidCaePaisCuenta = datosEntrada.getDecimal(NOMBRE_CAMPO_CAE_PAIS_CUENTA);
+        BigDecimal bidDocFormalizacion = datosEntrada.getDecimal(NOMBRE_CAMPO_DOC_FORMALIZACION);
+        String strLocalizacionNueva = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_LOCALIZACION));
+        String strCorretaje = datosEntrada.getString(NOMBRE_CAMPO_CORRETAJE);
+        String strEstdoTrea = datosEntrada.getString(NOMBRE_CAMPO_ESTADO_TAREA);
+        String fechaPrevistaFirmaAntigua = null;
+        String fechaPrevistaFirmaNueva = null;
+        String horaPrevistaFirmaAntigua = null;
+        String strFechaFormalizacion = datosEntrada.getString(NOMBRE_CAMPO_FEC_FORMALIZACION);
+        String strIbanCargoEuros = datosEntrada.getString(NOMBRE_CAMPO_IBAN_CE).trim();
+        String strIbanAbonoEuros = datosEntrada.getString(NOMBRE_CAMPO_IBAN_AE).trim();
+        String strIbanCargoDivisa = datosEntrada.getString(NOMBRE_CAMPO_IBAN_CD).trim();
+        String strIbanAbonoDivisa = datosEntrada.getString(NOMBRE_CAMPO_IBAN_AD).trim();
+        // Tipos de cuenta, inicializamos a uno, cuenta interna. ( Cuenta interna = 1, Cuenta externa = 2 )
+        BigDecimal bidTipoCuentaCE = BigDecimal.ONE;
+        BigDecimal bidTipoCuentaAE = BigDecimal.ONE;
+        BigDecimal bidTipoCuentaCD = BigDecimal.ONE;
+        BigDecimal bidTipoCuentaAD = BigDecimal.ONE;
+        if (null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_CE) && null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_AE) && null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_CD) && null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_AD)) {
+            bidTipoCuentaCE = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_CE);
+            bidTipoCuentaAE = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_AE);
+            bidTipoCuentaCD = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_CD);
+            bidTipoCuentaAD = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_CUENTA_AD);
+        }
+        /*20141110 se recupera la última versión completa.*/
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC datosSolicitud = gds.getUltimaVersionCompleta(bidNucExpediente);
+        /**
+         * Se excluye el expediente correspondiente con 150004 de la comprobacion de titularidad de cuentas.
+         */
+        if (UtilidadesTramitacion.comprobarControlOperatoria(bidNucExpediente, new BigDecimal(150004), false)) {
+            // si es domiciliación externa no se llama al ANPM_292 y no ASF
+            if (!BigDecimal.valueOf(2).equals(bidTipoCuentaCE) && !UtilidadesComun.esASF(datosSolicitud.getEntidad())) {
+                GestionPreformalizacionFormalizacionComunes.comprobarCuentas(bidNucExpediente, strIbanCargoEuros, strIbanAbonoEuros, strIbanAbonoDivisa);
+            }
+        }
+        // Campos para la firma del apoderado
+        String strHoraFormalizacionNueva = "";
+        if (!UtilidadesTramitacion.isBlankOrNull(datosEntrada.getString(NOMBRE_CAMPO_HORA_FORMALIZACION))) {
+            strHoraFormalizacionNueva = datosEntrada.getString(NOMBRE_CAMPO_HORA_FORMALIZACION);
+        } else {
+            strHoraFormalizacionNueva = Constantes.CTE_HORA_MINIMA;
+        }
+        BigDecimal bidTipoApoderado = BigDecimal.ONE;
+        if (null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_APODERADO)) {
+            bidTipoApoderado = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_APODERADO);
+        }
+        String strUsuarioApoderado = "";
+        if (null != datosEntrada.getString(NOMBRE_CAMPO_USUARIO_APODERADO)) {
+            strUsuarioApoderado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_USUARIO_APODERADO));
+        }
+        String strNombreApoderado = "";
+        if (null != datosEntrada.getString(NOMBRE_CAMPO_NOMBRE_APODERADO)) {
+            strNombreApoderado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_NOMBRE_APODERADO));
+        }
+        String str_telef_fijo_apoderado = "";
+        if (null != datosEntrada.getString(NOMBRE_CAMPO_TELEF_FIJO)) {
+            str_telef_fijo_apoderado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_TELEF_FIJO).trim());
+        }
+        String str_telef_movil_apoderado = "";
+        if (null != datosEntrada.getString(NOMBRE_CAMPO_TELEF_MOVIL)) {
+            str_telef_movil_apoderado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_TELEF_MOVIL).trim());
+        }
+        String strObservaciones = "";
+        if (null != datosEntrada.getString(NOMBRE_CAMPO_OBSERVACIONES)) {
+            strObservaciones = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(NOMBRE_CAMPO_OBSERVACIONES));
+        }
+        /*20150223 Obtenemos el centro contable y el tipo de prescriptor*/
+        centroContable = datosEntrada.getDecimal(NOMBRE_CAMPO_CENTRO_CONTABLE);
+        tipoPrescriptor = datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_PRESCRIPTOR);
+        strCodigoTarea = datosEntrada.getString(NOMBRE_CAMPO_CODIGO_TAREA);
+        if (!UtilidadesTramitacion.isEmptyOrNullString(strCodigoTarea)) {
+            bidCodigoTarea = UtilidadesTramitacion.stringToBigDecimal(strCodigoTarea, Locale.getDefault());
+        }
+        final GestionPreformalizacion gp = new GestionPreformalizacion();
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Buscamos la solicitud");
+        }
+        // Actualizar los datos de solicitud
+        /*
+		DatosSolicitudC datosSolicitud = gds.obtenerDatosSolicitud(bidOficinaSolicitud, 
+				bidNumeroSolicitud, 
+				bidVersionSolicitud, 
+				bidNucExpediente);
+		*/
+        /*20141110 se recupera la última versión completa.*/
+        // si la entidad de la solicitud que estamos preformalizando no coincide con la asociada a la oficina del terminal que realiza la operación
+        // no dejamos realizar la preformalización
+        String oficinaTerminal = contexto.getOficina();
+        String entidadCentro = UtilidadesComun.obtenerEntidadCentro(oficinaTerminal);
+        if (!(entidadCentro.equals(datosSolicitud.getEntidad()))) {
+            ServicioNegocio.rollback(CodigosError.CTE_COD_MSG_ERROR_ENTIDADES, null, null, null);
+        }
+        /**
+         * Si no es un prescriptor valido.
+         */
+        // if(!UtilidadesTramitacion.esPrescriptorValido(bidNucExpediente, datosSolicitud.getProducto().intValue(),datosSolicitud.getSubproducto().intValue(),datosSolicitud.getTipoPrescriptor(),datosSolicitud.getIdTarifa())) {
+        // ServicioNegocio.rollback(CodigosError.CLAVE_MENSAJE_ERROR_PRESCRIPTOR_INCORRECTO, null, null, null);
+        // }
+        GestionPreformalizacionFormalizacionComunes gpfc = new GestionPreformalizacionFormalizacionComunes();
+        gpfc.comprobarVigenciaProducto(datosSolicitud, strFechaFormalizacion);
+        GestionDatosAutorizacion gda = new GestionDatosAutorizacion();
+        DatosAutorizacionC datosAutorizacion = gda.buscarPorVersion(datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+        if (BigDecimal.ONE.equals(datosSolicitud.getIndicadorAutorizacion())) {
+            if (!datosSolicitud.getMarcaBO().equals(ConstantesComun.CTE_STR_S)) {
+                if (null != datosAutorizacion) {
+                    if (!UtilidadesAutorizacion.isSolicitudAutorizada(datosSolicitud)) {
+                        rollback(CodigosError.CTE_COD_MSG_ERROR_AUTORIZACION, null, null, null);
+                    }
+                }
+            }
+        }
+        // Fecha de formalizacion INTRODUCIDA POR EL USUARIO formateada para la comparacion
+        Date fechaForm = DateUtils.parseDate(strFechaFormalizacion, DateUtils.FORMATO_FECHA_CORTO);
+        if (UtilidadesTramitacion.comprobarControlOperatoria(bidNucExpediente, Constantes.CTE_CONTROL_OPERATORIA_EXP_DOCUMENTO, true) && !compruebaPlazosFiper()) {
+            cumplimientoAntelacionDocumentosVO = new CumplimientoAntelacionDocumentosVO();
+            // 20150603 Se comprueba el cumplimiento de los dias de antelación de la impresión de la fiper antes de la fecha de formalización.
+            cumplimientoAntelacionDocumentosVO = comprobarCumplimientoDiasAntelacionDocumentos(datosSolicitud, strFechaFormalizacion);
+        /*20150714 Si tenemos operatoria de la FIPER entonces imprimimos la oferta vinculante hipotecaria además de generarla.*/
+        /*20150722 Ahora lo vamos a comprobar de otra forma, si tenemos operatoria de la Oferta Vinculante imprimimos la OVH además de generarla.*/
+        /*
+			if (null != cumplimientoAntelacionDocumentosVO.getOperatoria())
+			{
+				seImprimeOVHipotecaria = true;
+			}
+			*/
+        }
+        /*20150722 Ahora lo vamos a comprobar de otra forma, si tenemos operatoria de la Oferta Vinculante imprimimos la OVH además de generarla.*/
+        if (null != GestionOperatoriaDocumentos.obtenerOperatoriaActual(Constantes.CTE_TIPO_DOCUMENTO_OFERTA_VINCULANTE, datosSolicitud.getOficinaContable())) {
+            seImprimeOVHipotecaria = true;
+        }
+        /*En caso de que sea una modificación de preform acabamos de generar una versión nueva de la solicitud.*/
+        /*20150311 Damos de alta una cita con el gestor comercial. 
+		 * Cuando es una modificación de preformalización, es decir está la fecha de formalización informada,
+		 * borramos la cita anterior.
+		 * Posteriormente damos de alta la cita nueva.
+		 * */
+        // Sólo se da de alta la cita si el tipo de apoderado es interno y la hora de formalización está informada.
+        /*
+		 * 20150506 Cuando es modificación de preform tenemos que borrar la cita de la versión anterior
+		 */
+        /*20150521 Borramos la cita anterior ANTES de generar la versión nueva de la solicitud, porque en la versión nueva
+		 * se machaca la fecha de formalización.
+		 */
+        /* #### Comienzo gestion citas y apoderados###############*/
+        fechaFormAnterior = DateHelper.sqlDateToString(datosSolicitud.getFechaFormalizacion(), DateHelper.FORMATO_DB2_DATE);
+        /*20150714 La gestión de apoderados internos tambien va por control de operatoria*/
+        if (UtilidadesTramitacion.comprobarControlOperatoria(bidNucExpediente, Constantes.CTE_CONTROL_PREFORM_CITAS_APODERADOS_INT, true)) {
+            if (!DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaFormAnterior)) {
+                GestionCitaAgendaGestor.borradoCita(datosSolicitud);
+            }
+        /* ##### Fin gestión citas y apoderados#########*/
+        }
+        fechaPrevistaFirmaAntigua = DateHelper.sqlDateToString(datosSolicitud.getFechaFormalizacion(), DateHelper.FORMATO_DD_MM_YYYY_BARRA);
+        fechaPrevistaFirmaNueva = DateUtils.formatDate(fechaForm, DateHelper.FORMATO_DD_MM_YYYY_BARRA);
+        horaPrevistaFirmaAntigua = DateHelper.timestampToString(datosSolicitud.getHoraFormalizacion(), DateUtils.CTE_FORMATO_HORA);
+        // 2013-10-22 G000895
+        // Comprobamos si la solicitud tiene Fecha de Formalizacion en ese caso se genera una nueva versión de la solicitud
+        // Esta comprobacion se hace dentro del metodo comprobarEstadoPreformalizacion
+        // Genera un nuevo numero de version de la solicitud
+        datosSolicitud = gpfc.comprobarEstadoPreformalizacion(strEstdoTrea, datosSolicitud, gds);
+        bidVersionSolicitud = datosSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+        bidNumeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+        /*20150714 La gestión de apoderados internos tambien va por control de operatoria*/
+        if (UtilidadesTramitacion.comprobarControlOperatoria(bidNucExpediente, Constantes.CTE_CONTROL_PREFORM_CITAS_APODERADOS_INT, true)) {
+            if ((0 == Constantes.CTE_TIPO_APODERADO_INTERNO.compareTo(bidTipoApoderado)) && (!Constantes.CTE_HORA_MINIMA.equals(strHoraFormalizacionNueva))) {
+                salidaAltaCita = GestionCitaAgendaGestor.altaCita(bidNucExpediente, fechaForm, strHoraFormalizacionNueva, strUsuarioApoderado, strObservaciones);
+            }
+        }
+        /*##### Fin gestión citas y apoderados#########*/
+        final String strDivisaPrestamo = datosSolicitud.getMonedaImporteTotal();
+        // Si la divisa del prestamo no es en euros, las cuentas en divisa deben ser iguales
+        // a la divisa del prestamo
+        // Variables para la comprobacion de la fecha
+        // Fecha de hoy formateada para la comparacion
+        // Date fechaHoy = new Date(DateUtils.getSoloFecha(DateUtils.dateNow()).getTime());
+        /*20150723 Si la fecha de formalización es inferior al día de hoy lanzamos un rollback.*/
+        java.sql.Date fechaHoy = new java.sql.Date(DateHelper.getInstance().askTime().getTime());
+        String fechaHoyStr = DateHelper.sqlDateToString(fechaHoy, DateHelper.FORMATO_YYYYMMDD);
+        /*20150728 Se comparan las fechas en formato AAAAMMDD*/
+        if (0 > DateUtils.formatDate(fechaForm, DateHelper.FORMATO_YYYYMMDD).compareTo(fechaHoyStr)) {
+            ServicioNegocio.rollback(CodigosError.CTE_ERROR_PREFORM_FECHA_INF_HOY, null, null, null);
+        }
+        if (!Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strDivisaPrestamo) && ((!strDivisaPrestamo.equals(strCadDivisa)) || (!strDivisaPrestamo.equals(strCcdDivisa)))) {
+            ServicioNegocio.rollback(ERROR_VALIDACION_CUENTAS_DIVISA, null, null, null);
+        } else // Si la divisa del prestamo es en euros las divisas en euros deben estar informadas y en euros
+        if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strDivisaPrestamo) && ((!UtilidadesComun.esASF(datosSolicitud.getEntidad()) && (!Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strCaeDivisa) || !Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strCceDivisa))) || (UtilidadesComun.esASF(datosSolicitud.getEntidad()) && !Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strCceDivisa)))) {
+            ServicioNegocio.rollback(ERROR_VALIDACION_CUENTAS_EURO, null, null, null);
+        } else /*20141203 se comenta el rollback, de momento no se hace esta validación.*/
+        /*
+		else if(!Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strDivisaPrestamo) 
+				&& !fechaHoy.equals(fechaForm)) {
+				//Para divisa la fecha de la operación solo puede ser la fecha de hoy
+				ServicioNegocio.rollback(ERROR_FECHA_FORMALIZACION, null, null, null);
+		}
+		 */
+        {
+            // El documento de formalizacion puede venir a nulo
+            if (null == bidDocFormalizacion) {
+                bidDocFormalizacion = Constantes.CTE_CERO_BIG;
+            }
+            if ((null != centroContable) && (null != tipoPrescriptor)) {
+                // 20150919 Se modifica el criterio para saber si controlamos el centro contable.
+                /*
+				if ((Constantes.CTE_TIPO_PRESCRIPTOR_EXTERNO.equals(tipoPrescriptor)) &&
+						(UtilidadesTramitacion.tienePrescriptorIdealista(bidNucExpediente) ||
+						 UtilidadesTramitacion.tienePrescriptorAbancaWeb(bidNucExpediente))
+					)
+				 */
+                /*20151127 Ahora el tipo de prescriptor vamos a actualizarlo siempre con lo que nos mande EEXP.*/
+                datosSolicitud.setTipoPrescriptor(tipoPrescriptor);
+            // 2016-04-07 - El control de centro contable y actualizacion de centro contable y tipo de
+            // prescriptor se hace en el servicio de comprobaciones (ANPM_454).
+            /*
+				if (UtilidadesTramitacion.controlCentroContable(bidNucExpediente, tipoPrescriptor))
+				{
+					//si el tipo prescriptor que tenemos es el 9, web, NO LO CAMBIAMOS, LO DEJAMOS COMO ESTÁ.
+					//if (0 != Constantes.CTE_TIPO_PRESCRIPTOR_WEB.compareTo(datosSolicitud.getTipoPrescriptor()))
+					//{
+					//	datosSolicitud.setTipoPrescriptor(tipoPrescriptor);
+					//}
+					//datosSolicitud.setOficinaContable(centroContable);
+				}
+				*/
+            }
+            // Se recogen los datos de la solicitud para inicializar las cuentas
+            final BigDecimal bidDivision = datosSolicitud.getDivision();
+            final BigDecimal bidSubdivision = datosSolicitud.getSubDivision();
+            // Le damos valor en función del  formato de cuenta que estemos creando
+            BigDecimal bidFormato = null;
+            final String strUsuario = contexto.getUsuario();
+            final String strVigencia = "S";
+            // Se intentan obtener las cuentas asociadas a la solicitud
+            // final GestionPreformalizacion gp = new GestionPreformalizacion();
+            // Lista de cuentas para generar el contexto de salida
+            List<DatosCuentasC> lstCuentasSalida = new ArrayList<DatosCuentasC>(4);
+            List<DatosCuentasC> lstCuentas = gpfc.consultaDatosCuentasLst(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente);
+            /*20150707 ########### ESTO NO ES NECESARIO COMENTARLO PORQUE COMPROBAMOS SI VIENE INFORMADO EL CODIGO APODERADO ##################################*/
+            if (null != datosEntrada.getDecimal(NOMBRE_CAMPO_TIPO_APODERADO)) {
+                List<ApoderadoC> lstApoderados = gpfc.consultaDatosApoderadoLst(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente);
+                if (lstApoderados.isEmpty()) {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Se van a crear los apoderados asociadas a esa versión de la solicitud");
+                    }
+                    apoderadoC = altaApoderado(gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, bidTipoApoderado, strUsuarioApoderado, strNombreApoderado, str_telef_fijo_apoderado, str_telef_movil_apoderado, strObservaciones, strUsuario);
+                    if (0 == Constantes.CTE_TIPO_APODERADO_INTERNO.compareTo(bidTipoApoderado)) {
+                        // salidaAltaAviso = GestionPreformalizacionFormalizacionComunes.generarAviso(apoderadoC,Constantes.CTE_STR_1);
+                        salidaAltaAviso = GestionPreformalizacionFormalizacionComunes.generarAvisoDelegacionFirmaCorregido(apoderadoC.getUsuarioApoderado(), Constantes.CTE_AVISO_ALTA, bidNucExpediente, fechaPrevistaFirmaNueva, strLocalizacionNueva, strHoraFormalizacionNueva);
+                    }
+                    // Si el tipo de apoderado es externo llamamos a gestion hipotecaria
+                    if (0 == Constantes.CTE_TIPO_APODERADO_EXTERNO.compareTo(bidTipoApoderado)) {
+                        GestionPreformalizacionFormalizacionComunes.gestionFirmaAsistida(bidNucExpediente, Constantes.CTE_SI_COMPROBACION_S);
+                    }
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Fin - crear los apoderados asociadas a esa versión de la solicitud");
+                    }
+                } else {
+                    /*En una modificación, si el nuevo usuario apoderado es interno se envía aviso, siempre y cuando cambiara algún dato que haga
+					 * que sea necesario enviar otro aviso, es decir:
+					 *   - Antes el usuario era interno pero era otro.
+					 *   - Era el mismo usuario pero cambió la fecha prevista de firma.
+					 *   - Era el mismo usuario pero cambió la hora prevista de firma.
+					 *   - Era el mismo usuario pero cambió la localidad.*/
+                    if ((0 == Constantes.CTE_TIPO_APODERADO_INTERNO.compareTo(bidTipoApoderado)) && ((!lstApoderados.get(0).getUsuarioApoderado().trim().equals(strUsuarioApoderado)) || ((lstApoderados.get(0).getUsuarioApoderado().trim().equals(strUsuarioApoderado)) && ((!fechaFormAnterior.equals(DateHelper.sqlDateToString(new java.sql.Date(fechaForm.getTime()), DateHelper.FORMATO_DB2_DATE))) || (!DateHelper.timestampToString(datosSolicitud.getHoraFormalizacion(), DateUtils.CTE_FORMATO_HORA).equals(strHoraFormalizacionNueva)) || (!datosSolicitud.getLocalidadFirma().trim().equals(strLocalizacionNueva)))))) {
+                        // 20150724 Se envía un aviso de baja sólo si el usuario es interno.
+                        if (0 == Constantes.CTE_TIPO_APODERADO_INTERNO.compareTo(lstApoderados.get(0).getTipoApoderado())) {
+                            // GestionPreformalizacionFormalizacionComunes.generarAviso(lstApoderados.get(0), Constantes.CTE_STR_0);
+                            /*20150729 Cuando es una baja no capturamos el resultado aviso */
+                            /*salidaAltaAviso = */
+                            GestionPreformalizacionFormalizacionComunes.generarAvisoDelegacionFirmaCorregido(lstApoderados.get(0).getUsuarioApoderado().trim(), Constantes.CTE_AVISO_BAJA, bidNucExpediente, fechaPrevistaFirmaAntigua, datosSolicitud.getLocalidadFirma().trim(), horaPrevistaFirmaAntigua);
+                        }
+                        // +++Comprobamos que el apoderado no sea el propio usuario, de lo contrario no se genera aviso
+                        // Se genera un aviso al apoderado
+                        // GestionPreformalizacionFormalizacionComunes.generarAviso(lstApoderados.get(0),Constantes.CTE_STR_1);
+                        salidaAltaAviso = GestionPreformalizacionFormalizacionComunes.generarAvisoDelegacionFirmaCorregido(strUsuarioApoderado, Constantes.CTE_AVISO_ALTA, bidNucExpediente, fechaPrevistaFirmaNueva, strLocalizacionNueva, strHoraFormalizacionNueva);
+                    }
+                    /*Si el usuario nuevo es externo*/
+                    if (0 == Constantes.CTE_TIPO_APODERADO_EXTERNO.compareTo(bidTipoApoderado)) {
+                        /*Si el usuario anterior es interno solicitamos la firma asistida*/
+                        if (0 == Constantes.CTE_TIPO_APODERADO_INTERNO.compareTo(lstApoderados.get(0).getTipoApoderado())) {
+                            GestionPreformalizacionFormalizacionComunes.gestionFirmaAsistida(bidNucExpediente, Constantes.CTE_SI_COMPROBACION_S);
+                            /*20150728 Además damos de baja el aviso al usuario interno anterior.*/
+                            /*20150729 Cuando es una baja no capturamos el resultado aviso */
+                            /*salidaAltaAviso = */
+                            GestionPreformalizacionFormalizacionComunes.generarAvisoDelegacionFirmaCorregido(lstApoderados.get(0).getUsuarioApoderado().trim(), Constantes.CTE_AVISO_BAJA, bidNucExpediente, fechaPrevistaFirmaAntigua, datosSolicitud.getLocalidadFirma().trim(), horaPrevistaFirmaAntigua);
+                        }
+                    /*Si el usuario anterior es externo ya se ha pedido antes la firma asistida, no hacemos nada*/
+                    } else {
+                        /*Si el usuario apoderado de la versión anterior era externo y el nuevo es interno, cancelamos la firma asistida*/
+                        if (0 == Constantes.CTE_TIPO_APODERADO_EXTERNO.compareTo(lstApoderados.get(0).getTipoApoderado())) {
+                            // Esto notificará a gestión hipotecaria que tiene que dejar de encargarse de la firma
+                            GestionPreformalizacionFormalizacionComunes.gestionFirmaAsistida(bidNucExpediente, Constantes.CTE_NO_COMPROBACION_N);
+                        }
+                    /*Si el usuario anterior es interno no hay nada que cancelar.*/
+                    }
+                    // actualizamos el apoderado.
+                    lstApoderados.get(0).getApoderadoKey().setNumeroSolicitud(bidNumeroSolicitud);
+                    lstApoderados.get(0).getApoderadoKey().setOficinaSolicitud(bidOficinaSolicitud);
+                    lstApoderados.get(0).getApoderadoKey().setVersionSolicitud(bidVersionSolicitud);
+                    lstApoderados.get(0).getApoderadoKey().setNucExpediente(bidNucExpediente);
+                    lstApoderados.get(0).setTipoApoderado(bidTipoApoderado);
+                    lstApoderados.get(0).setUsuarioApoderado(strUsuarioApoderado);
+                    lstApoderados.get(0).setNombreApoderado(strNombreApoderado);
+                    lstApoderados.get(0).setTelefonoFijo(str_telef_fijo_apoderado);
+                    lstApoderados.get(0).setTelefonoMovil(str_telef_movil_apoderado);
+                    lstApoderados.get(0).setObservaciones(strObservaciones);
+                    lstApoderados.get(0).setUsuario(strUsuario);
+                    ApoderadoEng apoderadoEng = new ApoderadoEng();
+                    apoderadoEng.persist(lstApoderados.get(0));
+                }
+            // Fin creación de apoderados
+            }
+            /*20150813 ANTES de llamar al servicio de Edición de datos solicitud, ANPM_257, por que sino da un error de coherencia de datos a nivel de
+			 * sesión cuando intentamos persistir los cambios en el servicio de Edición datos.*/
+            if (!Helper.isNullOrEmpty(strHoraFormalizacionNueva)) {
+                gds.actualizarHoraFormalizacion(datosSolicitud, strHoraFormalizacionNueva, strFechaFormalizacion);
+            }
+            final IContexto[] aContextoSolicitud = modificarSolicitud(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente, strFechaFormalizacion, bidDocFormalizacion, strLocalizacionNueva, strCorretaje);
+            if (lstCuentas.isEmpty()) {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Se van a crear las cuentas asociadas a la solicitud");
+                }
+                // Si la divisa del prestamo no es EUR se permite introducir cuentas en divisa
+                if (!Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strDivisaPrestamo)) {
+                    // Si viene IBAN para la cuenta de cargo en divisa damos valor al formato
+                    if (!StringUtils.isEmpty(strIbanCargoDivisa)) {
+                        bidFormato = Constantes.CTE_FORMATO_IBAN;
+                    } else {
+                        bidFormato = Constantes.CTE_FORMATO_NCC;
+                    }
+                    datosCuentaCcd = altaCuenta(gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCcdDivisa, bidCcdEntidad, bidCcdOficinaCuenta, bidCcdCuenta, bidCcdPaisCuenta, Constantes.CTE_TIPO_CUENTA_CONTABLE, Constantes.CTE_PRIORIDAD_CUENTA_UNO, bidTipoCuentaCD, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanCargoDivisa);
+                    lstCuentasSalida.add(datosCuentaCcd);
+                    // Si viene IBAN para la cuenta de abono en divisa damos valor al formato
+                    if (!StringUtils.isEmpty(strIbanAbonoDivisa)) {
+                        bidFormato = Constantes.CTE_FORMATO_IBAN;
+                    } else {
+                        bidFormato = Constantes.CTE_FORMATO_NCC;
+                    }
+                    datosCuentaCad = altaCuenta(gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCadDivisa, bidCadEntidad, bidCadOficinaCuenta, bidCadCuenta, bidCadPaisCuenta, Constantes.CTE_TIPO_CUENTA_ABONO, Constantes.CTE_PRIORIDAD_CUENTA_UNO, bidTipoCuentaAD, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanAbonoDivisa);
+                    lstCuentasSalida.add(datosCuentaCad);
+                }
+                // Las cuentas de euro son opcionales si la divisa del prestamo no es EUR
+                BigDecimal bidPrioridadDefecto = Constantes.CTE_PRIORIDAD_CUENTA_DOS;
+                if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(strDivisaPrestamo)) {
+                    bidPrioridadDefecto = Constantes.CTE_PRIORIDAD_CUENTA_UNO;
+                }
+                if (!UtilidadesTramitacion.isBlankOrNull(strCceDivisa) && !UtilidadesTramitacion.isBlankOrNull(bidCceEntidad) && !UtilidadesTramitacion.isBlankOrNull(bidCceOficinaCuenta) && !UtilidadesTramitacion.isBlankOrNull(bidCceCuenta)) {
+                    // Si viene IBAN para la cuenta de cargo en euros damos valor al formato
+                    if (!StringUtils.isEmpty(strIbanCargoEuros)) {
+                        bidFormato = Constantes.CTE_FORMATO_IBAN;
+                    } else {
+                        bidFormato = Constantes.CTE_FORMATO_NCC;
+                    }
+                    datosCuentaCce = altaCuenta(gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCceDivisa, bidCceEntidad, bidCceOficinaCuenta, bidCceCuenta, bidCcePaisCuenta, Constantes.CTE_TIPO_CUENTA_CONTABLE, bidPrioridadDefecto, bidTipoCuentaCE, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanCargoEuros);
+                    lstCuentasSalida.add(datosCuentaCce);
+                }
+                if (!UtilidadesTramitacion.isBlankOrNull(strCaeDivisa) && !UtilidadesTramitacion.isBlankOrNull(bidCaeEntidad) && !UtilidadesTramitacion.isBlankOrNull(bidCaeOficinaCuenta) && !UtilidadesTramitacion.isBlankOrNull(bidCaeCuenta)) {
+                    // Si viene IBAN para la cuenta de abono en euros damos valor al formato
+                    if (!StringUtils.isEmpty(strIbanAbonoEuros)) {
+                        bidFormato = Constantes.CTE_FORMATO_IBAN;
+                    } else {
+                        bidFormato = Constantes.CTE_FORMATO_NCC;
+                    }
+                    datosCuentaCae = altaCuenta(gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCaeDivisa, bidCaeEntidad, bidCaeOficinaCuenta, bidCaeCuenta, bidCaePaisCuenta, Constantes.CTE_TIPO_CUENTA_ABONO, bidPrioridadDefecto, bidTipoCuentaAE, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanAbonoEuros);
+                    lstCuentasSalida.add(datosCuentaCae);
+                }
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Fin - crear las cuentas asociadas a la solicitud");
+                }
+            } else {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Se van a modificar las cuentas asociadas a la solicitud");
+                }
+                // Recorremos la lista de cuentas asociadas a la solicitud y las vamos clasificando
+                for (DatosCuentasC datosCuentaActual : lstCuentas) {
+                    // Comprobamos si es de tipo de Cargo o Abono
+                    if (Constantes.CTE_TIPO_CUENTA_ABONO.equalsIgnoreCase(datosCuentaActual.getTipoCuenta())) {
+                        // Comprobamos la prioridad de la cuenta de abono
+                        if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentaActual.getDivisaCuenta())) {
+                            datosCuentaCae = datosCuentaActual;
+                        } else {
+                            datosCuentaCad = datosCuentaActual;
+                            if (!UtilidadesTramitacion.isBlankOrNull(strCadDivisa) && !UtilidadesTramitacion.isBlankOrNull(bidCadEntidad) && !UtilidadesTramitacion.isBlankOrNull(bidCadOficinaCuenta) && !UtilidadesTramitacion.isBlankOrNull(bidCadCuenta)) {
+                                modificarCuenta(gp, datosCuentaCad, strCadDivisa, bidCadEntidad, bidCadOficinaCuenta, bidCadCuenta, bidCadPaisCuenta, strUsuario, strVigencia, strIbanAbonoDivisa, bidTipoCuentaAD);
+                                lstCuentasSalida.add(datosCuentaCad);
+                            }
+                        }
+                    } else {
+                        // Comprobamos la prioridad de la cuenta de cargo
+                        if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentaActual.getDivisaCuenta())) {
+                            datosCuentaCce = datosCuentaActual;
+                        } else {
+                            datosCuentaCcd = datosCuentaActual;
+                            if (!UtilidadesTramitacion.isBlankOrNull(strCcdDivisa) && !UtilidadesTramitacion.isBlankOrNull(bidCcdEntidad) && !UtilidadesTramitacion.isBlankOrNull(bidCcdOficinaCuenta) && !UtilidadesTramitacion.isBlankOrNull(bidCcdCuenta)) {
+                                modificarCuenta(gp, datosCuentaCcd, strCcdDivisa, bidCcdEntidad, bidCcdOficinaCuenta, bidCcdCuenta, bidCcdPaisCuenta, strUsuario, strVigencia, strIbanCargoDivisa, bidTipoCuentaCD);
+                                lstCuentasSalida.add(datosCuentaCcd);
+                            }
+                        }
+                    }
+                }
+                // Si viene IBAN para la cuenta de cargo en euros damos valor al formato
+                if (!StringUtils.isEmpty(strIbanCargoEuros)) {
+                    bidFormato = Constantes.CTE_FORMATO_IBAN;
+                } else {
+                    bidFormato = Constantes.CTE_FORMATO_NCC;
+                }
+                datosCuentaCce = gestionCuentaEuros(datosCuentaCce, gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCceDivisa, bidCceEntidad, bidCceOficinaCuenta, bidCceCuenta, bidCcePaisCuenta, Constantes.CTE_TIPO_CUENTA_CONTABLE, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanCargoEuros, bidTipoCuentaCE);
+                if (datosCuentaCce != null) {
+                    lstCuentasSalida.add(datosCuentaCce);
+                }
+                // Si viene IBAN para la cuenta de abono en euros damos valor al formato
+                if (!StringUtils.isEmpty(strIbanAbonoEuros)) {
+                    bidFormato = Constantes.CTE_FORMATO_IBAN;
+                } else {
+                    bidFormato = Constantes.CTE_FORMATO_NCC;
+                }
+                datosCuentaCae = gestionCuentaEuros(datosCuentaCae, gp, bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strCaeDivisa, bidCaeEntidad, bidCaeOficinaCuenta, bidCaeCuenta, bidCaePaisCuenta, Constantes.CTE_TIPO_CUENTA_ABONO, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIbanAbonoEuros, bidTipoCuentaAE);
+                if (datosCuentaCae != null) {
+                    lstCuentasSalida.add(datosCuentaCae);
+                }
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Fin - modificar las cuentas asociadas a la solicitud");
+                }
+                // LOG que registra los campos modificados en los datos de solicitud.
+                LogModificacionDatosSolicitud.lanzarLogModificacionDatosSolicitud(bidNucExpediente, ConstantesComun.CTE_STR_COD_PROCEDENCIA_A254);
+            }
+            final IContexto[] aContextoCuentas = ContextoDatosCuentas.rellenarDatosContexto(lstCuentasSalida, datosSolicitud);
+            /*Guardamos los contextos de solicitud (ANPMN050), cuentas (ANPMN072) y resultado preform (ANPMN254) en 
+			 * en la lista de contextos de salida.*/
+            for (IContexto ctx : aContextoSolicitud) {
+                listaContextos.add(ctx);
+            }
+            for (IContexto ctx : aContextoCuentas) {
+                listaContextos.add(ctx);
+            }
+        }
+        // Calculamos el tipo de cambio
+        gp.actualizarTipoCambio(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente);
+        BigDecimal tipoExpediente = datosSolicitud.getTipoExpediente();
+        // Si el expediente es hipotecario se genera el Documento interno para minutar
+        esHipotecario = UtilidadesTramitacion.esHipotecario(tipoExpediente);
+        // UtilidadesTramitacion.actualizarTablaReaperturasExpediente("A", bidNucExpediente);
+        estadoTareaSolicitud = UtilidadesTramitacion.obtenerEstadoTarea(bidNucExpediente, bidCodigoTarea);
+        UtilidadesTramitacion.actualizarEstadoTarea(bidNucExpediente, bidCodigoTarea, estadoTareaSolicitud);
+        // para guardar en Gestion documental la OV para Hipotecarios
+        if (esHipotecario) {
+            if ((UtilidadesComun.esExpedienteSubrogacionAmpliacion(tipoExpediente)) || (UtilidadesComun.esExpedienteNovacion(tipoExpediente))) {
+                // Llamada al servicio ANPM_426 (VolcadoDatosPmosSrv)
+                IDatosEntradaTx datosInvocacion = getPrograma(contexto, Constantes.CTE_INT_CC_ANPM, Constantes.CTE_COP_VOLCADO_PMOS);
+                datosInvocacion.addCampo("OFICINA_SOLICITUD", datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud());
+                datosInvocacion.addCampo("NUMERO_SOLICITUD", datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+                datosInvocacion.addCampo("VERSION_SOLICITUD", datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+                datosInvocacion.addCampo("NUC_EXPEDIENTE", datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+                // Con formato dd-mm-yyyy
+                datosInvocacion.addCampo("FECHA_FORMALIZACION", strFechaFormalizacion);
+                datosInvocacion.addCampo("ENVIO_CORRESPONDENCIA", BigDecimal.ZERO);
+                datosInvocacion.addCampo("INDICADOR_CONTROL_OP", new BigDecimal(3));
+                invocarServicio(contexto, datosInvocacion);
+            } else {
+                adjuntarOVHipotecarios(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente, seImprimeOVHipotecaria);
+                // , enviarCorreo, ctxDireccionesCorreo);
+                generacionDocumentoInterno(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente);
+            }
+        }
+        /**
+         * Comprobaciones de tramitacion y actualizacion del centro contable.
+         */
+        IContexto[] ctxComprobaciones = GestionDatosSolicitud.ctxComprobacionesTramitacion(bidNucExpediente, ConstantesComun.CTE_BID_6, null);
+        // Comprobación adicional fiper no impresa para casos especiales
+        comprobacionAdicionalFiper(datosSolicitud);
+        // Comprueba si la Fiper no está en plazo para la oficina sólo si está la operatoria activada para este expediente.
+        if (UtilidadesTramitacion.comprobarControlOperatoria(datosSolicitud.getDatosSolicitudKey().getNucExpediente(), new BigDecimal(150020), true)) {
+            cumplimientoAntelacionDocumentosVO = new CumplimientoAntelacionDocumentosVO();
+            cumplimientoAntelacionDocumentosVO = compruebaFiperEnPlazo(datosSolicitud);
+        }
+        // Comprueba si la Fiper está caducada
+        /*aContextoSalida = compruebaFiperCaducada(
+												datosSolicitud, 
+												ultimaImpresionEnPlazo, 
+												listaContextos);*/
+        /*##### Comienzo gestión citas y apoderados#########*/
+        IContexto contextoResultadoPreform = rellenarContextoResultadoPreform(salidaAltaCita, salidaAltaAviso, cumplimientoAntelacionDocumentosVO, ctxComprobaciones);
+        listaContextos.add(contextoResultadoPreform);
+        /*##### Fin gestión citas y apoderados#########*/
+        aContextoSalida = listaContextos.toArray(new IContexto[listaContextos.size()]);
+        // pasandole el número de expediente y una S.
+        if (BigDecimal.valueOf(2).equals(bidTipoCuentaCE)) {
+            UtilidadesTramitacion.generarMandatoSEPA(bidNucExpediente);
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN SNANPM254: Alta/Modificación de datos de preformalización");
+        }
+        return aContextoSalida;
+    }
+
+    /**
+     * Método que rellena el contexto de preformalización.
+     *
+     * De este contexto pillaremos el mensaje de preformalización para mostrarlo en el popup de confirmación.
+     *
+     * @param salidaAltaCita
+     * @param salidaAltaAviso
+     * @return
+     */
+    private IContexto rellenarContextoResultadoPreform(int salidaAltaCita, int salidaAltaAviso, CumplimientoAntelacionDocumentosVO cumplimientoAntelacionDocumentosVO, IContexto[] ctxComprobaciones) {
+        IContexto contextoPreform = ContextoFactory.getInstance().getContexto(CTE_CTX_PREFORM);
+        String primerMensaje = new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_PREFORM_CORRECTA_NO_AVISO).toString();
+        String segundoMensaje = null;
+        // acabó bien.
+        contextoPreform.put(CTE_CTX_PREFORM_COD_ERROR, BigDecimal.ZERO);
+        /*Rellenamos campos de envío de avisos.*/
+        if (salidaAltaAviso == Constantes.CTE_SALIDA_ALTA_AVISO_CORRECTA) {
+            primerMensaje = new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_PREFORM_CORRECTA_AVISO).toString();
+        } else if (salidaAltaAviso == Constantes.CTE_SALIDA_ALTA_AVISO_NO_AVISO_MISMOS_USUARIOS) {
+            primerMensaje = new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_PREFORM_CORRECTA_NO_AVISO).toString();
+        }
+        /*Rellenamos campos de gestión de citas.*/
+        if (Constantes.CTE_SALIDA_ALTA_CITA_NO_ALTA_CLIENTE_RESUELTO_EN_TEMA == salidaAltaCita) {
+            segundoMensaje = new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_NO_ALTA_CITA_CLIENTE_RESUELTO_TEMA).toString();
+        } else if (Constantes.CTE_SALIDA_ALTA_CITA_CORRECTA == salidaAltaCita) {
+            segundoMensaje = new Mensaje(ServicioNegocio.getContexto(), CTE_MENSAJE_ALTA_CITA_CLIENTE).toString();
+        } else {
+            // no aplica
+            segundoMensaje = StringUtils.EMPTY;
+        }
+        contextoPreform.put(CTE_CTX_PREFORM_PRIMER_MENSAJE_PREFORM, primerMensaje);
+        if (null != segundoMensaje) {
+            contextoPreform.put(CTE_CTX_PREFORM_SEGUNDO_MENSAJE_PREFORM, segundoMensaje);
+        }
+        if (null != cumplimientoAntelacionDocumentosVO && null != cumplimientoAntelacionDocumentosVO.getCodSalidaImprFiperAntel()) {
+            contextoPreform.put(CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_COD, cumplimientoAntelacionDocumentosVO.getCodSalidaImprFiperAntel());
+        }
+        if (null != cumplimientoAntelacionDocumentosVO && !UtilidadesTramitacion.isBlankOrNull(cumplimientoAntelacionDocumentosVO.getMensSalidaImprFiperAntel())) {
+            if ((null != ctxComprobaciones) && (ctxComprobaciones.length > 0)) {
+                contextoPreform.put(CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_MENS, cumplimientoAntelacionDocumentosVO.getMensSalidaImprFiperAntel() + "\n\n" + ctxComprobaciones[0].getString("ANPMN454030"));
+            } else {
+                contextoPreform.put(CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_MENS, cumplimientoAntelacionDocumentosVO.getMensSalidaImprFiperAntel());
+            }
+        } else {
+            if ((null != ctxComprobaciones) && (ctxComprobaciones.length > 0) && !UtilidadesTramitacion.isBlankOrNull(ctxComprobaciones[0].getString("ANPMN454030"))) {
+                contextoPreform.put(CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_COD, new BigDecimal(4));
+                contextoPreform.put(CTE_CTX_PREFORM_ADVERT_IMPR_FIPER_ANTEL_MENS, ctxComprobaciones[0].getString("ANPMN454030"));
+            }
+        }
+        return contextoPreform;
+    }
+
+    /**
+     * Descripcion comprueba si solo ha variado la fecha de formalización, de ser asi
+     * devuelve un string con una marca de que ha sido asi, de lo contrario devuelve un string
+     * vacio
+     *
+     * @param datosVersionPrevia
+     * @param datosVersionSiguiente
+     * @return
+     */
+    public String compruebaVariacionesPreformalizacion(DatosSolicitudC datosVersionPrevia, DatosSolicitudC datosVersionSiguiente) {
+        GestionPreformalizacionFormalizacionComunes gdp = new GestionPreformalizacionFormalizacionComunes();
+        String soloVariaFormalizacion = new String("");
+        boolean variaFechaFormalizacion = false;
+        boolean variaAlgunOtroCampo = false;
+        // Cuentas de cargo y abornos asociadas a la solicitud tanto de divisas como de euros
+        DatosCuentasC datosCuentaVersionPreviaCcd = null;
+        DatosCuentasC datosCuentaVersionPreviaCad = null;
+        DatosCuentasC datosCuentaVersionPreviaCce = null;
+        DatosCuentasC datosCuentaVersionPreviaCae = null;
+        // Cuentas de cargo y abornos asociadas a la solicitud tanto de divisas como de euros
+        DatosCuentasC datosCuentaVersionSiquienteCcd = null;
+        DatosCuentasC datosCuentaVersionSiguienteCad = null;
+        DatosCuentasC datosCuentaVersionSiguienteCce = null;
+        DatosCuentasC datosCuentaVersionSiguienteCae = null;
+        List<DatosCuentasC> datosCuentaVersionPrevia = new ArrayList<DatosCuentasC>();
+        List<DatosCuentasC> datosCuentaVersionSiguiente = new ArrayList<DatosCuentasC>();
+        // Obtenemos los datos de cuenta de la version previa
+        datosCuentaVersionPrevia = gdp.consultaDatosCuentasLst(datosVersionPrevia.getDatosSolicitudKey().getOficinaSolicitud(), datosVersionPrevia.getDatosSolicitudKey().getNumSolicitud(), datosVersionPrevia.getDatosSolicitudKey().getVersionSolicitud(), datosVersionPrevia.getDatosSolicitudKey().getNucExpediente());
+        // Obtenemos los datos de cuenta de la version siguiente
+        datosCuentaVersionSiguiente = gdp.consultaDatosCuentasLst(datosVersionSiguiente.getDatosSolicitudKey().getOficinaSolicitud(), datosVersionSiguiente.getDatosSolicitudKey().getNumSolicitud(), datosVersionSiguiente.getDatosSolicitudKey().getVersionSolicitud(), datosVersionSiguiente.getDatosSolicitudKey().getNucExpediente());
+        if (!datosCuentaVersionPrevia.isEmpty()) {
+            // Versión previa
+            for (DatosCuentasC datosCuentaVersionPreviaProcesada : datosCuentaVersionPrevia) {
+                // Recorremos la lista de las cuentas asociadas a la solicitud y las vamos clasificando
+                if (Constantes.CTE_TIPO_CUENTA_ABONO.equalsIgnoreCase(datosCuentaVersionPreviaProcesada.getTipoCuenta())) {
+                    // Prioridad de la cuenta de cargo
+                    if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentaVersionPreviaProcesada.getDivisaCuenta())) {
+                        datosCuentaVersionPreviaCae = datosCuentaVersionPreviaProcesada;
+                    } else {
+                        datosCuentaVersionPreviaCad = datosCuentaVersionPreviaProcesada;
+                    }
+                } else {
+                    // Comprobamos la prioridad de la cuenta de cargo
+                    if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentaVersionPreviaProcesada.getDivisaCuenta())) {
+                        datosCuentaVersionPreviaCce = datosCuentaVersionPreviaProcesada;
+                    } else {
+                        datosCuentaVersionPreviaCcd = datosCuentaVersionPreviaProcesada;
+                    }
+                }
+            }
+        }
+        if (!datosCuentaVersionSiguiente.isEmpty()) {
+            // Version siguiente
+            for (DatosCuentasC datosCuentasVersionSiguienteProcesada : datosCuentaVersionSiguiente) {
+                // Recorremos la lista de la cuentas asociadas a la solicitud y las vamos clasificando
+                if (Constantes.CTE_TIPO_CUENTA_ABONO.equalsIgnoreCase(datosCuentasVersionSiguienteProcesada.getTipoCuenta())) {
+                    // Prioridad de la cuenta de cargo
+                    if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentasVersionSiguienteProcesada.getDivisaCuenta())) {
+                        datosCuentaVersionSiguienteCae = datosCuentasVersionSiguienteProcesada;
+                    } else {
+                        datosCuentaVersionSiguienteCad = datosCuentasVersionSiguienteProcesada;
+                    }
+                } else {
+                    // Comprobamos la prioridad de la cuenta de cargo
+                    if (Constantes.CTE_DIVISA_EURO.equalsIgnoreCase(datosCuentasVersionSiguienteProcesada.getDivisaCuenta())) {
+                        datosCuentaVersionSiguienteCce = datosCuentasVersionSiguienteProcesada;
+                    } else {
+                        datosCuentaVersionSiquienteCcd = datosCuentasVersionSiguienteProcesada;
+                    }
+                }
+            }
+        }
+        // Devuelve un vacio si la fecha de formalizacion es la misma para las dos versiones
+        if (!datosVersionSiguiente.getFechaFormalizacion().equals(datosVersionPrevia.getFechaFormalizacion())) {
+            variaFechaFormalizacion = true;
+        } else {
+            // Devuelve vacio ya que no varia la fecha de formalizacion
+            return soloVariaFormalizacion;
+        }
+        if (null != datosCuentaVersionSiguienteCae && null != datosCuentaVersionPreviaCae && !datosCuentaVersionSiguienteCae.getNumeroCuenta().equals(datosCuentaVersionPreviaCae.getNumeroCuenta())) {
+            // Si alguno de estos campos es modificado
+            variaAlgunOtroCampo = true;
+        } else if (null != datosCuentaVersionSiguienteCad && null != datosCuentaVersionPreviaCad && !datosCuentaVersionSiguienteCad.getNumeroCuenta().equals(datosCuentaVersionPreviaCad.getNumeroCuenta())) {
+            variaAlgunOtroCampo = true;
+        } else if (null != datosCuentaVersionSiguienteCce && null != datosCuentaVersionPreviaCce && !datosCuentaVersionSiguienteCce.getNumeroCuenta().equals(datosCuentaVersionPreviaCce.getNumeroCuenta())) {
+            variaAlgunOtroCampo = true;
+        } else if (null != datosCuentaVersionSiquienteCcd && null != datosCuentaVersionPreviaCcd && !datosCuentaVersionSiquienteCcd.getNumeroCuenta().equals(datosCuentaVersionPreviaCcd.getNumeroCuenta())) {
+            variaAlgunOtroCampo = true;
+        } else if (null != datosVersionSiguiente && null != datosVersionPrevia && !datosVersionSiguiente.getLocalidadFirma().equals(datosVersionPrevia.getLocalidadFirma()) || !datosVersionSiguiente.getDocumentoFormalizacion().equals(datosVersionPrevia.getDocumentoFormalizacion()) || !datosVersionSiguiente.getCorretaje().equals(datosVersionPrevia.getCorretaje())) {
+            // Si alguno de estos campos es modificado
+            variaAlgunOtroCampo = true;
+        }
+        if (variaFechaFormalizacion && !variaAlgunOtroCampo) {
+            soloVariaFormalizacion = "SI";
+        }
+        return soloVariaFormalizacion;
+    }
+
+    /**
+     * Crea una cuenta en la BBDD y se añade a la lista que se pasa como parametro
+     * @param gp
+     * @param bidNumeroSolicitud
+     * @param bidOficinaSolicitud
+     * @param bidVersionSolicitud
+     * @param bidNucExpediente
+     * @param strDivisa
+     * @param bidEntidad
+     * @param bidOficinaCuenta
+     * @param bidCuenta
+     * @param bidPaisCuenta
+     * @param strTipoCuentaAC
+     * @param bidPrioridad
+     * @param bidTipoCuenta
+     * @param bidDivision
+     * @param bidSubdivision
+     * @param bidFormato
+     * @param strUsuario
+     * @param strVigencia
+     * @return DatosCuenta creada
+     */
+    private DatosCuentasC altaCuenta(GestionPreformalizacion gp, BigDecimal bidNumeroSolicitud, BigDecimal bidOficinaSolicitud, BigDecimal bidVersionSolicitud, BigDecimal bidNucExpediente, String strDivisa, BigDecimal bidEntidad, BigDecimal bidOficinaCuenta, BigDecimal bidCuenta, BigDecimal bidPaisCuenta, String strTipoCuentaAC, BigDecimal bidPrioridad, BigDecimal bidTipoCuenta, BigDecimal bidDivision, BigDecimal bidSubdivision, BigDecimal bidFormato, String strUsuario, String strVigencia, String strIban) {
+        DatosCuentasC datosCuenta = new DatosCuentasC(bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, strDivisa, bidEntidad, bidOficinaCuenta, bidCuenta, bidPaisCuenta, strTipoCuentaAC, bidPrioridad, bidTipoCuenta, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIban);
+        // si la cuenta es de cargo y domiciliación externa necesitamos un id para la domiciliación
+        if (Constantes.CTE_BID_CUENTA_EXTERNA.equals(bidTipoCuenta) && Constantes.CTE_TIPO_CUENTA_CARGO.equals(strTipoCuentaAC)) {
+            BigDecimal idDom = UtilidadesComun.obtenerIdDomiciliacion();
+            datosCuenta.setBidIdDomiciliacion(idDom);
+        }
+        gp.crearDatosCuenta(datosCuenta);
+        return datosCuenta;
+    }
+
+    /**
+     * Crea un apoderado en la BBDD
+     * @param gp
+     * @param bidNumeroSolicitud
+     * @param bidOficinaSolicitud
+     * @param bidVersionSolicitud
+     * @param bidNucExpediente
+     * @return Apoderado creada
+     */
+    private ApoderadoC altaApoderado(GestionPreformalizacion gp, BigDecimal bidNumeroSolicitud, BigDecimal bidOficinaSolicitud, BigDecimal bidVersionSolicitud, BigDecimal bidNucExpediente, BigDecimal bidTipoApoderado, String strUsuarioApoderado, String strNombreApoderado, String str_telef_fijo_apoderado, String str_telef_movil_apoderado, String strObservaciones, String strUsuario) {
+        ApoderadoC apoderado = new ApoderadoC(bidNumeroSolicitud, bidOficinaSolicitud, bidVersionSolicitud, bidNucExpediente, bidTipoApoderado, strUsuarioApoderado, strNombreApoderado, str_telef_fijo_apoderado, str_telef_movil_apoderado, strObservaciones, strUsuario);
+        ApoderadoEng apoderadoEng = new ApoderadoEng();
+        apoderadoEng.persist(apoderado);
+        return apoderado;
+    }
+
+    /**
+     * Modifica los datos de la solicitud relacionados con la pantalla de preformalizacion
+     * @param bidOficinaSolicitud
+     * @param bidNumeroSolicitud
+     * @param bidVersionSolicitud
+     * @param bidNucExpediente
+     * @param strFechaFormalizacion
+     * @param bidDocFormalizacion
+     * @param strLocalizacion
+     * @param strCorretaje
+     * @return Contexto de salida con los datos de la solicitud modificada
+     */
+    private IContexto[] modificarSolicitud(final BigDecimal bidOficinaSolicitud, final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud, final BigDecimal bidNucExpediente, final String strFechaFormalizacion, final BigDecimal bidDocFormalizacion, final String strLocalizacion, final String strCorretaje) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO modificar los datos de la solicitud");
+        }
+        // Servicio de edicion de datos de formalizacion de una solicitud DatosSolicitudFormalizacionEdicionSrv
+        final IDatosEntradaTx datosEntradaSolicitudEdicionSrv = getPrograma(getContexto(), ID_CUENTA_ANPM, ID_COOP_EDICION_SOLICITUD);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_OFICINA_SOLICITUD, bidOficinaSolicitud);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_NUMERO_SOLICITUD, bidNumeroSolicitud);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_VERSION_SOLICITUD, bidVersionSolicitud);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EXPEDIENTE, bidNucExpediente);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EDICIONSRV_FECHA, strFechaFormalizacion);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EDICIONSRV_DOCUMENTO, bidDocFormalizacion);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EDICIONSRV_LOCALIDAD, strLocalizacion);
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EDICIONSRV_CORRETAJE, strCorretaje);
+        // Se pone el valor de 0 - Oficina al medio de formalizacion
+        datosEntradaSolicitudEdicionSrv.addCampo(NOMBRE_CAMPO_EDICIONSRV_MEDIO, BigDecimal.ZERO);
+        final IContexto[] aContextoSolicitud = invocarServicio(getContexto(), datosEntradaSolicitudEdicionSrv);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN modificar los datos de la solicitud");
+        }
+        return aContextoSolicitud;
+    }
+
+    /**
+     * Modifica la cuenta que se pasa como parámetro y la guarda
+     * @param gp
+     * @param datosCuenta
+     * @param strDivisa
+     * @param bidEntidad
+     * @param bidOficinaCuenta
+     * @param bidDc
+     * @param bidCuenta
+     * @param bidPaisCuenta
+     * @param strUsuario
+     * @param strVigencia
+     */
+    private void modificarCuenta(final GestionPreformalizacion gp, final DatosCuentasC datosCuenta, final String strDivisa, final BigDecimal bidEntidad, final BigDecimal bidOficinaCuenta, final BigDecimal bidCuenta, final BigDecimal bidPaisCuenta, final String strUsuario, final String strVigencia, String strIban, BigDecimal bidTipoCuenta) {
+        if (!StringUtils.isEmpty(strIban)) {
+            datosCuenta.setCuenta(strIban);
+            datosCuenta.setFormato(new BigDecimal(3));
+        } else {
+            datosCuenta.setCuenta(DatosCuentasC.getCuentaFormateada(bidEntidad, bidOficinaCuenta, bidCuenta));
+            datosCuenta.setFormato(BigDecimal.ONE);
+        }
+        datosCuenta.setDivisaCuenta(strDivisa);
+        datosCuenta.setEntidad(bidEntidad);
+        datosCuenta.setOficinaCuenta(bidOficinaCuenta);
+        datosCuenta.trocearCuentaCompleta(bidCuenta);
+        datosCuenta.setPaisCuenta(bidPaisCuenta);
+        datosCuenta.setUsuario(strUsuario);
+        datosCuenta.setVigente(strVigencia);
+        datosCuenta.setBidTipoCuenta(bidTipoCuenta);
+        if ((Constantes.CTE_BID_CUENTA_EXTERNA.equals(bidTipoCuenta)) && (Constantes.CTE_BID_CUENTA_INTERNA.equals(datosCuenta.getBidTipoCuenta())) && (Constantes.CTE_TIPO_CUENTA_CARGO.equals(datosCuenta.getTipoCuenta()))) {
+            BigDecimal idDom = datosCuenta.getBidIdDomiciliacion();
+            if (BigDecimal.ZERO.equals(idDom)) {
+                idDom = UtilidadesComun.obtenerIdDomiciliacion();
+                datosCuenta.setBidIdDomiciliacion(idDom);
+            }
+        }
+        gp.guardarDatosCuenta(datosCuenta);
+    }
+
+    /**
+     * Comprueba segun el valor de datosCuentas si la operacion a realizar
+     * con la cuenta de euros es un alta, una modificacion o un borrado
+     * @param datosCuentaEuros Cuenta de euros recuperada en una consulta
+     * @param gp Gestion de la preforma
+     * @param bidSolicitud
+     * @param bidOficina
+     * @param bidVersion
+     * @param bidNucExpediente
+     * @param strDivisa
+     * @param bidEntidad
+     * @param bidOficinaCuenta
+     * @param bidCuenta
+     * @param bidPaisCuenta
+     * @param strTipoCuenta A/C
+     * @param bidDivision
+     * @param bidSubdivision
+     * @param bidFormato
+     * @param strUsuario
+     * @param strVigencia
+     * @return La cuenta de euros modificada o dada de alta
+     */
+    private DatosCuentasC gestionCuentaEuros(final DatosCuentasC datosCuentaEuros, final GestionPreformalizacion gp, final BigDecimal bidSolicitud, final BigDecimal bidOficina, final BigDecimal bidVersion, final BigDecimal bidNucExpediente, final String strDivisa, final BigDecimal bidEntidad, final BigDecimal bidOficinaCuenta, final BigDecimal bidCuenta, final BigDecimal bidPaisCuenta, final String strTipoCuenta, final BigDecimal bidDivision, final BigDecimal bidSubdivision, final BigDecimal bidFormato, final String strUsuario, final String strVigencia, String strIban, BigDecimal bidTipoCuenta) {
+        DatosCuentasC datosCuenta = datosCuentaEuros;
+        if (!UtilidadesTramitacion.isBlankOrNull(strDivisa) && !UtilidadesTramitacion.isBlankOrNull(bidEntidad) && !UtilidadesTramitacion.isBlankOrNull(bidOficinaCuenta) && !UtilidadesTramitacion.isBlankOrNull(bidCuenta)) {
+            if (datosCuentaEuros == null) {
+                // Se trata de un alta de la cuenta de euros
+                DatosCuentasC newDatosCuentaEuros = new DatosCuentasC(bidSolicitud, bidOficina, bidVersion, bidNucExpediente, strDivisa, bidEntidad, bidOficinaCuenta, bidCuenta, bidPaisCuenta, strTipoCuenta, Constantes.CTE_PRIORIDAD_CUENTA_DOS, bidTipoCuenta, bidDivision, bidSubdivision, bidFormato, strUsuario, strVigencia, strIban);
+                gp.crearDatosCuenta(newDatosCuentaEuros);
+                datosCuenta = newDatosCuentaEuros;
+            } else {
+                // si la cuenta es de cargo y domiciliación externa necesitamos un id para la domiciliación
+                if ((Constantes.CTE_BID_CUENTA_EXTERNA.equals(bidTipoCuenta)) && (Constantes.CTE_BID_CUENTA_INTERNA.equals(datosCuentaEuros.getBidTipoCuenta())) && (Constantes.CTE_TIPO_CUENTA_CARGO.equals(strTipoCuenta))) {
+                    BigDecimal idDom = datosCuentaEuros.getBidIdDomiciliacion();
+                    if (BigDecimal.ZERO.equals(idDom)) {
+                        idDom = UtilidadesComun.obtenerIdDomiciliacion();
+                        datosCuentaEuros.setBidIdDomiciliacion(idDom);
+                    }
+                }
+                datosCuentaEuros.getCuentasKey().setNumeroSolicitud(bidSolicitud);
+                datosCuentaEuros.getCuentasKey().setOficinaSolicitud(bidOficina);
+                datosCuentaEuros.getCuentasKey().setVersionSolicitud(bidVersion);
+                datosCuentaEuros.getCuentasKey().setNucExpediente(bidNucExpediente);
+                if (!StringUtils.isEmpty(strIban)) {
+                    datosCuentaEuros.setCuenta(strIban);
+                } else {
+                    datosCuentaEuros.setCuenta(DatosCuentasC.getCuentaFormateada(bidEntidad, bidOficinaCuenta, bidCuenta));
+                }
+                datosCuentaEuros.setDivisaCuenta(strDivisa);
+                datosCuentaEuros.setEntidad(bidEntidad);
+                datosCuentaEuros.setOficinaCuenta(bidOficinaCuenta);
+                datosCuentaEuros.trocearCuentaCompleta(bidCuenta);
+                datosCuentaEuros.setTipoCuenta(strTipoCuenta);
+                datosCuentaEuros.setDivision(bidDivision);
+                datosCuentaEuros.setSubdivision(bidSubdivision);
+                datosCuentaEuros.setFormato(bidFormato);
+                datosCuentaEuros.setUsuario(strUsuario);
+                datosCuentaEuros.setVigente(strVigencia);
+                datosCuentaEuros.setPaisCuenta(bidPaisCuenta);
+                datosCuentaEuros.setBidTipoCuenta(bidTipoCuenta);
+                gp.guardarDatosCuenta(datosCuentaEuros);
+            }
+        } else {
+            if (null != datosCuentaEuros) {
+                // Se elimina la cuenta ya que se ha vaciado
+                gp.eliminarCuenta(datosCuentaEuros);
+                datosCuenta = null;
+            }
+        }
+        return datosCuenta;
+    }
+
+    /**
+     * Invoca al servicio que genera y adjunta el Documento interno para minutar
+     * @param bidOficinaSolicitud
+     * @param bidNumeroSolicitud
+     * @param bidVersionSolicitud
+     * @param bidNucExpediente
+     */
+    // 08-08-2013 - G000895
+    private IContexto[] generacionDocumentoInterno(final BigDecimal bidOficinaSolicitud, final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud, // , final String enviarCorreo, final IContexto direccionesCorreo)
+    final BigDecimal bidNucExpediente) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO generar Documento interno minuta");
+        }
+        // Servicio de generación del Documento interno para minutar DocInternoMinutaSrv
+        final IDatosEntradaTx datosEntradaDocInternoMinutaSrv = getPrograma(getContexto(), ID_CUENTA_ANPM, ID_COOP_GENERACION_DOC_INTERNO);
+        datosEntradaDocInternoMinutaSrv.addCampo(NOMBRE_CAMPO_OFICINA_SOLICITUD, bidOficinaSolicitud);
+        datosEntradaDocInternoMinutaSrv.addCampo(NOMBRE_CAMPO_NUMERO_SOLICITUD, bidNumeroSolicitud);
+        datosEntradaDocInternoMinutaSrv.addCampo(NOMBRE_CAMPO_VERSION_SOLICITUD, bidVersionSolicitud);
+        datosEntradaDocInternoMinutaSrv.addCampo(NOMBRE_CAMPO_EXPEDIENTE, bidNucExpediente);
+        // if (null != enviarCorreo)
+        // {
+        // datosEntradaDocInternoMinutaSrv.addCampo(
+        // ENVIAR_CORREO, enviarCorreo);
+        // }
+        // if (null != direccionesCorreo)
+        // {
+        // datosEntradaDocInternoMinutaSrv.addCampo(
+        // CNTX_DIRECCIONES_CORREO, direccionesCorreo);
+        // }
+        final IContexto[] aContextoSolicitud = invocarServicio(getContexto(), datosEntradaDocInternoMinutaSrv);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN generar Documento interno minuta");
+        }
+        return aContextoSolicitud;
+    }
+
+    /**
+     * Invoca al servicio que genera y adjunta la Oferta vinculante para hipotecarios
+     * @param bidOficinaSolicitud
+     * @param bidNumeroSolicitud
+     * @param bidVersionSolicitud
+     * @param bidNucExpediente
+     */
+    // 08-08-2013 - G000895
+    private IContexto[] adjuntarOVHipotecarios(final BigDecimal bidOficinaSolicitud, final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud, final BigDecimal bidNucExpediente, boolean seImprimeOVHipotecaria) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO generar Oferta vinculante para hipotecarios");
+        }
+        // Servicio de  impresion de la Oferta Vinculante para expedientes hipotecarios ImprimirOfertaVinculanteHipotecariosSrv
+        final IDatosEntradaTx datosEntradaOVHipotecariosSrv = getPrograma(getContexto(), ID_CUENTA_ANPM, ID_COOP_GENERACION_OFERTA_VINCULANTE);
+        datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_OFICINA_SOLICITUD, bidOficinaSolicitud);
+        datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_NUMERO_SOLICITUD, bidNumeroSolicitud);
+        datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_VERSION_SOLICITUD, bidVersionSolicitud);
+        datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_EXPEDIENTE, bidNucExpediente);
+        /*20150714 Si la operatoria de la FIPER está activada para esta oficina, generamos E IMPRIMIMOS la OVHipotecaria*/
+        if (seImprimeOVHipotecaria) {
+            datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_ORIGEN, // 1: imprimir & generar, 2: generar.
+            Constantes.CTE_STR_1);
+        } else {
+            datosEntradaOVHipotecariosSrv.addCampo(NOMBRE_CAMPO_ORIGEN, ORIGEN_BOTON_ACEPTAR);
+        }
+        final IContexto[] aContextoSolicitud = invocarServicio(getContexto(), datosEntradaOVHipotecariosSrv);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("FIN generar Oferta vinculante para hipotecarios");
+        }
+        return aContextoSolicitud;
+    }
+
+    /**
+     * Si la oficina de la solicitud está parametrizada en la tabla de operatoria de documentos, AN47TB01,
+     * entonces comprobamos si la fiper se ha impreso con la debida antelación en relación a la fecha de formalización.
+     *
+     * @param datosSolicitud
+     * @param fechaForm
+     */
+    /* ####### 20150707 COMENTAMOS EL METODO */
+    private CumplimientoAntelacionDocumentosVO comprobarCumplimientoDiasAntelacionDocumentos(DatosSolicitudC datosSolicitud, String fechaForm) {
+        OperatoriaDocumentosOficinaC operatoria = null;
+        HistoricoImpresionC historicoImpresionFiper = null;
+        BigDecimal numeroDiasAntelacion = null;
+        Date fechaImpresionFiper = null;
+        String fechaImpresionFiperStr = null;
+        // Date fechaMinimaForm = null;
+        String fechaMinimaFormStr = null;
+        // Necesaria para llamar a ENCA_401 a través del DateUtils.calcularDiasHabiles(..),
+        String fechaMinimaFormStrDD_MM_AAAA = null;
+        // nos devuelve la fecha en formato DD-MM-AAAA
+        BigDecimal codSalidaImprFiperAntel = CumplimientoAntelacionDocumentosVO.CTE_SALIDA_IMPR_FIPER_ANTEL_OK;
+        StringBuilder mensSalidaImprFiperAntel = new StringBuilder();
+        mensSalidaImprFiperAntel.append(StringUtils.EMPTY);
+        CumplimientoAntelacionDocumentosVO cumplimientoAntelacionDocumentosVO = new CumplimientoAntelacionDocumentosVO();
+        BigDecimal nuc = null;
+        nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        // Recuperamos la operatoria para esta oficina en relación a la FIPER
+        // 20150809 Debido a que cuando el tipo de prescriptor del préstamo es Idealista la oficina
+        // de la solicitud es la 806, oficina virtual, consultamos la tabla de operatoria de documentos
+        // por la oficina contable, que es la oficina tramitadora.
+        operatoria = GestionOperatoriaDocumentos.obtenerOperatoriaActual(Constantes.CTE_TIPO_DOCUMENTO_FIPER, datosSolicitud.getOficinaContable());
+        // 20150725 La comprobación de la operatoria de la fiper sólo se hace si es necesario (préstamos hipotecarios).
+        if ((null != operatoria) && (Constantes.CTE_STR_S.equals(datosSolicitud.getNecesidadFiper()))) {
+            cumplimientoAntelacionDocumentosVO.setOperatoria(operatoria);
+            numeroDiasAntelacion = operatoria.getId().getPlazo();
+            // if (null != historicoImpresionFiper)
+            if (!datosSolicitud.getDateFechaImpresionFipper().equals(DateUtils.getSoloFecha(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO)))) {
+                /*
+				 * 20150709 AHORA VAMOS A OBTENER LA FECHA DE IMPRESION DE LA FIPER BUSCANDO LA MAS RECIENTE EN EL HISTORICO, 
+				 * AUNQUE PARA EL CRITERIO DE SABER SI SE IMPRIMIO LA FIPER O NO MANTENEMOS LA FECHA DE LA TABLA DE SOLICITUD, 
+				 * AN251320.
+				*/
+                historicoImpresionFiper = GestionHistoricoImpresion.consultarHistoricoImpresionFechaMasReciente(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), nuc, Constantes.CTE_TIPO_DOCUMENTO_FIPER);
+                /*Si no tenemos información en el histórico pillamos la fecha de impresión de la fiper de la tabla de solicitud.*/
+                if (null != historicoImpresionFiper) {
+                    fechaImpresionFiperStr = DateHelper.timestampToString(historicoImpresionFiper.getId().getTimestamp(), DateHelper.FORMATO_DB2_DATE);
+                    fechaImpresionFiper = DateHelper.stringASqlDate(fechaImpresionFiperStr, DateHelper.FORMATO_DB2_DATE);
+                } else {
+                    fechaImpresionFiper = datosSolicitud.getDateFechaImpresionFipper();
+                }
+                // *Si la suma de la fecha impresion fiper mas los dias de antelacion es superior a
+                // * la fecha de formalización cascamos.
+                /*20150804 Obtenemos la fecha mínima llamando a ENCA_401, sumando días hábiles que en realidad son naturales.
+				 * A la fecha de impresiónn del documento le sumamos el plazo*/
+                // fechaMinimaForm = DateUtils.addDays(fechaImpresionFiper, numeroDiasAntelacion.intValue());
+                fechaMinimaFormStrDD_MM_AAAA = DateUtils.calcularDiasHabiles(fechaImpresionFiper, numeroDiasAntelacion, datosSolicitud.getOficinaContable());
+                fechaMinimaFormStr = DateUtils.cambiaFormatoFecha(fechaMinimaFormStrDD_MM_AAAA, DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_YYYY_MM_DD_GUION);
+                // if (0 <= fechaMinimaFormStr.compareTo(fechaForm))
+                if (0 <= fechaMinimaFormStr.compareTo(DateUtils.cambiaFormatoFecha(fechaForm, DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_YYYY_MM_DD_GUION))) {
+                    // FALTA CAMBIAR EL CODIGO OPERATORIA DOCUMENTO.
+                    if (!compruebaPlazosFiper() && Constantes.CTE_IND_OPERATORIA_DOCUMENTO_OBLIGATORIA.equals(operatoria.getTipoControl())) {
+                        /*Operatoria obligatoria y fiper impresa pero no con antelación suficiente.*/
+                        ServicioNegocio.rollback(CodigosError.CTE_ERROR_FECHA_FORMALIZACION_MINIMA, null, new String[] { numeroDiasAntelacion.toString(), fechaMinimaFormStr }, null);
+                    } else {
+                        /*Operatoria informativa y fiper impresa pero no con antelación suficiente.*/
+                        codSalidaImprFiperAntel = CumplimientoAntelacionDocumentosVO.CTE_SALIDA_IMPR_FIPER_ANTEL_NO_ANTEL;
+                        // operatoria informativa, avisamos al usuario, mirar como hacerlo, podemos meter un campo en el ANPMN254 pero
+                        // no va a caber en la ventanita de la dll, entre todo lo que ya tiene ya anda por cerca de los 255 caracteres.
+                        // mensSalidaImprFiperAntel.append("La fecha de formalización del préstamo debe ser ");
+                        mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), RECUERDE_HAN_TRANSCURRIDO_405181042).toString());
+                        mensSalidaImprFiperAntel.append(numeroDiasAntelacion.toString());
+                        // mensSalidaImprFiperAntel.append(" dias posterior a la fecha de impresión de la fiper, es decir, cómo mínimo debe ser el día ");
+                        mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), DIAS_FECHA_IMPRESI_N_FIPER_FECHA_PREVISTA_FIRMA_1565037948).toString());
+                    // mensSalidaImprFiperAntel.append(fechaMinimaFormStr);
+                    }
+                } else {
+                // se cumple la antelación, no hacemos nada.
+                }
+            } else {
+                if (Constantes.CTE_IND_OPERATORIA_DOCUMENTO_OBLIGATORIA.equals(operatoria.getTipoControl())) {
+                    /*Operatoria obligatoria y fiper no impresa.*/
+                    // la oficina con este documento están en la tabla de operatoria, AN47TB01 PERO no se ha impreso la FIPER,
+                    // lanzamos rollback sólo en el caso de que sea obligatoria, si la operatoria es informativa continuamos pero avisando al usuario.
+                    ServicioNegocio.rollback(CodigosError.CTE_ERROR_PREFORM_NO_FIPER, null, null, new String[] { numeroDiasAntelacion.toString() });
+                } else {
+                    /*Operatoria informativa y fiper no impresa.*/
+                    codSalidaImprFiperAntel = CumplimientoAntelacionDocumentosVO.CTE_SALIDA_IMPR_FIPER_ANTEL_NO_IMPR;
+                    // operatoria informativa, avisamos al usuario, mirar como hacerlo, podemos meter un campo en el ANPMN254 pero
+                    // no va a caber en la ventanita de la dll, entre todo lo que ya tiene ya anda por cerca de los 255 caracteres.
+                    // solución: mostrar dos ventanitas.
+                    mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), RECUERDE_DEBE_IMPRIMIR_FIPER_RECOGER_FIRMA_CLIENTE_243254226).toString());
+                    mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), FINALIZAR_TAREA_FECHA_PREVISTA_FIRMA_DEBE_1193189037).toString());
+                    mensSalidaImprFiperAntel.append(numeroDiasAntelacion.toString());
+                    mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), DIAS_POSTERIOR_FECHA_IMPRESI_N_FIPER_708905297).toString());
+                // mensSalidaImprFiperAntel.append("Recuerde que no han transcurrido los ");
+                // mensSalidaImprFiperAntel.append(numeroDiasAntelacion.toString());
+                // mensSalidaImprFiperAntel.append(" dias desde la fecha de impresión de la FIPER a la fecha prevista de firma.");
+                }
+            }
+            cumplimientoAntelacionDocumentosVO.setCodSalidaImprFiperAntel(codSalidaImprFiperAntel);
+            cumplimientoAntelacionDocumentosVO.setMensSalidaImprFiperAntel(mensSalidaImprFiperAntel.toString());
+        }
+        return cumplimientoAntelacionDocumentosVO;
+    }
+
+    /**
+     * Método que comprueba si la fiper ha sido impresa para solventar los casos excepcionales en que no se haga.
+     * Si la fecha de impresión está vacía (la preformalización no se ha reabierto), se llama al servicio de impresión
+     * de la fiper, se manda un correo y se llama a expediente para finalizar.
+     *
+     * @param datosSolicitud
+     */
+    private void comprobacionAdicionalFiper(DatosSolicitudC solicitud) {
+        if (null != solicitud && null != solicitud.getDateFechaImpresionFipper() && "0001-01-01".equals(solicitud.getDateFechaImpresionFipper().toString()) && "S".equals(solicitud.getNecesidadFiper())) {
+            // Se llama al servicio de impresión de la FIPER
+            IDatosEntradaTx entrada = getPrograma(getContexto(), 507, 261);
+            entrada.addCampo("NUC_EXPEDIENTE", solicitud.getDatosSolicitudKey().getNucExpediente());
+            IContexto[] salida = invocarServicio(getContexto(), entrada);
+            if (null == salida || 0 == salida.length) {
+                ServicioNegocio.rollback(12114, null, null, null);
+            }
+            // Se manda correo en caso de que la fiper no se haya impreso normalmente y
+            // haya tenido que forzarse su impresión al final. $OP-LBL-NL-3$ $OP-LBL-NL-2$ $OP-LBL-NL-2$
+            UtilidadesComun.enviarCorreo("MAIL_FIPER", new Mensaje(ServicioNegocio.getContexto(), NUC_3392574).toString() + solicitud.getDatosSolicitudKey().getNucExpediente().toString() + new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_249413466).toString() + solicitud.getDatosSolicitudKey().getVersionSolicitud().toString() + new Mensaje(ServicioNegocio.getContexto(), _ERROR_709922214).toString() + new Mensaje(ServicioNegocio.getContexto(), FIPER_GENERADO_AUTOM_TICAMENTE_221744344).toString());
+            // Se llama al servicio de expediente para finalizar la tarea
+            UtilidadesComun.actualizarEstadoTarea(solicitud.getDatosSolicitudKey().getNucExpediente(), ConstantesComun.CTE_CODIGO_PROCESO_PREFORM, "F");
+        // ServicioNegocio.rollback(212, null, new String[] {"Error controlado para no finalizar la solicitud por error. Fecha impresión fiper: "+solicitud.getDateFechaImpresionFipper(),"Todo OK"}, null);
+        }
+    }
+
+    /**
+     * Si la FIPER fue generada en plazo devuelve true, si no devuelve false.
+     * Este método sólo realiza comprobaciones si existe el parámetro en la AN82.
+     *
+     * @param solicitud
+     * @return
+     */
+    private CumplimientoAntelacionDocumentosVO compruebaFiperEnPlazo(DatosSolicitudC solicitud) {
+        boolean fiperEnPlazo = true;
+        BigDecimal plazo = BigDecimal.ZERO;
+        HistoricoImpresionC ultimaImpresionEnPlazo = null;
+        BigDecimal codSalidaImprFiperAntel = CumplimientoAntelacionDocumentosVO.CTE_SALIDA_IMPR_FIPER_ANTEL_OK;
+        StringBuilder mensSalidaImprFiperAntel = new StringBuilder();
+        mensSalidaImprFiperAntel.append(StringUtils.EMPTY);
+        CumplimientoAntelacionDocumentosVO cumplimientoAntelacionDocumentosVO = new CumplimientoAntelacionDocumentosVO();
+        if (null != solicitud && null != solicitud.getNecesidadFiper() && "S".equals(solicitud.getNecesidadFiper()) && compruebaPlazosFiper()) {
+            // Consulta en la AN47 el número de días de antelación correspondientes a la oficina de la solicitud.
+            OperatoriaDocumentosOficinaC operatoria = GestionOperatoriaDocumentos.obtenerOperatoriaActual(Constantes.CTE_TIPO_DOCUMENTO_FIPER, solicitud.getOficinaContable());
+            if (null == operatoria) {
+                operatoria = registraOficinaNueva(solicitud.getOficinaContable());
+            }
+            if (null != operatoria) {
+                cumplimientoAntelacionDocumentosVO.setOperatoria(operatoria);
+                plazo = operatoria.getId().getPlazo();
+                // Se consulta en la AN48 si hay alguna Fiper anterior a la fecha requerida,
+                ultimaImpresionEnPlazo = new HistoricoImpresionEng().consultaUltimaFiperEnPlazo(solicitud.getDatosSolicitudKey().getNucExpediente(), solicitud.getFechaFormalizacion(), plazo, solicitud.getDatosSolicitudKey().getOficinaSolicitud());
+                // si no la hay
+                if (null == ultimaImpresionEnPlazo) {
+                    fiperEnPlazo = false;
+                } else // y si la hay se recogen todas las solicitudes desde la más recierte en plazo hasta la última con timestamp anterior a la impresión
+                {
+                    List<DatosSolicitudC> solicitudes = new DatosSolicitudEng().buscarVersionesSolicitud(solicitud.getDatosSolicitudKey().getOficinaSolicitud(), solicitud.getDatosSolicitudKey().getNumSolicitud(), solicitud.getDatosSolicitudKey().getNucExpediente());
+                    // que cumpla el plazo requerido por la oficina.
+                    if (null != solicitudes && 0 < solicitudes.size()) {
+                        int nSolicitudes = solicitudes.size();
+                        Timestamp fechaUltimaEnPlazo = ultimaImpresionEnPlazo.getId().getTimestamp();
+                        // Desde la version actual de solicitudes hasta la penúltima con timestamp anterior a la impresión
+                        for (int j = 0; j < nSolicitudes && solicitudes.get(j).getTimestamp().after(fechaUltimaEnPlazo); j++) {
+                            // Se buscan diferencias entre una versión y la anterior en los campos importe solic
+                            if (0 != solicitudes.get(j).getImporteSolicitado().compareTo(solicitudes.get(j + 1).getImporteSolicitado()) || 0 != solicitudes.get(j).getPlazoTotal().compareTo(solicitudes.get(j + 1).getPlazoTotal())) {
+                                fiperEnPlazo = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            // Si la Fiper no está en plazo se informa de ello y se cancela la operación
+            if (!fiperEnPlazo) {
+                if (Constantes.CTE_IND_OPERATORIA_DOCUMENTO_OBLIGATORIA.equals(operatoria.getTipoControl())) {
+                    ServicioNegocio.rollback(14108, null, null != plazo ? new String[] { plazo.toString() } : null, null != plazo ? new String[] { plazo.toString() } : null);
+                } else {
+                    // Si es una subrogracion, no se muetra el mensaje de la FIPER
+                    if (0 != solicitud.getSubrogacionOtraEntidad().compareTo(new BigDecimal(3))) {
+                        /*Operatoria informativa y fiper impresa pero no con antelación suficiente.*/
+                        codSalidaImprFiperAntel = CumplimientoAntelacionDocumentosVO.CTE_SALIDA_IMPR_FIPER_ANTEL_NO_ANTEL;
+                        // operatoria informativa, avisamos al usuario, mirar como hacerlo, podemos meter un campo en el ANPMN254 pero
+                        // no va a caber en la ventanita de la dll, entre todo lo que ya tiene ya anda por cerca de los 255 caracteres.
+                        mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), RECUERDE_HAN_TRANSCURRIDO_405181042).toString());
+                        mensSalidaImprFiperAntel.append(plazo.toString());
+                        mensSalidaImprFiperAntel.append(new Mensaje(ServicioNegocio.getContexto(), DIAS_FECHA_IMPRESI_N_FIPER_FECHA_PREVISTA_FIRMA_1565037948).toString());
+                    }
+                }
+            } else {
+            // se cumple la antelación, no hacemos nada.
+            }
+        }
+        cumplimientoAntelacionDocumentosVO.setCodSalidaImprFiperAntel(codSalidaImprFiperAntel);
+        cumplimientoAntelacionDocumentosVO.setMensSalidaImprFiperAntel(mensSalidaImprFiperAntel.toString());
+        return cumplimientoAntelacionDocumentosVO;
+    }
+
+    /*private IContexto[] compruebaFiperCaducada(
+									DatosSolicitudC solicitud,
+									HistoricoImpresionC ultimaImpresionEnPlazo,
+									List<IContexto> listaContextos)
+	{
+		// Si la fiper en plazo está caducada
+		if(null != ultimaImpresionEnPlazo
+		&& null != ultimaImpresionEnPlazo.getFechaMaximaValidez()
+		&& ultimaImpresionEnPlazo.getFechaMaximaValidez().before(DateUtils.dateNow()))
+		{
+			GestionComprobacionPrescriptores.generarNuevaVersionSolicitud(solicitud);
+			
+			java.sql.Date fechaNula = new java.sql.Date(DateUtils.parseDate(
+																		DateUtils.CTE_DATELOWESTONLYDAY, 
+																		DateUtils.FORMATO_FECHA_AMERICANO
+																		).getTime());
+			
+			solicitud = new DatosSolicitudEng().getUltimaVersion(solicitud.getDatosSolicitudKey().getNucExpediente());
+			
+			solicitud.setDateFechaImpresionFipper(fechaNula);
+			
+			solicitud.update();
+			
+			solicitud = new DatosSolicitudEng().getUltimaVersionCompleta(solicitud.getDatosSolicitudKey().getNucExpediente());
+			
+			solicitud.setDateFechaImpresionFipper(fechaNula);
+			
+			solicitud.update();
+			
+			IContexto contexto = listaContextos.get(listaContextos.size()-1);
+			listaContextos.remove(listaContextos.size()-1);
+			
+			contexto.put(CTE_CTX_PREFORM_COD_ERROR, BigDecimal.ONE); 
+			contexto.put(CTE_CTX_PREFORM_PRIMER_MENSAJE_PREFORM, "La Fiper está caducada");
+			contexto.put(CTE_CTX_PREFORM_SEGUNDO_MENSAJE_PREFORM, "Debe imprimir una nueva Fiper");
+			
+			listaContextos.add(contexto);
+		}
+		
+		return listaContextos.toArray(new IContexto[listaContextos.size()]);
+	}*/
+    /**
+     * Crea un registro nuevo para fijar un plazo mínimo para la Fiper para esa oficina contable.
+     * El número de días se recoge de la 82. Se manda un correo informando del alta.
+     *
+     * @param oficinaContable
+     * @return
+     */
+    private OperatoriaDocumentosOficinaC registraOficinaNueva(BigDecimal oficinaContable) {
+        // Se recoge el plazo de la 82
+        BigDecimal plazo = BigDecimal.ZERO;
+        IDatosEntradaTx entrada = getPrograma(getContexto(), 507, 75);
+        entrada.addCampo("AGRUPACION_PARAMETRO", "PLAZ_FIPER");
+        entrada.addCampo("NOMBRE_PARAMETRO", "PLAZO");
+        IContexto[] salida = invocarServicio(getContexto(), entrada);
+        if (null != salida && 0 < salida.length && null != salida[0] && null != salida[0].getString("ANPMN031050")) {
+            plazo = new BigDecimal(salida[0].getString("ANPMN031050"));
+        }
+        // volvemos a llamar al servicio para leer también de la AN82
+        // el tipo de control a realizar por defecto
+        String tipoControl = "I";
+        entrada = getPrograma(getContexto(), 507, 75);
+        entrada.addCampo("AGRUPACION_PARAMETRO", "PLAZ_FIPER");
+        entrada.addCampo("NOMBRE_PARAMETRO", "TIPCONTROL");
+        salida = invocarServicio(getContexto(), entrada);
+        if (null != salida && 0 < salida.length && null != salida[0] && null != salida[0].getString("ANPMN031050")) {
+            tipoControl = salida[0].getString("ANPMN031050").trim();
+        }
+        // Se construye el registro y persiste
+        OperatoriaDocumentosOficinaC operatoria = new OperatoriaDocumentosOficinaEng().createNewObject();
+        operatoria.setId(new OperatoriaDocumentosOficinaKey());
+        operatoria.getId().setCodOperatoria("FI");
+        operatoria.getId().setOficina(oficinaContable);
+        operatoria.getId().setPlazo(plazo);
+        operatoria.getId().setTipoOficina(BigDecimal.ZERO.toString());
+        operatoria.setFechaAlta(new java.sql.Date(DateUtils.dateNow().getTime()));
+        operatoria.setFechaBaja(DateUtils.toSQLDate(DateUtils.parseDate("2100-01-01", "yyyy-MM-dd")));
+        operatoria.setTimestamp(new Timestamp(DateUtils.dateNow().getTime()));
+        operatoria.setTipoControl(tipoControl);
+        operatoria.setUsuario("U0000");
+        operatoria.persist();
+        // Envío de correo informando el alta $OP-LBL-NL-2$ $OP-LBL-NL-2$
+        UtilidadesComun.enviarCorreo("PLAZ_FIPER", new Mensaje(ServicioNegocio.getContexto(), OFICINA_CONTABLE_1795196159).toString() + oficinaContable.toString() + new Mensaje(ServicioNegocio.getContexto(), _SIDO_DADA_ALTA_CAG_AN47TB01_PLAZO_557180437).toString() + plazo.toString() + new Mensaje(ServicioNegocio.getContexto(), D_AS_99509395).toString());
+        return operatoria;
+    }
+
+    /**
+     * Pequeño método auxiliar que comprueba en la 82 si se deben ejecutar las nuevas comprobaciones
+     * de plazos correspondientes a la Fiper
+     *
+     * @return
+     */
+    private boolean compruebaPlazosFiper() {
+        boolean comprueba = false;
+        IDatosEntradaTx entrada = getPrograma(getContexto(), 507, 75);
+        entrada.addCampo("AGRUPACION_PARAMETRO", "PLAZ_FIPER");
+        entrada.addCampo("NOMBRE_PARAMETRO", "ACTIVO");
+        IContexto[] salida = invocarServicio(getContexto(), entrada);
+        if (null != salida && 0 < salida.length && null != salida[0] && BigDecimal.ONE.toString().equalsIgnoreCase(salida[0].getString("ANPMN031050"))) {
+            comprueba = true;
+        }
+        return comprueba;
+    }
+
+    private static final String OFICINA_CONTABLE_1795196159 = "OFICINA_CONTABLE_1795196159";
+
+    private static final String D_AS_99509395 = "D_AS_99509395";
+
+    private static final String _ERROR_709922214 = "_ERROR_709922214";
+
+    private static final String NUC_3392574 = "NUC_3392574";
+
+    private static final String _VERSI_N_249413466 = "_VERSI_N_249413466";
+
+    private static final String FINALIZAR_TAREA_FECHA_PREVISTA_FIRMA_DEBE_1193189037 = "FINALIZAR_TAREA_FECHA_PREVISTA_FIRMA_DEBE_1193189037";
+
+    private static final String FIPER_GENERADO_AUTOM_TICAMENTE_221744344 = "FIPER_GENERADO_AUTOM_TICAMENTE_221744344";
+
+    private static final String _SIDO_DADA_ALTA_CAG_AN47TB01_PLAZO_557180437 = "_SIDO_DADA_ALTA_CAG_AN47TB01_PLAZO_557180437";
+
+    private static final String RECUERDE_HAN_TRANSCURRIDO_405181042 = "RECUERDE_HAN_TRANSCURRIDO_405181042";
+
+    private static final String DIAS_POSTERIOR_FECHA_IMPRESI_N_FIPER_708905297 = "DIAS_POSTERIOR_FECHA_IMPRESI_N_FIPER_708905297";
+
+    private static final String DIAS_FECHA_IMPRESI_N_FIPER_FECHA_PREVISTA_FIRMA_1565037948 = "DIAS_FECHA_IMPRESI_N_FIPER_FECHA_PREVISTA_FIRMA_1565037948";
+
+    private static final String RECUERDE_DEBE_IMPRIMIR_FIPER_RECOGER_FIRMA_CLIENTE_243254226 = "RECUERDE_DEBE_IMPRIMIR_FIPER_RECOGER_FIRMA_CLIENTE_243254226";
+}

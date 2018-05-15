@@ -1,0 +1,2246 @@
+/**
+ * Aplicacion de Activo
+ * Novacaixagalicia © 2009-2010
+ */
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections.map.HashedMap;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.aplicacion.GestionDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.datEconomicos.ClausulaRestringuidaC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionClausulasRestringuidas;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.comun.LogModificacionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesGenericas;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.backOffice.ModificacionesBackOfficeC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.destinos.DestinosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.estudiosCliente.EstudiosClienteC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.estudiosCliente.EstudiosClienteEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.estudiosCliente.EstudiosClienteKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.gastosCompartidos.GastosCompartidosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.gastosCompartidos.GastosCompartidosEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionNivelesAutorizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionVersionBackOffice;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada.contextos.ContextosDatosSolicitudPrestamo;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ComparacionNivelesAutorizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesTramitacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.NuevaVersionRequerida;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mail.Mail;
+import es.caixagalicia.ifrt.mail.sender.IMailSender;
+import es.caixagalicia.ifrt.mail.sender.MailSenderImpl;
+import es.caixagalicia.ifrt.mainframe.ctgfacade.CtgFacade;
+import es.caixagalicia.ifrt.persistencia.eccv02.CEcc;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Servicio para la gestion de solicitudes de préstamos
+ *
+ * CO: ANPM_151
+ * CTX: ANPMN050
+ *
+ * @author F001297
+ * @author G000857
+ */
+public class DatosSolicitudAltaSrv extends ServicioNegocio {
+
+    // Campos de entrada
+    private static final int CTE_POSICION_TIRA_ID_PASO = 0;
+
+    private static final int CTE_POSICION_TIRA_ID_CLAVE = 1;
+
+    private static final int CTE_POSICION_TIRA_ID_PASO1 = 2;
+
+    private static final int CTE_POSICION_TIRA_ID_PASO2 = 3;
+
+    private static final int CTE_POSICION_TIRA_ID_PASO4 = 5;
+
+    private static final int CTE_POSICION_TIRA_ID_PASO5 = 6;
+
+    // private static final int CTE_POSICION_TIRA_ID_FORMALIZACION = 7;
+    // Modificacion para BO
+    private static final int CTE_POSICION_TIRA_ID_BO = 8;
+
+    /*Campos de entrada del servicio ANPM_151*/
+    private static final String CTE_POSICION_TIRA_EXCLUSIVIDAD = "INDICADOR_EXCLUSIVIDAD";
+
+    private static final String CTE_POSICION_TIRA_TITULARIDAD = "TITULARIDAD";
+
+    private static final String CTE_POSICION_TIRA_DISPONIBILIDAD = "DISPONIBILIDAD";
+
+    private static final String CTE_POSICION_TIRA_COMPROBACION_LTV = "COMPROBACION_LTV";
+
+    private static final String CTE_POSICION_TIRA_INCREMENTO_DURANTE_AMORTIZACION = "INCREMENTO_DUR_AMORT";
+
+    private static final String CTE_POSICION_TIRA_TECLEO_CUENTAS = "TECLEO_CUENTAS";
+
+    private static final String CTE_ENTRADA_TIPO_PRESCRIPTOR = "TIPO_PRESCRIPTOR";
+
+    private static final String CTE_ENTRADA_OFI_CNTL = "OFI_CNTL";
+
+    private static final String CTE_ENTRADA_IND_GRUPO_INMOBILIARIO = "IND_GRUPO_INMOBILIARIO";
+
+    private static final String CTE_ENTRADA_IND_CONTROL_EDAD = "IND_CONTROL_EDAD";
+
+    private static final String CTE_ENTRADA_IND_FLEXIBILIDAD = "IND_FLEXIBILIDAD";
+
+    private static final String CTE_ENTRADA_NUM_PERIODO_CAMBIO = "NUM_PERIODO_CAMBIO";
+
+    private static final String CTE_ENTRADA_UNI_PERIODO_CAMBIO = "UNI_PERIODO_CAMBIO";
+
+    private static final String CTE_ENTRADA_COLECTIVO = "COLECTIVO";
+
+    private static final String CTE_ENTRADA_TIPO_CALCULO = "TIPO_CALCULO_AMORT";
+
+    private static final String CTE_ENTRADA_TIPO_TITULACION = "TITULACION";
+
+    private static final String CTE_ENTRADA_TIPO_ESTUDIOS = "TIPO_ESTUDIOS";
+
+    private static final String CTE_ENTRADA_DENOMINACION = "DENOMINACION";
+
+    private static final String CTE_ENTRADA_UNIVERSIDAD = "UNIVERSIDAD";
+
+    private static final String CTE_ENTRADA_CURSO = "CURSO";
+
+    private static final String CTE_ENTRADA_NOTA = "NOTA";
+
+    private static final String CTE_ENTRADA_COMPATIBILIZA = "COMPATIBILIZA";
+
+    private static final String CTE_ENTRADA_GRUPO = "GRUPO";
+
+    private static final String CTE_ENTRADA_REFACCIONARIO = "REFACCIONARIO";
+
+    private static final String CTE_ENTRADA_COSTE_EFECTIVO = "COSTE_EFECTIVO";
+
+    private static final String CTE_ENTRADA_FECHA_VENCIMIENTO_FINAL = "FECHA_VENCIMIENTO_FINAL";
+
+    private static final String CTE_ENTRADA_IMPORTE_COMIS_ANTICIPADA = "IMPORTE_COMIS_ANTICIPADA";
+
+    private static final String CTE_ENTRADA_IMPORTE_AMPLIADO = "IMPORTE_AMPLIADO";
+
+    private static final String CTE_ENTRADA_IMPORTE_PRINCIPAL_OTRA_ENTIDAD = "PRINCIPAL_OTRA_ENTIDAD";
+
+    private static final String CTE_ENTRADA_MONEDA_COMIS_CANCELACION = "MONEDA_COM_CANCELACION";
+
+    private static final String CTE_ENTRADA_MONEDA_IMPORTE_AMPLIADO = "MONEDA_IMP_AMPLIADO";
+
+    private static final String CTE_ENTRADA_MONEDA_PRINCIPAL_RIESGO = "MONEDA_PRINCIPAL_RIESGO";
+
+    private static final String CTE_ENTRADA_NOVACION_SIN_MODALIDAD = "NOVACION_SIN_MODALIDAD";
+
+    private static final String CTE_ENTRADA_IMPORTE_DEPOSITO_ORIGEN = "IMPORTE_DEPOSITO_ORIGEN";
+
+    private static final String CTE_ENTRADA_IMPORTE_DEPOSITO_AMPLIADO = "IMPORTE_DEPOSITO_AMPLIADO";
+
+    private static final BigDecimal CTE_UNO_BIG_DECIMAL = new BigDecimal(1);
+
+    private static final int CTE_CERO = 0;
+
+    private static final int CTE_UNO = 1;
+
+    private static final int CTE_DOS = 2;
+
+    private static final int CTE_TRES = 3;
+
+    private static final int CTE_CUATRO = 4;
+
+    private static final int CTE_CINCO = 5;
+
+    private static final int CTE_MIL = 1000;
+
+    private static final String CTE_SIN_SUBDESTINO = "00";
+
+    /*
+	 * Constante para la comprobacion BO
+	 */
+    private static final String CTE_COMPROBACION_BO = "S";
+
+    /*
+	 * Constante modificacion BO
+	 */
+    private static final String CTE_MODIFICADO_BO = "S";
+
+    private static final String CTE_TIRA_IND_NECESITA_AUTORIZACION = "ANPMN060010";
+
+    /*
+	 * CUENTA CONTABLE DE LA APLICACION ANPM
+	 */
+    private static final Integer CTE_CUENTA_CONTABLE_APLICACION_ANPM = Integer.valueOf(507);
+
+    /*
+	 * SERVICIO DE COMPARACION DE VERSIONES DE AUTORIZACION DE APLICACION ANPM
+	 */
+    private static final Integer CTE_COD_OPERACION_COMPARACION_AUTORIZACION_SRV = Integer.valueOf(213);
+
+    private static final String CTE_OPCOMP_CAMPO_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+
+    private static final String CTE_OPCOMP_CAMPO_NUM_SOLICITUD = "NUMERO_SOLICITUD";
+
+    private static final String CTE_OPCOMP_CAMPO_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+
+    private static final String CTE_OPCOMP_CAMPO_NUM_EXPEDIENTE = "NUMERO_EXPEDIENTE";
+
+    /*
+	 * SERVICIO DE CONSULTA DE RED DE UN CENTRO
+	 */
+    private static final Integer CTE_CUENTA_CONTABLE_APLICACION_CGAL = Integer.valueOf(100);
+
+    private static final Integer CTE_COD_OPERACION_CONS_RED_SRV = Integer.valueOf(307);
+
+    private static final Integer CTE_OPCNTRO_CAMPO_POSICION_CENTRO = Integer.valueOf(0);
+
+    private static final String CTE_CNTXTO_CONS_RED_DIVISION = "CG057C061";
+
+    /*
+	 * SERVICIO DE COMPROBACIÓN DE SI UNA SOLICITUD REQUIERE AUTORIZACION DE APLICACION ANPM
+	 */
+    private static final Integer CTE_COD_OPERACION_CHECK_AUTORIZACION_SRV = Integer.valueOf(171);
+
+    private static final String CTE_OPCHECK_CAMPO_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+
+    private static final String CTE_OPCHECK_CAMPO_NUM_SOLICITUD = "NUMERO_SOLICITUD";
+
+    private static final String CTE_OPCHECK_CAMPO_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+
+    private static final String CTE_OPCHECK_CAMPO_NUM_EXPEDIENTE = "NUMERO_EXPEDIENTE";
+
+    /*
+	 * CONSTANTES DE GARANTIA HIPOTECARIA
+	 */
+    private static final String CTE_GARANTIA_HIPOTECARIA1 = "HIP";
+
+    private static final String CTE_GARANTIA_HIPOTECARIA2 = "HBE";
+
+    private static final String CTE_COMPROBACION_ES_HIPOTECARIO = "H";
+
+    private static final String CTE_ESPECIALIDAD_DIVISA = "D";
+
+    /*CONSTANTES PARA EL CONTEXTO INFORMATIVO*/
+    private static final String CTE_CTX_INFORMATIVO = "ANPMN112";
+
+    private static final String CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA = "ANPMN112010";
+
+    private static final String CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM = "ANPMN112020";
+
+    private static final String CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM = "ANPMN112030";
+
+    private static final String CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ = "ANPMN112040";
+
+    private static final String CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC = "ANPMN112050";
+
+    /*Títulos y cuerpos del mensaje de finalización de solicitud $NON-NL-1$*/
+    private static final String CTE_TIT_MENS_FINAL_TRAM_SOLICITUD_FINALIZADA = "SOLICITUD_FINALIZADA_567470829";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_ALTA_SOLICITUD_FINALIZADA = "REALIZADO_CORRECTAMENTE_ALTA_SOLICITUD_1515806513";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_MODIF_SOLICITUD_FINALIZADA = "REALIZADO_CORRECTAMENTE_MODIFICACI_N_SOLICITUD_1981419520";
+
+    // $NON-NL-1$
+    private static final String CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_TOT_AUTORIZADA = "SOLICITUD_FINALIZADA_567470829";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_TOT_AUTORIZADA = "GENERADO_AUTORIZACI_N_SIGUE_VALIENDO_AUTORIZACI_N_133429097";
+
+    // $NON-NL-1$
+    private static final String CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_NUEVA = "SOLICITUD_PR_STAMO_GUARDADA_2141165282";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_NUEVA = "SOLICITUD_TODAV_A_GUARDADO_PRECIOS_FUERA_LA_TARIFA_421224456";
+
+    // $NON-NL-1$
+    private static final String CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_ANT_PARC = "SOLICITUD_FINALIZADA_567470829";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_ANT_PARC = "GENERADO_AUTORIZACI_N_EXISTE_AUTORIZACI_N_ANTERIOR_1532343900";
+
+    // $NON-NL-1$
+    private static final String CTE_TIT_MENS_FINAL_TRAM_PRECIOS_CADUCADOS = "SOLICITUD_PR_STAMO_FINALIZADA_2251040";
+
+    // $NON-NL-1$
+    private static final String CTE_CUERPO_MENS_FINAL_TRAM_PRECIOS_CADUCADOS = "GENERADO_NUEVA_AUTORIZACI_N_PRECIOS_CADUCADOS_1227404382";
+
+    /* Constante agrupación para obtención de red*/
+    // private static final String CTE_AGRUPACON_RED = "CART_RED";
+    /*CONSTANTES CONTEXTO SUBPRODUCTO*/
+    // private static final String CTE_CTX_SUBPRODUCTO = "ANPMN002";
+    // private static final String CTE_CTX_SUBPRODUCTO_CADUCIDAD_PRECIO = "ANPMN002680";
+    /* Tipos de expediente */
+    /*private final int PMOS = 1;
+	private final int ANPM = 191;*/
+    /**
+     * CONSTANTE PARA LA RECUPERACION DEL TIPO DE GARANTIA
+     */
+    private static final String CTE_TIPO_EXPEDIENTE = "ANPMN079010";
+
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(DatosSolicitudAltaSrv.class);
+
+    /**
+     *  Constructor sin parametros.
+     */
+    public DatosSolicitudAltaSrv() {
+        super();
+    }
+
+    /**
+     * Ejecuta la logica de negocio del servicio
+     *
+     * @see es.caixagalicia.ifrt.core.ServicioNegocio
+     * 		#ejecutar(
+     * 			es.caixagalicia.ifrt.core.IContextoEjecucion,
+     * 			es.caixagalicia.ifrt.core.IDatosEntradaTx)
+     * @param contexto contexto de ejecucion
+     * @param datosEntrada datos de entrada
+     * @return <code>IContexto[]</code>
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada) {
+        final long lInicio = System.currentTimeMillis();
+        // Se muestra un log y se crea una entrada en el diario electrónico
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM151: Gestion de solicitudes de préstamos (alta)");
+        }
+        contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        // Se extrae el PASO y la CLAVE
+        // obligatorio
+        String bidPaso = datosEntrada.getString(CTE_POSICION_TIRA_ID_PASO);
+        // obligatorio
+        String strClave = datosEntrada.getString(CTE_POSICION_TIRA_ID_CLAVE);
+        // obligatorio
+        BigDecimal bidOficinaSolicitud = new BigDecimal(strClave.substring(BigDecimal.ZERO.intValue(), 4));
+        // obligatorio
+        BigDecimal bidNumeroSolicutud = new BigDecimal(strClave.substring(4, 11));
+        // obligatorio
+        BigDecimal bidVersionSolicitud = new BigDecimal(strClave.substring(11, 18));
+        // obligatorio
+        BigDecimal bidNumeroExpediente = new BigDecimal(strClave.substring(18, 33));
+        // obligatorio
+        BigDecimal bidDivisionSolicitud = new BigDecimal(strClave.substring(33, 36));
+        // obligatorio
+        BigDecimal bidSubdivisionSolicitud = new BigDecimal(strClave.substring(36, 38));
+        // obligatorio
+        BigDecimal bidDigitoSolicitud = new BigDecimal(strClave.substring(38, 39));
+        // obligatorio
+        BigDecimal bidCodigoProducto = new BigDecimal(strClave.substring(39, 46));
+        // obligatorio
+        BigDecimal bidCodigoSubproducto = new BigDecimal(strClave.substring(46, 53));
+        // obligatorio
+        BigDecimal bidVersionGeneral = new BigDecimal(strClave.substring(53, 60));
+        // obligatorio
+        BigDecimal bidColectivo = new BigDecimal(strClave.substring(60, 67));
+        String estadoAutorizacion = null;
+        BigDecimal tipoPrescriptor = null;
+        BigDecimal ofiContable = null;
+        BigDecimal indGrupoInmobiliario = null;
+        String indControlEdad = null;
+        String indFlexibilidad = null;
+        BigDecimal numeroPeriodoCambio = null;
+        String unidadPeriodoCambio = null;
+        BigDecimal idColectivo = null;
+        String tipoCalculo = null;
+        String titulacion = null;
+        String tipoEstudios = null;
+        String denominacion = null;
+        String universidad = null;
+        String curso = null;
+        String nota = null;
+        String compatibiliza = null;
+        String grupo = null;
+        BigDecimal refaccionario = null;
+        BigDecimal costeEfectivoRemanente = null;
+        String fechaVencimientoFinal = null;
+        BigDecimal importeComisionAnticipada = null;
+        BigDecimal importeAmpliado = null;
+        BigDecimal importePrincipalOtraEntidad = null;
+        BigDecimal importeDepositoOrigen = null;
+        BigDecimal importeDepositoAmpliado = null;
+        String monedaPrincipalRiesgo = null;
+        String monedaImpComisionCancelacion = null;
+        String monedaImpAmpliado = null;
+        DatosSolicitudC datosSolicitudAnterior = null;
+        boolean existeAutorizacionAnterior = false;
+        boolean noHayAutorizacionNueva = false;
+        int comparacionDatoADato = ComparacionNivelesAutorizacion.SIN_VARIACION;
+        boolean autorizacionTotalmenteAutorizada = false;
+        boolean necesitaAutorizacion = false;
+        boolean noSeFinalizaSolicitud = true;
+        // String red = null;
+        List<IContexto> listaContextoSalida = null;
+        // Este flag nos va a indicar si se trata de un alta de una nueva solicitud (0)
+        // o de una modificación de una solicitud ya existente (1) en el paso 1.
+        int indModificacion = CTE_CERO;
+        // Recuperar el dato de la tira para saber si BO
+        // Optativo
+        String stringBO = datosEntrada.getString(CTE_POSICION_TIRA_ID_BO);
+        /*20141125 UtilidadesTramitacion.comprobarDatoNull(..) devuelve un string vacio si el que recibe está a null*/
+        /*Se hace para que no haya problema con las versiones del CO ANPM_151 en la APB*/
+        String strExclusividad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_POSICION_TIRA_EXCLUSIVIDAD));
+        String strTitularidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_POSICION_TIRA_TITULARIDAD));
+        String strDisponibilidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_POSICION_TIRA_DISPONIBILIDAD));
+        String strComprobacionLtv = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_POSICION_TIRA_COMPROBACION_LTV));
+        String strTecleoCuentas = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_POSICION_TIRA_TECLEO_CUENTAS));
+        BigDecimal bidIncrementoDuranteAmortizacion = datosEntrada.getDecimal(CTE_POSICION_TIRA_INCREMENTO_DURANTE_AMORTIZACION);
+        if (null == bidIncrementoDuranteAmortizacion) {
+            bidIncrementoDuranteAmortizacion = BigDecimal.ZERO;
+        }
+        /*20150409 Obtenemos el tipo de prescriptor y la oficina contable*/
+        tipoPrescriptor = datosEntrada.getDecimal(CTE_ENTRADA_TIPO_PRESCRIPTOR);
+        ofiContable = datosEntrada.getDecimal(CTE_ENTRADA_OFI_CNTL);
+        /*20150713 Obtenemos el indicador de Grupo inmobiliario*/
+        // Por defecto: No grupo inmob.
+        indGrupoInmobiliario = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IND_GRUPO_INMOBILIARIO));
+        /*20150910 Obtenemos campos de la flexible*/
+        indControlEdad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_IND_CONTROL_EDAD));
+        indFlexibilidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_IND_FLEXIBILIDAD));
+        numeroPeriodoCambio = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_NUM_PERIODO_CAMBIO));
+        unidadPeriodoCambio = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_UNI_PERIODO_CAMBIO));
+        idColectivo = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_COLECTIVO));
+        tipoCalculo = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_TIPO_CALCULO));
+        /**
+         * Campos entrada educredito
+         */
+        titulacion = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_TIPO_TITULACION));
+        tipoEstudios = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_TIPO_ESTUDIOS));
+        denominacion = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_DENOMINACION));
+        universidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_UNIVERSIDAD));
+        curso = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_CURSO));
+        nota = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_NOTA));
+        compatibiliza = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_COMPATIBILIZA));
+        grupo = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_GRUPO));
+        refaccionario = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_REFACCIONARIO));
+        /**
+         * Campos entrada subrogacion
+         */
+        costeEfectivoRemanente = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_COSTE_EFECTIVO));
+        fechaVencimientoFinal = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_FECHA_VENCIMIENTO_FINAL));
+        importeComisionAnticipada = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IMPORTE_COMIS_ANTICIPADA));
+        importeAmpliado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IMPORTE_AMPLIADO));
+        importePrincipalOtraEntidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IMPORTE_PRINCIPAL_OTRA_ENTIDAD));
+        importeDepositoOrigen = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IMPORTE_DEPOSITO_ORIGEN));
+        importeDepositoAmpliado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getDecimal(CTE_ENTRADA_IMPORTE_DEPOSITO_AMPLIADO));
+        monedaPrincipalRiesgo = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_MONEDA_PRINCIPAL_RIESGO));
+        monedaImpComisionCancelacion = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_MONEDA_COMIS_CANCELACION));
+        monedaImpAmpliado = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_MONEDA_IMPORTE_AMPLIADO));
+        BigDecimal bidIndicadorExclusividad = BigDecimal.ZERO;
+        if (!UtilidadesTramitacion.isBlankOrNull(strExclusividad) && strExclusividad.equals(Constantes.CTE_STRING_UNO)) {
+            bidIndicadorExclusividad = BigDecimal.ONE;
+        }
+        String novacionSinModalidad = UtilidadesTramitacion.comprobarDatoNull(datosEntrada.getString(CTE_ENTRADA_NOVACION_SIN_MODALIDAD));
+        if (Utilidades.isBlankOrNull(novacionSinModalidad)) {
+            novacionSinModalidad = Constantes.NO;
+        }
+        /*
+		 * Corregido el 09-Febrero-2012
+		 * Es necesario guardar si el tipo de garantía es hipotecaria para las validaciones de los datos del paso 2 - Datos económicos
+		 */
+        List<ModificacionesBackOfficeC> listaModificacionesBO = new ArrayList<ModificacionesBackOfficeC>();
+        String garantiaHipotecaria = "";
+        DatosSolicitudC solicitud = null;
+        DatosAutorizacionC datosAutorizacion = null;
+        final GestionDatosSolicitud gs = new GestionDatosSolicitud();
+        final GestionVersionBackOffice gvBO = new GestionVersionBackOffice();
+        Integer codError = Constantes.CTE_CERO;
+        ResultadoDatosSolicitudVO resultado = null;
+        IContexto[] ctxResultado = null;
+        GestionDatosAutorizacion gda = new GestionDatosAutorizacion();
+        /*20150730 Adaptación Maricarmen nueva, 5809: Aquellos expedientes que tengan la fecha de alta superior a la fecha AN82TB01(GENERAL, FECHVALHMC) tendrán
+		 * que tramitarse su solicitud asociada con la Maricarmen nueva, 5809, para ello lanzamos un rollback para que el usuario abra el buscador de productos
+		 * del paso 1 del proceso guiado de tramitación y lo cambie. */
+        if (0 == BigDecimal.ONE.compareTo(new BigDecimal(bidPaso))) {
+            comprobarFechaValidezMaximaHMC(bidNumeroExpediente, bidCodigoProducto);
+        }
+        // Se comprueba si el objeto de DatosSolicitudC existe ya en la tabla
+        // Si el objeto no existe significa que haremos una insercción, en caso contrario una modificación sobre la BD
+        DatosSolicitudC solicitudExiste = null;
+        /*20151126 Vamos a recuperar tambien la ultima versión completa, si existe*/
+        DatosSolicitudC solicitudUltVersionCompleta = null;
+        solicitudExiste = gs.obtenerDatosSolicitud(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente);
+        solicitudUltVersionCompleta = gs.getUltimaVersionCompleta(bidNumeroExpediente);
+        boolean esRefaccionario = UtilidadesTramitacion.esRefaccionario(refaccionario, bidCodigoProducto, bidCodigoSubproducto, bidColectivo);
+        if (LOGGER.isDebugEnabled()) {
+            if (null != solicitudExiste) {
+                LOGGER.debug("Solicitud no es nula");
+            } else {
+                LOGGER.debug("Solicitud es nula");
+            }
+        }
+        // Se obtienen los datos de entrada según el valor del número de solicitud
+        switch(new BigDecimal(bidPaso).intValue()) {
+            // Paso 1
+            case CTE_UNO:
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Paso 1");
+                }
+                // Se extraen los datos del PASO1
+                String strPaso1 = datosEntrada.getString(CTE_POSICION_TIRA_ID_PASO1);
+                // Se contruye un objeto a partir de los datos del PASO 1
+                solicitud = obtenerDatoSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, new BigDecimal(bidPaso), strPaso1, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, contextoEjecucion.getUsuario(), bidIndicadorExclusividad, strTitularidad, strDisponibilidad, strComprobacionLtv, bidIncrementoDuranteAmortizacion, strTecleoCuentas);
+                // 2016-03-16 - Modificacion oficina contable:
+                // - Si es una alta: se setea el valor siempre con el que viene en la tira.
+                // - Si es una modificacion:
+                // > Si el tipo de prescriptor es 2 o 9: se setea con el valor que viene en la tira.
+                // > En otro caso: se setea con el valor de la oficina contable de la solicitud existente.
+                indModificacion = Integer.parseInt(strPaso1.substring(157, 158));
+                if (CTE_CERO == indModificacion) {
+                    // Indicador modificacion = 0 => es una alta
+                    solicitud.setOficinaContable(new BigDecimal(strPaso1.substring(14, 18)));
+                } else {
+                    // Indicador modificacion = 1 => es una modificacion
+                    if (CTE_UNO == indModificacion) {
+                        BigDecimal tipoPrescriptorTira = new BigDecimal(strPaso1.substring(53, 54));
+                        if (Constantes.CTE_TIPO_PRESCRIPTOR_EXTERNO.compareTo(tipoPrescriptorTira) == 0 || Constantes.CTE_TIPO_PRESCRIPTOR_WEB.compareTo(tipoPrescriptorTira) == 0) {
+                            solicitud.setOficinaContable(new BigDecimal(strPaso1.substring(14, 18)));
+                        } else {
+                            /*
+							if (null != solicitudExiste)
+							{
+								solicitud.setOficinaContable(solicitudExiste.getOficinaContable());
+							}
+							else
+							{
+								if (null != solicitudUltVersionCompleta)
+								{
+									solicitud.setOficinaContable(solicitudUltVersionCompleta.getOficinaContable());
+								}
+							}
+							*/
+                            if (null != solicitudUltVersionCompleta) {
+                                solicitud.setOficinaContable(solicitudUltVersionCompleta.getOficinaContable());
+                            } else {
+                                if (null != solicitudExiste) {
+                                    solicitud.setOficinaContable(solicitudExiste.getOficinaContable());
+                                }
+                            }
+                        }
+                    }
+                }
+                /*20150714 Se añade grupo inmobiliario para la Hipoteca Flexible*/
+                solicitud.setIndGrupoInmobiliario(indGrupoInmobiliario);
+                /*20150910 Se añaden campos de la flexible*/
+                solicitud.setIndControlEdad(indControlEdad);
+                solicitud.setIndFlexibilidad(indFlexibilidad);
+                solicitud.setPeriodoCambio(numeroPeriodoCambio);
+                solicitud.setUnidadPeriodoCambio(unidadPeriodoCambio);
+                // Codigo de colectivo.
+                solicitud.setIdColectivo(idColectivo);
+                // Tipo de calculo
+                solicitud.setTipoCalculo(tipoCalculo);
+                solicitud.setRefaccionario(refaccionario);
+                solicitud.setCosteEfectivoRemanente(costeEfectivoRemanente);
+                solicitud.setImporteComisionCancelacion(importeComisionAnticipada);
+                solicitud.setImportePrincipalRiesgo(importePrincipalOtraEntidad);
+                solicitud.setMonedaImpComisCancelacion(monedaImpComisionCancelacion);
+                solicitud.setMonedaPrincipalRiesgo(monedaPrincipalRiesgo);
+                if (!UtilidadesComun.isBlankOrNull(fechaVencimientoFinal)) {
+                    solicitud.setFechaVencimientoFinal(DateUtils.toSQLDate(DateUtils.parseDate(fechaVencimientoFinal, DateUtils.FORMATO_FECHA_CORTO)));
+                } else {
+                    final Date fechaMinima = new Date(DateUtils.dateLowest().getTime());
+                    solicitud.setFechaVencimientoFinal(fechaMinima);
+                }
+                // Se guarda en la AN25,el indicador de si es una novacion sin modalidad(S/N - 1/0)
+                BigDecimal indNovacionSinModalidad = BigDecimal.ZERO;
+                if (Constantes.SI.compareTo(novacionSinModalidad) == 0) {
+                    indNovacionSinModalidad = BigDecimal.ONE;
+                }
+                solicitud.setIndNovacionSinModalidad(indNovacionSinModalidad);
+                // Se extraen los campos del paso 1 referentes a los destinos
+                BigDecimal bidIndicadorModificacionDestinos = new BigDecimal(strPaso1.substring(143, 144));
+                String strDestinoPrincipal = strPaso1.substring(144, 148);
+                String strSubdestinoPrincipal = strPaso1.substring(148, 152);
+                String strNivelDestino = strPaso1.substring(152, 157);
+                String strComentarioDestino = Constantes.CTE_STRING_EMPTY;
+                BigDecimal bidGarantiaOficina = new BigDecimal(strPaso1.substring(32, 34));
+                /* V360144 20140909 CAMBIO PROVISIONAL:
+				 * 
+				 * Modificacion en primeiro paso catalogo, clasificacion:
+				 * - Facer que determinados destinos, subdestinos e tipos garantia non aparezan cando estamos en ABANCA e o codigo producto = 5808.
+				 * Concretamente:
+				 * No combo de garantías sólo son válidos o 01, 03, 04 (acabados en 99).
+				 * Destino - subdestino: NON son validos:
+				 * - 5021 - 0004
+				 * - 5022 - 0045.
+				 * O servicio ANPM_151 invócase cando na pantalla de clasificación (primeiro paso) se lle dá a "continuar" e recibe os valores actuais dos combos.
+				 * 
+				 * 
+				 * 20150902 Lo corregimos: ahora esto se hace para las dos Maricármenes: la 5808 y la 5809. 
+				 * */
+                if (UtilidadesTramitacion.esEntornoAbanca() && (0 == Constantes.CTE_COD_PROD_HIP_VAR_BONIF.compareTo(bidCodigoProducto) || 0 == Constantes.CTE_COD_PROD_HIP_VAR_BONIF_NUEVA.compareTo(bidCodigoProducto))) {
+                    if (Constantes.CTE_DESTINO_5021.equals(strDestinoPrincipal) && Constantes.CTE_SUBDESTINO_0004.equals(strSubdestinoPrincipal)) {
+                        ServicioNegocio.rollback(CodigosError.CTE_ERROR_SUBDESTINO_NO_VALIDO_5021_0004, null, null, null);
+                    }
+                    if (Constantes.CTE_DESTINO_5022.equals(strDestinoPrincipal) && Constantes.CTE_SUBDESTINO_0045.equals(strSubdestinoPrincipal)) {
+                        ServicioNegocio.rollback(CodigosError.CTE_ERROR_SUBDESTINO_NO_VALIDO_5022_0045, null, null, null);
+                    }
+                    if (!((0 == Constantes.CTE_COD_GARANTIA_01.compareTo(bidGarantiaOficina)) || (0 == Constantes.CTE_COD_GARANTIA_02.compareTo(bidGarantiaOficina)) || (0 == Constantes.CTE_COD_GARANTIA_03.compareTo(bidGarantiaOficina)) || (0 == Constantes.CTE_COD_GARANTIA_04.compareTo(bidGarantiaOficina)))) {
+                        ServicioNegocio.rollback(CodigosError.CTE_ERROR_GARANTIA_NO_VALIDA, null, null, null);
+                    // * No combo de garantías sólo son válidos o 01, 02, 03, 04 (acabados en 99).
+                    }
+                }
+                // Si es invocado desde NSDK
+                if (!UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    solicitud.setMarcaBO(stringBO);
+                }
+                // Ademas el stringBO debe ser distinto de nulo y blanco
+                if (null != solicitud.getDatosSolicitudKey().getVersionSolicitud() && solicitud.getDatosSolicitudKey().getVersionSolicitud().intValue() > CTE_UNO && !UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    listaModificacionesBO = recuperarCambiosRealizadosBO(solicitud, stringBO, CTE_UNO);
+                }
+                // Si existe comentario de destino
+                if (strPaso1.length() > 159) {
+                    strComentarioDestino = strPaso1.substring(159);
+                }
+                // un alta o una modificacion con cambio de producto/subproducto.
+                if (necesarioObtenerCaducidad(indModificacion, solicitudExiste)) {
+                    BigDecimal caducidadPrecio = null;
+                    // Obtener caducidad precio
+                    caducidadPrecio = UtilidadesTramitacion.obtenerCaducidadPrecio(solicitud.getProducto(), solicitud.getSubproducto(), solicitud.getVersionGeneral(), solicitud.getLineaColectivo());
+                    solicitud.setCaducidadPrecios(caducidadPrecio);
+                    // producto modificando destinos)
+                    if ((null != solicitudExiste) && (solicitudExiste.getProducto().compareTo(BigDecimal.ZERO) == 0) && (solicitudExiste.getSubproducto().compareTo(BigDecimal.ZERO) == 0) && (solicitudExiste.getVersionGeneral().compareTo(BigDecimal.ZERO) == 0)) {
+                        // La solicitud temporal ha sido creada por ANPM_160, con valor 0 para la caducidad.
+                        // Se actualiza el valor de caducidad en la solicitud temporal.
+                        solicitudExiste.setCaducidadPrecios(caducidadPrecio);
+                    }
+                }
+                // correspondientes.
+                if (CTE_UNO == indModificacion && solicitudExiste == null) {
+                    solicitud.getDatosSolicitudKey().setVersionSolicitud(bidVersionSolicitud);
+                    solicitud.getDatosSolicitudKey().setNumSolicitud(bidNumeroSolicutud);
+                    // - Apta e-Notario (AN251620)
+                    if (null != solicitudUltVersionCompleta) {
+                        solicitud.setMedioFormalizacion(solicitudUltVersionCompleta.getMedioFormalizacion());
+                        solicitud.setIntervencionPoliza(solicitudUltVersionCompleta.getIntervencionPoliza());
+                        solicitud.setAptaEnotario(solicitudUltVersionCompleta.getAptaEnotario());
+                    }
+                    indModificacion = CTE_CERO;
+                }
+                // 20161108: Se obtiene el tipo de cartera llamando al servicio AZTR_025. Por el tipo de cartera obtenida,
+                // se busca en la tabla AN82TB01 la red equivalente.
+                // String tipoCartera = UtilidadesComun.obtenerTipoCartera(bidNumeroExpediente);
+                // if ((StringUtils.isNotBlank(tipoCartera)) && (null != tipoCartera))
+                // {
+                // red = UtilidadesComun.consultaParametro(tipoCartera, CTE_AGRUPACON_RED);
+                // }
+                // else
+                // {
+                // red = UtilidadesComun.consultaParametro("VACIO", CTE_AGRUPACON_RED);
+                // }
+                // 20161108: seteamos en la solicitud la red correspondiente
+                // solicitud.setRed(red);
+                solicitud.setRed(invocarConsultaRed(solicitud, contextoEjecucion));
+                solicitud = gs.actualizarDestinos(solicitud, indModificacion, bidIndicadorModificacionDestinos.intValue(), strDestinoPrincipal, strSubdestinoPrincipal, strNivelDestino, strComentarioDestino, contextoEjecucion.getUsuario());
+                /**
+                 * Actualizar los datos de interés, si es una persona consumidora
+                 */
+                // if(UtilidadesTramitacion.esConsumidorNoIlog(solicitud.getDatosSolicitudKey().getNucExpediente()).equals(Constantes.CTE_SI_COMPROBACION_S)){
+                // List<CondicionesInteresC> listaCondicionesInteres = solicitud.getCondicionesInteres();
+                // for(CondicionesInteresC condicionInteres:listaCondicionesInteres) {
+                // condicionInteres.setIntSuelo(BigDecimal.ZERO);
+                // condicionInteres.setIntSueloInteresInicial(BigDecimal.ZERO);
+                // }
+                // solicitud.setCondicionesInteres(listaCondicionesInteres);
+                // }
+                // Actualizacion campo Volcado PMOS en la tabla AN25TB01 //
+                ClausulaRestringuidaC clausula = GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(solicitud.getProducto().intValueExact(), solicitud.getSubproducto().intValueExact(), ConstantesComun.CTE_STR_CLAUSULA_EXP, solicitud.getTipoExpediente().intValueExact());
+                if (null != clausula) {
+                    int indicadorVolcado = 0;
+                    String volcadoPMOS = clausula.getVolcadoPMOS();
+                    if (!UtilidadesTramitacion.isBlankOrNull(volcadoPMOS)) {
+                        indicadorVolcado = Integer.parseInt(volcadoPMOS.trim());
+                    }
+                    if (!UtilidadesTramitacion.isEmptyOrNullString(volcadoPMOS)) {
+                        solicitud.setVolcadoPMOS(new BigDecimal(indicadorVolcado));
+                    }
+                }
+                if (!esRefaccionario) {
+                    solicitud.setDeposito(Constantes.CTE_STR_0);
+                }
+                // Se actualizan los nuevos valores parametrizados en el catalogo de la solicitud
+                // este metodo es ampliable para que con una unica llamada se actualicen tantos datos como se requiera
+                UtilidadesTramitacion.actualizarCamposCatalogo(solicitud.getProducto(), solicitud.getSubproducto(), solicitud.getVersionGeneral(), solicitud.getLineaColectivo(), solicitud);
+                break;
+            // Paso 2
+            case CTE_DOS:
+                // Se extraen los datos del PASO2
+                String strPaso2 = datosEntrada.getString(CTE_POSICION_TIRA_ID_PASO2);
+                // Se contruye un objeto a partir de los datos del PASO 2
+                solicitud = obtenerDatoSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, new BigDecimal(bidPaso), Constantes.CTE_STRING_EMPTY, strPaso2, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, contextoEjecucion.getUsuario(), bidIndicadorExclusividad, strTitularidad, strDisponibilidad, strComprobacionLtv, bidIncrementoDuranteAmortizacion, strTecleoCuentas);
+                // Si es invocado desde NSDK
+                if (!UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    solicitud.setMarcaBO(stringBO);
+                }
+                if (null != solicitud.getDatosSolicitudKey().getVersionSolicitud() && solicitud.getDatosSolicitudKey().getVersionSolicitud().intValue() > CTE_UNO && !UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    listaModificacionesBO = recuperarCambiosRealizadosBO(solicitud, stringBO, CTE_DOS);
+                }
+                /*
+				 * Modificado el 09-Febrero-2012
+				 * Recibimos el tipo de garantía para saber si es hipotecaria o no
+				 */
+                garantiaHipotecaria = strPaso2.substring(206, 209);
+                // Provisional
+                if (esRefaccionario && 0 == solicitud.getDeposito().compareTo(Constantes.CTE_STR_1)) {
+                    BigDecimal bidCien = new BigDecimal(100);
+                    solicitud.setDeposito(Constantes.CTE_UNO);
+                    solicitud.setPorcentajeDeposito(bidCien);
+                    solicitud.setImporteDeposito(solicitud.getImporteTotal());
+                }
+                solicitud.setImporteAmpliado(importeAmpliado);
+                solicitud.setMonedaImpAmpliado(monedaImpAmpliado);
+                solicitud.setImporteDepositoOrigen(importeDepositoOrigen);
+                solicitud.setImporteDepositoAmpliado(importeDepositoAmpliado);
+                break;
+            // Paso 3
+            case CTE_TRES:
+                // No se realiza ninguna acción en este paso
+                break;
+            // Paso 4
+            case CTE_CUATRO:
+                // Se extraen los datos del PASO4
+                String strPaso4 = datosEntrada.getString(CTE_POSICION_TIRA_ID_PASO4);
+                // Se contruye un objeto a partir de los datos del PASO 4
+                solicitud = obtenerDatoSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, new BigDecimal(bidPaso), Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, strPaso4, Constantes.CTE_STRING_EMPTY, contextoEjecucion.getUsuario(), bidIndicadorExclusividad, strTitularidad, strDisponibilidad, strComprobacionLtv, bidIncrementoDuranteAmortizacion, strTecleoCuentas);
+                // Si es invocado desde NSDK
+                if (!UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    solicitud.setMarcaBO(stringBO);
+                }
+                // Es decir en caso de que la solicitud no sea un alta nueva
+                if (null != solicitud.getDatosSolicitudKey().getVersionSolicitud() && solicitud.getDatosSolicitudKey().getVersionSolicitud().intValue() > CTE_UNO && !UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    // Ponemos las condiciones de capital
+                    if (null != solicitudExiste.getCondicionesCapital() || solicitudExiste.getCondicionesCapital().size() == 0) {
+                        solicitud.setCondicionesCapital(solicitudExiste.getCondicionesCapital());
+                    }
+                    // Poner los tratamientos de adelantos
+                    if (null != solicitudExiste.getTratamientoAdelantos() || solicitudExiste.getTratamientoAdelantos().size() == 0) {
+                        solicitud.setTratamientoAdelantos(solicitudExiste.getTratamientoAdelantos());
+                    }
+                    listaModificacionesBO = recuperarCambiosRealizadosBO(solicitud, stringBO, CTE_CUATRO);
+                }
+                // Actualizar datos de la solicitud con datos del riesgo origen
+                GestionDatosSolicitud.actualizarSolicitudConDatosRiesgoOrigen(solicitudExiste);
+                break;
+            // Paso 5
+            case CTE_CINCO:
+                // Se extraen los datos del PASO5
+                String strPaso5 = datosEntrada.getString(CTE_POSICION_TIRA_ID_PASO5);
+                // Se contruye un objeto a partir de los datos del PASO 5
+                solicitud = obtenerDatoSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, new BigDecimal(bidPaso), Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, strPaso5, contextoEjecucion.getUsuario(), bidIndicadorExclusividad, strTitularidad, strDisponibilidad, strComprobacionLtv, bidIncrementoDuranteAmortizacion, strTecleoCuentas);
+                if (null != solicitudUltVersionCompleta) {
+                    solicitud.setTipoPrescriptor(solicitudUltVersionCompleta.getTipoPrescriptor());
+                    solicitud.setCanal(solicitudUltVersionCompleta.getCanal());
+                    solicitud.setIndModoAlta(solicitudUltVersionCompleta.getIndModoAlta());
+                }
+                /*20150409 Controlamos las versiones*/
+                if (null != tipoPrescriptor && null != ofiContable) {
+                    /*20150409 Si el tipo de prescriptor es Externo y se controla el centro contable (Idealista o Abanca Web), entonces lo actualizamos*/
+                    /*
+					if ((0 == Constantes.CTE_TIPO_PRESCRIPTOR_EXTERNO.compareTo(tipoPrescriptor)) &&
+						((UtilidadesTramitacion.tienePrescriptorIdealista(bidNumeroExpediente))||
+						 (UtilidadesTramitacion.tienePrescriptorAbancaWeb(bidNumeroExpediente)))
+						)
+					*/
+                    /*20151127 Ahora si cumple el criterio de control de centro contable actualizamos el tipo de prescriptor de la 
+					 * solicitud con el que nos envíe EEXP siempre.*/
+                    /*El tipo de prescriptor también lo cambiamos antes, así que va a quedar esta actualización, es decir siempre nos vamos a quedar 
+					 * con lo que nos envíe EEXP. */
+                    solicitud.setTipoPrescriptor(tipoPrescriptor);
+                // 20150919 Se modifica el criterio para saber si controlamos el centro contable.
+                // 2016-04-05 - El control y actualizacion de centro contable/tipo prescriptor ya se hace
+                // en el servicio de comprobaciones (ANPM_454).
+                /*
+					if (UtilidadesTramitacion.controlCentroContable(bidNumeroExpediente, tipoPrescriptor))
+					{
+						//20190919 Si el tipo prescriptor que ya tiene es Web NO LO CAMBIAMOS, lo dejamos como está
+						//if (0 != Constantes.CTE_TIPO_PRESCRIPTOR_WEB.compareTo(solicitud.getTipoPrescriptor()))
+						//{
+						//	solicitud.setTipoPrescriptor(tipoPrescriptor);
+						//}
+						
+						solicitud.setOficinaContable(ofiContable);
+					}
+					*/
+                }
+                /**
+                 * Comprobamos que si tiene deposito tiene que tener plazo de carencia
+                 */
+                if (solicitud.getDeposito().equals(Constantes.CTE_SI_COMPROBACION_S)) {
+                    if (!UtilidadesTramitacion.isBlankOrNull(solicitud.getPlazoCarencia()) || 0 == solicitud.getPlazoCarencia().compareTo(BigDecimal.ZERO)) {
+                        ServicioNegocio.rollback(CodigosError.CTE_ERROR_DEPOSITO_PLAZO_CARENCIA_ERROR, null, new String[] { solicitud.getDatosSolicitudKey().getNucExpediente().toString() }, null);
+                    }
+                }
+                /**
+                 * Comprobar los plazos
+                 */
+                solicitud = UtilidadesTramitacion.actualizarPlazoInteres(solicitudExiste, solicitud);
+                // Si es invocado desde NSDK
+                if (!UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    solicitud.setMarcaBO(stringBO);
+                } else if (UtilidadesTramitacion.isBlankOrNull(stringBO) && stringBO.equals(CTE_COMPROBACION_BO) && !UtilidadesTramitacion.isBlankOrNull(solicitud.getDatosSolicitudKey().getVersionSolicitud()) && solicitud.getDatosSolicitudKey().getVersionSolicitud().equals(CTE_UNO_BIG_DECIMAL)) {
+                    // Si es invocado en un alta nueva
+                    solicitud.setMarcaBO(stringBO);
+                }
+                // si la siguiente version de BO si la genera le pondremos un cero a autorizacion indicador.
+                if (!UtilidadesTramitacion.isBlankOrNull(stringBO) && stringBO.equals(CTE_COMPROBACION_BO) && !solicitud.getDatosSolicitudKey().getVersionSolicitud().equals(BigDecimal.ONE)) {
+                    // Insertamos un 0 en el indicador
+                    if (comprobarAutorizacionOficina(solicitud)) {
+                        solicitud.setIndicadorAutorizacion(BigDecimal.ZERO);
+                    } else {
+                        // Debemos poner primero el indicador y despues ejecutar las comprobaciones de BO
+                        solicitud.setIndicadorAutorizacion(this.invocarCheckAutorizacion(solicitud, contextoEjecucion));
+                    }
+                } else {
+                    // Debemos poner primero el indicador y despues ejecutar las comprobaciones de BO
+                    solicitud.setIndicadorAutorizacion(this.invocarCheckAutorizacion(solicitud, contextoEjecucion));
+                }
+                // Es decir en caso de que la solicitud no sea un alta nueva
+                if (null != solicitud.getDatosSolicitudKey().getVersionSolicitud() && solicitud.getDatosSolicitudKey().getVersionSolicitud().intValue() > CTE_UNO && !UtilidadesTramitacion.isBlankOrNull(stringBO)) {
+                    // Ponemos a la solicitud en pantalla las comisiones que se han guardado en 156
+                    if (!UtilidadesTramitacion.isBlankOrNull(solicitudExiste.getComisiones()) || solicitudExiste.getComisiones().size() == 0) {
+                        solicitud.setComisiones(solicitudExiste.getComisiones());
+                    }
+                    listaModificacionesBO = recuperarCambiosRealizadosBO(solicitud, stringBO, CTE_CINCO);
+                }
+                /*Al finalizar la solicitud hay que comprobar si la solicitud tiene depósito y han introducido 
+				 * importe en el concepto de "otros destinos", entonces hay que enviar un correo electrónico a 
+				 * Laura Alvarez Conde y al buzón "disposicionprestamoscreditos@abanca.com", que se parametrizará 
+				 * en la tabla AN82TB01 se creará la agrupación MAIL_DPOS, con los datos del remitente,
+				 * asunto y destinatario. Asunto: " Alta con disposición en otros destinos", en el cuerpo  
+				 * " Para el expediente XXXXX se ha dado de alta disposiciones en el concepto "otros destinos".*/
+                UtilidadesTramitacion.enviarCorreoDepositos(solicitudExiste);
+                modificarComparteGastos(bidNumeroExpediente, solicitudUltVersionCompleta, solicitud);
+                break;
+            default:
+                break;
+        }
+        // Validar los datos de entrada al servicio
+        ResultadoVO res = this.validarDatosSolicitud(contextoEjecucion, solicitud, Integer.valueOf(bidPaso), garantiaHipotecaria);
+        if (res.getCodigoResultado() != CodigosError.NO_ERROR) {
+            ServicioNegocio.rollback(res.getCodigoResultado(), res.getTituloParams(), res.getDescripcionParams(), res.getSolucionParams());
+        }
+        // Si la solicitud no existe se da de alta una nueva (paso 1)
+        if (solicitudExiste == null) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Insercción");
+            }
+            // solicitud.setRed(Constantes.CTE_RED_COMERCIAL);
+            // 20161020: se la forma de setear la red: de forma estática a llamar al servicio CGAL_307
+            // Se quita esta llamada al CGAL_307 ya que se está haciendo en el paso 1 la misma llamada. Así evitamos llamar dos veces innecesariamente.
+            // solicitud.setRed(invocarConsultaRed(solicitud, contextoEjecucion));
+            /*20151026 Establecemos el indicador de última versión en la versión incompleta*/
+            solicitud.setStrIndicador3(Constantes.CTE_STR_S);
+            resultado = gs.altaSolicitudTemporal(solicitud);
+        } else // Si la solicitud ya existe (paso > 1) se modifica para añadir los datos del nuevo paso
+        {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Modificación");
+            }
+            // Antes de continuar con la modificación de la solicitud comprobamos si la poliza esta impresa.
+            if (null != solicitudExiste.getDatosGeneralesEnotario() && solicitudExiste.getDatosGeneralesEnotario().size() > 0) {
+                UtilidadesComun.comprobacionPolizaEnviada(solicitudExiste.getDatosGeneralesEnotario().get(0));
+            }
+            // Comprobar si tenemos que actualizar datos en AN55TB01
+            if (null != solicitudExiste.getEstudiosCliente() && solicitudExiste.getEstudiosCliente().size() > 0 && null != solicitudExiste.getEstudiosCliente().get(0) && (new BigDecimal(bidPaso).intValue() == CTE_UNO)) {
+                BigDecimal bidGrupo = BigDecimal.ZERO;
+                if (!UtilidadesTramitacion.isBlankOrNull(grupo)) {
+                    bidGrupo = new BigDecimal(grupo.substring(BigDecimal.ONE.intValue(), 3));
+                }
+                // Actualizar los datos de AN55TB01
+                solicitudExiste.getEstudiosCliente().get(0).setCodigoGrupoTitulacion(grupo);
+                solicitudExiste.getEstudiosCliente().get(0).setCodigoProducto(bidCodigoProducto);
+                solicitudExiste.getEstudiosCliente().get(0).setCodigoSubproducto(bidCodigoSubproducto);
+                solicitudExiste.getEstudiosCliente().get(0).setCompaginaEstudiosTrabajo(compatibiliza);
+                solicitudExiste.getEstudiosCliente().get(0).setCurso(curso);
+                solicitudExiste.getEstudiosCliente().get(0).setDenominacion(denominacion);
+                solicitudExiste.getEstudiosCliente().get(0).setGrupo(bidGrupo);
+                solicitudExiste.getEstudiosCliente().get(0).setNotaMediaUltimoCurso(new BigDecimal(nota));
+                solicitudExiste.getEstudiosCliente().get(0).setTipoEstudio(tipoEstudios);
+                solicitudExiste.getEstudiosCliente().get(0).setTitulacion(titulacion);
+                solicitudExiste.getEstudiosCliente().get(0).setUniversidad(universidad);
+                solicitudExiste.getEstudiosCliente().get(0).setUsuario(contextoEjecucion.getUsuario());
+            }
+            resultado = gs.modificacionSolicitud(solicitudExiste, solicitud, new BigDecimal(bidPaso));
+            /**
+             * Además de persistir en la tabla de BO seteo el estado de la solicitud anterior
+             */
+            if (!UtilidadesTramitacion.isBlankOrNull(listaModificacionesBO) && listaModificacionesBO.size() > 0 && solicitudExiste.getMarcaBO().equals(CTE_MODIFICADO_BO)) {
+                GestionVersionBackOffice gvBackOffice = new GestionVersionBackOffice();
+                gvBackOffice.persistirCambiosRealizadosPorBO(listaModificacionesBO);
+            }
+        }
+        // *Si viene algun dato informado
+        if (new BigDecimal(bidPaso).intValue() == CTE_UNO) {
+            if (!UtilidadesTramitacion.isBlankOrNull(titulacion) || !UtilidadesTramitacion.isBlankOrNull(tipoEstudios) || !UtilidadesTramitacion.isBlankOrNull(denominacion) || !UtilidadesTramitacion.isBlankOrNull(universidad) || !UtilidadesTramitacion.isBlankOrNull(curso) || !UtilidadesTramitacion.isBlankOrNull(nota) || !UtilidadesTramitacion.isBlankOrNull(compatibiliza)) {
+                // Se verifica la completud de los datos
+                if (!UtilidadesTramitacion.isBlankOrNull(titulacion) && !UtilidadesTramitacion.isBlankOrNull(tipoEstudios) && !UtilidadesTramitacion.isBlankOrNull(denominacion) && !UtilidadesTramitacion.isBlankOrNull(universidad) && !UtilidadesTramitacion.isBlankOrNull(curso) && !UtilidadesTramitacion.isBlankOrNull(nota) && !UtilidadesTramitacion.isBlankOrNull(compatibiliza)) {
+                    // Verificar que es un alta.
+                    if (solicitudExiste == null) {
+                        List<EstudiosClienteC> listaEstudiosCliente = new ArrayList<EstudiosClienteC>();
+                        EstudiosClienteEng daoEstudiosCliente = new EstudiosClienteEng();
+                        EstudiosClienteC estudiosClienteC = daoEstudiosCliente.createNewObject();
+                        EstudiosClienteKey estudiosClienteKey = estudiosClienteC.getEstudiosClienteKey();
+                        estudiosClienteKey.setNuc(solicitud.getDatosSolicitudKey().getNucExpediente());
+                        estudiosClienteKey.setNumeroSolicitud(solicitud.getDatosSolicitudKey().getNumSolicitud());
+                        estudiosClienteKey.setOficinaSolicitud(solicitud.getDatosSolicitudKey().getOficinaSolicitud());
+                        estudiosClienteKey.setVersionSolicitud(solicitud.getDatosSolicitudKey().getVersionSolicitud());
+                        estudiosClienteKey.setDatosSolicitud(solicitud);
+                        BigDecimal bidGrupo = BigDecimal.ZERO;
+                        if (!UtilidadesTramitacion.isBlankOrNull(grupo)) {
+                            bidGrupo = new BigDecimal(grupo.substring(BigDecimal.ONE.intValue(), 3));
+                        }
+                        estudiosClienteC = new EstudiosClienteC(estudiosClienteKey, solicitud.getProducto(), solicitud.getSubproducto(), solicitud.getVersionGeneral(), titulacion, tipoEstudios, denominacion, universidad, curso, new BigDecimal(nota), compatibiliza, contextoEjecucion.getUsuario(), bidGrupo, grupo);
+                        listaEstudiosCliente.add(estudiosClienteC);
+                        solicitud.setEstudiosCliente(listaEstudiosCliente);
+                        daoEstudiosCliente.persist(estudiosClienteC);
+                        daoEstudiosCliente.flush();
+                    }
+                } else {
+                    ServicioNegocio.rollback(Constantes.CTE_ERROR_FALTAN_DATOS_ESTUDIOS, null, null, null);
+                }
+            }
+        }
+        // Se recupera el resultado del ANPM_454 para mostrar mensaje de información
+        ctxResultado = GestionDatosSolicitud.ctxComprobacionesTramitacion(bidNumeroExpediente, new BigDecimal(bidPaso), new BigDecimal(indModificacion));
+        // en el paso 5 hay que completar la finalización de la solicitud.
+        if (Constantes.CTE_CINCO.intValue() == Integer.valueOf(bidPaso).intValue() && Constantes.CTE_CERO.intValue() == resultado.getCodError().intValue()) {
+            // llamada a PTMO_208 --> devuelve una S si el producto está activo y una N si no lo está
+            IDatosEntradaTx productoActivoPTMO208 = getPrograma(contextoEjecucion, Constantes.CTE_CUENTA_CONTABLE, Constantes.CTE_CODIGO_OPERACION);
+            productoActivoPTMO208.addCampo("ID_PRODUCTO", bidCodigoProducto);
+            IContexto[] llamadaServicio = invocarServicio(contextoEjecucion, productoActivoPTMO208);
+            String productoActivo = llamadaServicio[0].getString("PTMON208010");
+            if (// 20160426 : se comprueba si el producto está activo
+            "N".equals(productoActivo)) {
+                ServicioNegocio.rollback(Constantes.CTE_ERROR_PRODUCTO_NO_ACTIVO, new String[] { solicitud.getProducto().toString() }, new String[] { solicitud.getProducto().toString() }, null);
+            }
+            // Validar que la fecha tope de solicitud sea inferior a la fecha de alta de la solicitud (fecha actual)
+            // Buscamos la fecha tope de solicitud del subproducto
+            ResultadoVO resVO = this.validarFechaTopeSolicitud(resultado.getDatos());
+            if (Constantes.CTE_CERO != resVO.getCodigoResultado()) {
+                ServicioNegocio.rollback(resVO.getCodigoResultado(), resVO.getTituloParams(), resVO.getDescripcionParams(), resVO.getSolucionParams());
+            }
+            necesitaAutorizacion = BigDecimal.ONE.intValue() == resultado.getDatos().getIndicadorAutorizacion().intValue();
+            final boolean esBO = stringBO.equals(CTE_COMPROBACION_BO);
+            // Si es un alta de una nueva solicitud y no necesita autorización
+            // hay que finalizar la solicitud.
+            // Si es una modificación de solicitud siempre se llama a finalizar
+            // solicitud (para comprobar si la nueva versión es necesaria o no).
+            datosSolicitudAnterior = gs.buscarVersionAnterior(resultado.getDatos().getDatosSolicitudKey().getOficinaSolicitud(), null, resultado.getDatos().getDatosSolicitudKey().getVersionSolicitud(), resultado.getDatos().getDatosSolicitudKey().getNucExpediente());
+            final boolean bAltaNueva = null == datosSolicitudAnterior;
+            /**/
+            GestionNivelesAutorizacion gna = new GestionNivelesAutorizacion();
+            // Comparación dato a dato entre versiones de solicitud.
+            if (!bAltaNueva) {
+                // Autorización anterior no anulada.
+                datosAutorizacion = gda.buscarAutorizacionNoAnulada(datosSolicitudAnterior.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitudAnterior.getDatosSolicitudKey().getNumSolicitud());
+                // 20151118 Comentamos provisionalmente el nuevo comportamiento cuando hay una autorización
+                // anterior parcialmente autorizada o totalmente autorizada, y se empeoraron las condiciones
+                // del cliente (yendo al mismo tramo) o permanecen igual.
+                existeAutorizacionAnterior = (datosAutorizacion != null);
+                if (existeAutorizacionAnterior) {
+                    // Recuperamos el estado de la autorización anterior
+                    estadoAutorizacion = UtilidadesAutorizacion.consultaEstadoAutorizacionAGEN(ServicioNegocio.getContexto(), datosAutorizacion);
+                    if (ConstantesAutorizacion.CTE_ESTADO_AUT_AUT_TOT.equals(estadoAutorizacion) || ConstantesAutorizacion.CTE_ESTADO_AUT_AUT_PARCIAL.equals(estadoAutorizacion)) {
+                        comparacionDatoADato = gna.compararNivelesAutorizacion(resultado.getDatos(), datosSolicitudAnterior);
+                        noHayAutorizacionNueva = (ComparacionNivelesAutorizacion.EMPEORAN_CONDICIONES_CLIENTE == comparacionDatoADato) || (ComparacionNivelesAutorizacion.SIN_VARIACION == comparacionDatoADato);
+                        if (noHayAutorizacionNueva) {
+                            // *anterior, en el estado que estaba antes, y dejamos activado el indicador de autorización.
+                            if (ConstantesAutorizacion.CTE_ESTADO_AUT_AUT_TOT.equals(estadoAutorizacion)) {
+                                autorizacionTotalmenteAutorizada = true;
+                            // El booleano desactivarIndAutorizacion nos indica que en principio se iba a generar autorización, activamos el indicador de
+                            // * autorización, pero ahora
+                            // determinamos que no se va a generar.
+                            // 20151104 Desactivamos el indicador de autorización
+                            // 20151124 No vamos a generar autorización porque existe una autorización totalmente autorizada, pero vamos a dejar
+                            // activado el indicador de autorización.
+                            /*
+								resultado.getDatos().setIndicadorAutorizacion(BigDecimal.ZERO);
+								resultado = gs.updateSolicitud(resultado.getDatos());
+								necesitaAutorizacion = BigDecimal.ONE.intValue() == 
+									resultado.getDatos().getIndicadorAutorizacion().intValue();
+								 */
+                            } else {
+                                autorizacionTotalmenteAutorizada = false;
+                            // Está autorizado parcialmente
+                            // NO SE COPIA AQUI, ANTES HAY QUE COMPLETARLA.
+                            // UtilidadesAutorizacion.generarAutorizacionVersionNueva(resultado.getDatos(), true);
+                            // Dejamos activado el indicador de autorización.
+                            }
+                        }
+                    }
+                }
+            }
+            /*20151104 Tambien finalizamos la solicitud si se ha desactivado el indicador de autorización*/
+            if (!bAltaNueva || !necesitaAutorizacion || (necesitaAutorizacion && stringBO.equals(CTE_COMPROBACION_BO)) || noHayAutorizacionNueva) {
+                if (solicitudExiste.getMarcaBO().equals(CTE_MODIFICADO_BO) && // Comprobamos que no es un alta
+                !solicitudExiste.getDatosSolicitudKey().getVersionSolicitud().equals(BigDecimal.ONE)) {
+                    /*
+					 * Cundo es BO modifico el estado para copiar el estado de la solicitud anterior
+				 	*/
+                    modificarDatosConcesionSolicitudBO(resultado.getDatos());
+                }
+                /*20151124 NO vamos a finalizar la solicitud si NO Necesitamos autorización, o si necesitamos autorización Y ADEMÁS hay autorización nueva.*/
+                if (necesitaAutorizacion) {
+                    if (noHayAutorizacionNueva) {
+                        /*Se iba a generar autorización pero no se genera porque nos vale la que había antes, dos casos posibles:
+						 * 	- Está autorizada totalmente o está autorizada parcialmente.
+						 * En cualquiera de los casos finalizamos aqui la solicitud.
+						 * */
+                        noSeFinalizaSolicitud = false;
+                    } else {
+                        /*Flujo normal de autorizaciones: NO finalizamos aqui la solicitud.*/
+                        noSeFinalizaSolicitud = true;
+                    }
+                } else {
+                    /*No se necesita autorización: finalizamos aquí la solicitud.*/
+                    noSeFinalizaSolicitud = false;
+                }
+                // 2018-01-22 - Si es una subrogacion de otra entidad no puede compartir gastos.
+                // En este caso se inserta una fila en la AN56TB01 indicando que no se comparten gastos.
+                comprobarComparteGastos(resultado.getDatos());
+                resultado = gs.finalizarSolicitud(resultado.getDatos(), contextoEjecucion, noSeFinalizaSolicitud, esBO);
+                if (0 == resultado.getDatos().getIndicadorAutorizacion().compareTo(BigDecimal.ZERO)) {
+                    comprobacionesSolicitud(resultado.getDatos().getDatosSolicitudKey().getNucExpediente(), ConstantesComun.CTE_ESTADO_TAREA_SOLIC_FINALIZADA, resultado.getDatos().getTipoExpediente().intValue());
+                }
+                // LOG que registra los campos modificados en los datos de solicitud.
+                LogModificacionDatosSolicitud.lanzarLogModificacionDatosSolicitud(resultado.getDatos().getDatosSolicitudKey().getNucExpediente(), ConstantesComun.CTE_STR_COD_PROCEDENCIA_A151);
+                // Aqui habra que meter llamada para finalizar las modificaciones de BO
+                gvBO.finalizarModificacionBO(resultado);
+                // Modificacion 16/08/2013
+                // Se envia un correo cuando es un prestamo hipotecario en divisa
+                // Comprobamos que sea hipotecario y en divisa ?¿
+                String tipoExpediente = new String();
+                tipoExpediente = tipoDeExpediente(resultado.getDatos(), contextoEjecucion);
+                if (!UtilidadesTramitacion.isBlankOrNull(tipoExpediente) && tipoExpediente.equals(CTE_COMPROBACION_ES_HIPOTECARIO) && resultado.getDatos().getDatosSolicitudKey().getVersionSolicitud().equals(BigDecimal.ONE) && resultado.getDatos().getEspecialidad().equals(CTE_ESPECIALIDAD_DIVISA)) {
+                    enviarCorreoBO(resultado.getDatos());
+                }
+            }
+            // && NuevaVersionRequerida.CTE_VERSION_REQUERIDA.equals(resultado.getCodError()))
+            if (!bAltaNueva && !necesitaAutorizacion && !BigDecimal.ZERO.equals(resultado.getDatos().getDatosSolicitudKey().getNumSolicitud()) && NuevaVersionRequerida.CTE_VERSION_REQUERIDA.equals(resultado.getCodError())) {
+                this.invocarComparacionDatosAutorizacion(resultado.getDatos(), contextoEjecucion);
+            }
+            /*20151104 Vamos a hacer que tampoco llame a AGEN ni levante la pantalla de autorizaciones cuando es una modificación de solicitud,
+			 * la versión anterior tiene autorización completamente Autorizada, para la versión actual tambien hay precios fuera de nivel oficina
+			 * , el nivel es el mismo que el anterior y además se empeoran las condiciones del cliente: en este caso nos vale con la autorización
+			 * que fue autorizada anteriormente.*/
+            if (!bAltaNueva && necesitaAutorizacion && NuevaVersionRequerida.CTE_VERSION_REQUERIDA.equals(resultado.getCodError())) {
+                if ((!BigDecimal.ZERO.equals(resultado.getDatos().getDatosSolicitudKey().getNumSolicitud()) && (UtilidadesTramitacion.isBlankOrNull(stringBO) || stringBO.equals(CTE_COMPROBACION_BO))) || noHayAutorizacionNueva) {
+                    if (null != datosAutorizacion) {
+                        resultado.setEstadoAutorizacion(datosAutorizacion.getEstado());
+                    }
+                    // Si existe una autorizacion anterior no anulada
+                    if (null != datosAutorizacion) {
+                        gda.copiarDatosAutorizacion(datosAutorizacion, contextoEjecucion.getUsuario(), resultado.getDatos().getDatosSolicitudKey().getOficinaSolicitud(), resultado.getDatos().getDatosSolicitudKey().getNumSolicitud(), resultado.getDatos().getDatosSolicitudKey().getVersionSolicitud());
+                    }
+                }
+            }
+        }
+        // debemos generar el contexto de salida
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Se genera el contexto de salida");
+            LOGGER.debug("coderror: " + codError);
+        }
+        IContexto[] contextoSalida = ContextosDatosSolicitudPrestamo.rellenarDatosContexto(resultado.getDatos(), resultado.getCodError(), resultado.getEstadoAutorizacion());
+        /*20151118 Vamos a enviar tambien una instancia del contexto informativo de finalización de tramitación.*/
+        listaContextoSalida = new ArrayList<IContexto>(1);
+        for (IContexto contexto : contextoSalida) {
+            listaContextoSalida.add(contexto);
+        }
+        if (0 == Constantes.CTE_BID_5.compareTo(new BigDecimal(bidPaso))) {
+            IContexto ctxInformativo = rellenarContextoInformativo(resultado.getDatos(), necesitaAutorizacion, existeAutorizacionAnterior, noHayAutorizacionNueva, autorizacionTotalmenteAutorizada, datosAutorizacion);
+            listaContextoSalida.add(ctxInformativo);
+        }
+        if (// comprobamos que el contexto no sea nulo
+        null != ctxResultado) {
+            // se recupera el campo advertencia del contexto 454
+            String advertencia = ctxResultado[0].getString("ANPMN454030");
+            String destinoError = ctxResultado[0].getString("ANPMN454040");
+            if (null != ctxResultado && StringUtils.isNotEmpty(advertencia)) {
+                if (StringUtils.isNotEmpty(destinoError)) {
+                    if (destinoError.trim().equals("5025")) {
+                        // Actualizar marca destino 5025 obras y mejoras
+                        solicitudExiste.setIndicadorCarObrasMejoras(BigDecimal.ONE);
+                        solicitudExiste.update();
+                    } else if (destinoError.trim().equals("5202")) {
+                        // Actualizar marca destino 5202 otros prestamos
+                        solicitudExiste.setIndicadorCarDeudasDistintasVivienda(BigDecimal.ONE);
+                        solicitudExiste.update();
+                    }
+                }
+            }
+            if (// si la advertencia no es vacía, entonces añadimos el contexto del ANPMN454 al contexto de salida
+            StringUtils.isNotEmpty(advertencia)) {
+                listaContextoSalida.add(ctxResultado[0]);
+            } else {
+                /**
+                 * En este punto solo puede venir error del 5025 si no viene tenemos que poner a cero el campo CAR
+                 */
+                if (null != solicitudExiste && 0 == BigDecimal.ONE.compareTo(solicitudExiste.getIndicadorCarObrasMejoras()) && null != bidPaso && new BigDecimal(bidPaso).intValue() == CTE_DOS) {
+                    solicitudExiste.setIndicadorCarObrasMejoras(BigDecimal.ZERO);
+                    solicitudExiste.update();
+                }
+            }
+            // Se añade el segundo contexto, con la advertencia de tarjetización
+            if (1 < ctxResultado.length && null != ctxResultado[1] && StringUtils.isNotBlank(ctxResultado[1].getString("ANPMN454030"))) {
+                listaContextoSalida.add(ctxResultado[1]);
+            }
+        }
+        contextoSalida = listaContextoSalida.toArray(new IContexto[listaContextoSalida.size()]);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Se ha dado de alta la solicitud correctamente");
+            LOGGER.debug("FIN SNANPM151: Alta de una solicitud. " + "Tiempo total: " + (System.currentTimeMillis() - lInicio) + "ms");
+        }
+        return contextoSalida;
+    }
+
+    /**
+     * Método que nos rellena el contexto informativo de la finalización de una tramitación.
+     *
+     * Si el nivel máximo de autorización es oficina: funcionamiento habitual.
+     *  - Ind solic completada: S
+     *  - Titulo mens final tram: "Solicitud finalizada"
+     *  - Cuerpo mens final tram.
+     *  	* Si es alta: "Se ha realizado correctamente el alta de la solicitud."
+     *  	* Si es modif: "Se ha realizado correctamente la modificación de la solicitud."
+     *  - Ind levantar pantalla autorización: N
+     *  - Estado tarea solic: F
+     *
+     *  Si se va a generar una autorización por el cauce habitual:
+     *  - Ind solic completada: N
+     *  - Si es un alta.
+     *  	* Titulo mens final tram: "Solicitud de préstamo no guardada"
+     *  	* Cuerpo mens final tram: "La solicitud todavía no se ha guardado ya que tiene precios fuera de la tarifa de oficina"
+     *  - Si es una modificación.
+     *  	* Titulo mens final tram: "Modificación de la solicitud no guardada"
+     *  	* Cuerpo mens final tram: "La modificación de la solicitud todavia no se ha guardado ya que tiene precios fuera de la tarifa de oficina"
+     *  - Ind levantar pantalla autorización: S
+     *  - Estado tarea solic: Da igual porque el estado lo va a cambiar la pantalla de autorizaciones, AN028D00. Pero mejor enviarle la C, pend. autoriz.
+     *
+     * Si existe una autorización anterior TOTALMENTE autorizada y esta modif. de tram hace que se debiera generar
+     * una autorización al mismo nivel pero empeoran las condiciones del cliente o quedan igual.
+     *
+     * - Ind solic completada: S
+     * - Titulo mens final tram: "Solicitud finalizada"
+     * - Cuerpo mens final tram: "No se ha generado autorización porque sigue valiendo la autorización totalmente aceptada generada en una versión anterior."
+     * - Ind levantar pantalla autorización: N
+     * - Estado tarea solic: F
+     *
+     * Si existe una autorización anterior PARCIALMENTE autorizada y esta modif. de tram hace que se debiera generar
+     * una autorización al mismo nivel pero empeoran las condiciones del cliente o quedan igual.
+     *
+     * - Ind solic completada: S
+     * - Titulo mens final tram: "Solicitud finalizada"
+     * - Cuerpo mens final tram: "No se ha generado autorización porque existe una autorización anterior parcialmente autorizada, pero sigue pendiente de autorizar."
+     * - Ind levantar pantalla autorización: N
+     * - Estado tarea solic: C, pendiente autorizar.
+     *
+     * @param datosSolicitud
+     * @param existeAutorizacionAnterior
+     * @param noHayAutorizacionNueva
+     * @param desactivarIndAutorizacion
+     *
+     * @return ctx Contexto informativo.
+     */
+    private static IContexto rellenarContextoInformativo(DatosSolicitudC datosSolicitud, boolean necesitaAutorizacion, boolean existeAutorizacionAnterior, boolean noHayAutorizacionNueva, boolean autorizacionTotalmenteAutorizada, DatosAutorizacionC datosAutorizacion) {
+        IContexto ctx = null;
+        boolean esAlta = false;
+        boolean preciosCaducados = UtilidadesTramitacion.comprobarPreciosCaducados(datosSolicitud);
+        esAlta = 0 == BigDecimal.ONE.compareTo(datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+        /* Hay cuatro casos posibles:
+		 *  - Que la solicitud no necesite autorización porque el nivel máximo es oficina, es decir, no se ha desctivado el indicador autorización.
+		 *     * Es el caso "normal", se finaliza la solicitud, no se levanta autorizaciones y volvemos a EEXP.
+		 * 
+		 * 
+		 * */
+        ctx = ContextoFactory.getInstance().getContexto(CTE_CTX_INFORMATIVO);
+        if (necesitaAutorizacion) {
+            if (noHayAutorizacionNueva) {
+                if (autorizacionTotalmenteAutorizada) {
+                    // no necesita autorización pero originalmente sí que la necesitaba pero se ha desactivado: esto es porque hay autorización anterior totalmente
+                    // autorizada al mismo nivel y se empeoraron condiciones del cliente o quedaron igual.
+                    ctx.put(CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA, ConstantesGenericas.CTE_STR_S);
+                    ctx.put(CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_TOT_AUTORIZADA).toString());
+                    ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_TOT_AUTORIZADA).toString());
+                    ctx.put(CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ, ConstantesGenericas.CTE_STR_N);
+                    ctx.put(CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC, ConstantesComun.CTE_ESTADO_TAREA_SOLIC_FINALIZADA);
+                } else {
+                    // parcialmente autorizada
+                    // necesita autorización pero NO se genera una nueva, hemos volcado la que ya existe y que está PARCIALMENTE autorizada.
+                    // no vamos a levantar autorizaciones.
+                    ctx.put(CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA, ConstantesGenericas.CTE_STR_S);
+                    ctx.put(CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_ANT_PARC).toString());
+                    ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_ANT_PARC).toString());
+                    ctx.put(CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ, ConstantesGenericas.CTE_STR_N);
+                    ctx.put(CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC, ConstantesComun.CTE_ESTADO_TAREA_SOLIC_PEND_AUT);
+                }
+            } else {
+                // hay autorización nueva: flujo normal de autorizaciones.
+                // flujo normal de autorizaciones: necesita autorización y hay autorización nueva.
+                ctx.put(CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA, ConstantesGenericas.CTE_STR_N);
+                ctx.put(CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_TIT_MENS_FINAL_TRAM_AUTORIZACION_NUEVA).toString());
+                ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_AUTORIZACION_NUEVA).toString());
+                ctx.put(CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ, ConstantesGenericas.CTE_STR_S);
+                ctx.put(CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC, ConstantesComun.CTE_ESTADO_TAREA_SOLIC_PEND_AUT);
+            }
+        } else {
+            // no necesita autorizacion: finalizacion.
+            ctx.put(CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA, ConstantesGenericas.CTE_STR_S);
+            ctx.put(CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_TIT_MENS_FINAL_TRAM_SOLICITUD_FINALIZADA).toString());
+            if (esAlta) {
+                ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_ALTA_SOLICITUD_FINALIZADA).toString());
+            } else {
+                ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_MODIF_SOLICITUD_FINALIZADA).toString());
+            }
+            ctx.put(CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ, ConstantesGenericas.CTE_STR_N);
+            ctx.put(CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC, ConstantesComun.CTE_ESTADO_TAREA_SOLIC_FINALIZADA);
+        }
+        if (preciosCaducados) {
+            ctx.put(CTE_CTX_INFORMATIVO_IND_SOLIC_COMPLETADA, ConstantesGenericas.CTE_STR_S);
+            ctx.put(CTE_CTX_INFORMATIVO_TIT_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_TIT_MENS_FINAL_TRAM_PRECIOS_CADUCADOS).toString());
+            ctx.put(CTE_CTX_INFORMATIVO_CUERPO_MENS_FINAL_TRAM, new Mensaje(ServicioNegocio.getContexto(), CTE_CUERPO_MENS_FINAL_TRAM_PRECIOS_CADUCADOS).toString());
+            ctx.put(CTE_CTX_INFORMATIVO_IND_LEVANTAR_PANTALA_AUTORIZ, ConstantesGenericas.CTE_STR_N);
+            ctx.put(CTE_CTX_INFORMATIVO_ESTADO_TAREA_SOLIC, ConstantesComun.CTE_ESTADO_TAREA_SOLIC_PEND_AUT);
+            if (null != datosAutorizacion) {
+                datosAutorizacion.setEstado("P");
+                datosAutorizacion.persist();
+            }
+        }
+        return ctx;
+    }
+
+    /**
+     * Esta funcion copia los valores de la concesión de la versión anterior para solicitudes BO
+     */
+    public void modificarDatosConcesionSolicitudBO(DatosSolicitudC solicitudActual) {
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC solicitudAnterior = gds.buscarVersionAnterior(solicitudActual.getDatosSolicitudKey().getOficinaSolicitud(), null, solicitudActual.getDatosSolicitudKey().getVersionSolicitud(), solicitudActual.getDatosSolicitudKey().getNucExpediente());
+        solicitudActual.setEstadoSolicitud(solicitudAnterior.getEstadoSolicitud());
+        solicitudActual.setOrganoConcesion(solicitudAnterior.getOrganoConcesion());
+        solicitudActual.setDateFechaConcesion(solicitudAnterior.getDateFechaConcesion());
+    }
+
+    /**
+     * Comprueba si la version anterior tramitada por una oficina tiene autorizacion o si la version es igual a uno y no se comprueba
+     */
+    public boolean comprobarAutorizacionOficina(DatosSolicitudC solicitud) {
+        Boolean autorizacionEnOficina = false;
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC datosSolicitudVersionAnteriorNoBO = new DatosSolicitudC();
+        datosSolicitudVersionAnteriorNoBO = gds.buscarVersionAnteriorNoBO(solicitud.getDatosSolicitudKey().getNucExpediente(), solicitud.getDatosSolicitudKey().getVersionSolicitud());
+        // Si la version anterior de oficina no genera autorizacion
+        if (null != datosSolicitudVersionAnteriorNoBO && 0 != datosSolicitudVersionAnteriorNoBO.getIndicadorAutorizacion().compareTo(BigDecimal.ONE)) {
+            autorizacionEnOficina = true;
+        } else {
+            autorizacionEnOficina = false;
+        }
+        return autorizacionEnOficina;
+    }
+
+    /**
+     * @param solicitudEnCurso
+     * @param esBO
+     * @param paso
+     * @return
+     */
+    public List<ModificacionesBackOfficeC> recuperarCambiosRealizadosBO(DatosSolicitudC solicitudEnCurso, String esBO, int paso) {
+        final GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        GestionVersionBackOffice gestionVersionBackOffice = new GestionVersionBackOffice();
+        List<ModificacionesBackOfficeC> modificacionesRealizadasBO = new ArrayList<ModificacionesBackOfficeC>();
+        if (null != esBO && CTE_COMPROBACION_BO.equals(esBO.toString())) {
+            // Obtengo la version anterior de la solicitud
+            DatosSolicitudC solicitudVersionAterior = gds.buscarVersionAnterior(solicitudEnCurso.getDatosSolicitudKey().getOficinaSolicitud(), null, solicitudEnCurso.getDatosSolicitudKey().getVersionSolicitud(), solicitudEnCurso.getDatosSolicitudKey().getNucExpediente());
+            modificacionesRealizadasBO = gestionVersionBackOffice.compararVersionesSolicitudBO(solicitudEnCurso, solicitudVersionAterior, paso);
+        } else if ((solicitudEnCurso.getMarcaBO() != null) && (CTE_COMPROBACION_BO.equals(solicitudEnCurso.getMarcaBO()))) {
+            // Si el parametro a comprobar viene vacio y hemos llegado aqui probamos con la solicitud
+            // Puede estar llamandose desde otro servicio de negocio
+            // Obtengo la version anterior de la solicitud
+            DatosSolicitudC solicitudVersionAterior = gds.buscarVersionAnterior(solicitudEnCurso.getDatosSolicitudKey().getOficinaSolicitud(), null, solicitudEnCurso.getDatosSolicitudKey().getVersionSolicitud(), solicitudEnCurso.getDatosSolicitudKey().getNucExpediente());
+            modificacionesRealizadasBO = gestionVersionBackOffice.compararVersionesSolicitudBO(solicitudEnCurso, solicitudVersionAterior, paso);
+        }
+        return modificacionesRealizadasBO;
+    }
+
+    /**
+     * Método que a partir de ciertos datos básicos del alta, crea un nuevo objeto DatosSolicitudC
+     * @param bidOficinaSolicitud
+     * @param bidNumeroSolicutud
+     * @param bidVersionSolicitud
+     * @param bidNumeroExpediente
+     * @param bidDivisionSolicitud
+     * @param bidSubdivisionSolicitud
+     * @param bidDigitoSolicitud
+     * @param bidCodigoProducto
+     * @param bidCodigoSubproducto
+     * @param bidVersionGeneral
+     * @param bidColectivo
+     * @param bidPaso
+     * @param strPaso1
+     * @param strPaso2
+     * @param strPaso4
+     * @param strPaso5
+     * @return un DatosSolicitudC
+     */
+    private DatosSolicitudC obtenerDatoSolicitudC(BigDecimal bidOficinaSolicitud, BigDecimal bidNumeroSolicutud, BigDecimal bidVersionSolicitud, BigDecimal bidNumeroExpediente, BigDecimal bidDivisionSolicitud, BigDecimal bidSubdivisionSolicitud, BigDecimal bidDigitoSolicitud, BigDecimal bidCodigoProducto, BigDecimal bidCodigoSubproducto, BigDecimal bidVersionGeneral, BigDecimal bidColectivo, BigDecimal bidPaso, String strPaso1, String strPaso2, String strPaso4, String strPaso5, String strUsuario, BigDecimal bidExclusividad, String strTitularidad, String strDisponibilidad, String strComprobacionLtv, BigDecimal bidIncrementoDuranteAmortizacion, String strTecleoCuentas) {
+        DatosSolicitudC solicitud = null;
+        switch(bidPaso.intValue()) {
+            // se emplean los datos del paso 1
+            case 1:
+                // El campo bidVersionSolicitud no usa, ya que en una alta, el constructor lo introduce a 0 por defecto
+                String strEspecialidad = strPaso1.substring(0, 1);
+                // Corregido el 02-02-2012. Si viene un 0 lo convertimos a cadena vacía ""
+                if ("0".equals(strEspecialidad)) {
+                    strEspecialidad = "";
+                }
+                BigDecimal bidPeriodoTransitorio = new BigDecimal(strPaso1.substring(BigDecimal.ONE.intValue(), 8));
+                String strTipoOperacion = strPaso1.substring(8, 10);
+                BigDecimal bidRevolvingLinea = new BigDecimal(strPaso1.substring(BigDecimal.TEN.intValue(), 11));
+                BigDecimal bidNumeroNovacion = new BigDecimal(strPaso1.substring(11, 14));
+                // BigDecimal bidOficinaContable = new BigDecimal(strPaso1.substring(14, 18));
+                BigDecimal bidOficinaContable = null;
+                String strCnae = strPaso1.substring(18, 23);
+                BigDecimal bidSector = new BigDecimal(strPaso1.substring(23, 25));
+                BigDecimal bidNivelSector = new BigDecimal(strPaso1.substring(25, 30));
+                BigDecimal bidClaseRiesgo = new BigDecimal(strPaso1.substring(30, 31));
+                BigDecimal bidTipoGarantia = new BigDecimal(strPaso1.substring(31, 32));
+                BigDecimal bidGarantiaOficina = new BigDecimal(strPaso1.substring(32, 34));
+                BigDecimal bidNivelGarantiaOficina = new BigDecimal(strPaso1.substring(34, 39));
+                BigDecimal bidGarantiaGMR = new BigDecimal(strPaso1.substring(39, 41));
+                BigDecimal bidGarantiaContable = new BigDecimal(strPaso1.substring(41, 43));
+                BigDecimal bidTipoExpediente = new BigDecimal(strPaso1.substring(43, 48));
+                BigDecimal bidNivelExpediente = new BigDecimal(strPaso1.substring(48, 53));
+                BigDecimal bidTipoPrescriptor = new BigDecimal(strPaso1.substring(53, 54));
+                // Integer indModificacion = Integer.parseInt(strPaso1.substring(157, 158));
+                /*20150220 Si el tipo prescriptor es Externo y el prescriptor del expediente es Idealista la 
+				 * oficina contable será la que nos llega de la dll, en caso contrario será la oficina propietaria*/
+                /*
+				if ((0 == Constantes.CTE_TIPO_PRESCRIPTOR_EXTERNO.compareTo(bidTipoPrescriptor)) &&
+						(UtilidadesTramitacion.tienePrescriptorIdealista(bidNumeroExpediente) ||
+						 UtilidadesTramitacion.tienePrescriptorAbancaWeb(bidNumeroExpediente))
+					)
+*/
+                // 20150919 Se modifica el criterio para saber si controlamos el centro contable.
+                // 20150928 Ahora podemos pillar siempre el centro contable de la tira, porque ya va a venir siempre informada con el centro contable
+                // de Expediente Electrónico, EE034C090.
+                /*
+				if (UtilidadesTramitacion.controlCentroContable(bidNumeroExpediente, bidTipoPrescriptor))
+				{
+*/
+                // // 2016-03-16 - Modificacion oficina contable:
+                // // - Si es una alta: se setea el valor siempre con el que viene en la tira.
+                // // - Si es una modificacion: se setea el valor con el que viene en la tira solo si el tipo de prescriptor es 2 o 9.
+                // if (CTE_CERO == indModificacion)
+                // {
+                // // Indicador modificacion = 0 => es una alta
+                // bidOficinaContable = new BigDecimal(strPaso1.substring(14, 18));
+                // }
+                // else
+                // {
+                // if (CTE_UNO == indModificacion)
+                // {
+                // // Indicador modificacion = 1 => es una modificacion
+                // if  ((Constantes.CTE_TIPO_PRESCRIPTOR_EXTERNO.compareTo(bidTipoPrescriptor) == 0) ||
+                // (Constantes.CTE_TIPO_PRESCRIPTOR_WEB.compareTo(bidTipoPrescriptor) == 0))
+                // {
+                // bidOficinaContable = new BigDecimal(strPaso1.substring(14, 18));
+                // }
+                // }
+                // }
+                /*
+				}
+				else
+				{
+					bidOficinaContable = bidOficinaSolicitud;
+				}
+*/
+                String strUsuarioCrm = strPaso1.substring(54, 62);
+                String strEntidad = strPaso1.substring(62, 66);
+                BigDecimal bidCanal = new BigDecimal(strPaso1.substring(66, 67));
+                BigDecimal bidNivelCanal = new BigDecimal(strPaso1.substring(67, 72));
+                BigDecimal bidProvinciaPbe = new BigDecimal(strPaso1.substring(72, 74));
+                BigDecimal bidPaisRiesgo = new BigDecimal(strPaso1.substring(74, 77));
+                BigDecimal bidPaisOperacion = new BigDecimal(strPaso1.substring(77, 80));
+                BigDecimal bidPaisGarantia = new BigDecimal(strPaso1.substring(80, 83));
+                BigDecimal bidSubrogacionOtraEntidad = new BigDecimal(strPaso1.substring(83, 84));
+                BigDecimal bidDomicialicionExterna = new BigDecimal(strPaso1.substring(84, 85));
+                BigDecimal bidMdi = new BigDecimal(strPaso1.substring(85, 87));
+                BigDecimal bidOrdenImputacionPagos = new BigDecimal(strPaso1.substring(87, 88));
+                BigDecimal bidPermiteAdelantar = new BigDecimal(strPaso1.substring(88, 89));
+                BigDecimal bidPermiteCancelar = new BigDecimal(strPaso1.substring(89, 90));
+                BigDecimal bidConsideraFestivos = new BigDecimal(strPaso1.substring(90, 91));
+                BigDecimal bidDiaAplicar = new BigDecimal(strPaso1.substring(91, 92));
+                BigDecimal bidDiasGracia = new BigDecimal(strPaso1.substring(92, 93));
+                BigDecimal bidEnvioBo = new BigDecimal(strPaso1.substring(93, 94));
+                BigDecimal bidHipotecaVivienda = new BigDecimal(strPaso1.substring(94, 95));
+                BigDecimal bidCuadroAmortizacionIrregular = new BigDecimal(strPaso1.substring(95, 96));
+                BigDecimal bidCuadroSaldoDispuesto = new BigDecimal(strPaso1.substring(96, 97));
+                BigDecimal bidRecargable = new BigDecimal(strPaso1.substring(97, 98));
+                BigDecimal bidEstadoSolicitud = new BigDecimal(strPaso1.substring(98, 100));
+                BigDecimal bidCobroInteresesDemora = new BigDecimal(strPaso1.substring(100, 101));
+                BigDecimal bidCobroInteresesAdelanto = new BigDecimal(strPaso1.substring(101, 102));
+                String strFechaFinalMaxima = strPaso1.substring(102, 112);
+                String strFechaMaximaCarencia = strPaso1.substring(112, 122);
+                String strFechaMaximaDiferimiento = strPaso1.substring(122, 132);
+                String strFechaMaximaDesembolso = strPaso1.substring(132, 142);
+                BigDecimal bidCondicionesADquirientePromotor = new BigDecimal(strPaso1.substring(142, 143));
+                BigDecimal bidInmuebleEspana = new BigDecimal(strPaso1.substring(158, 159));
+                solicitud = new DatosSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, strEspecialidad, bidPeriodoTransitorio, strTipoOperacion, bidRevolvingLinea, bidNumeroNovacion, bidOficinaContable, strCnae, bidSector, bidNivelSector, bidClaseRiesgo, bidTipoGarantia, bidGarantiaOficina, bidNivelGarantiaOficina, bidGarantiaGMR, bidGarantiaContable, bidTipoExpediente, bidNivelExpediente, bidTipoPrescriptor, strUsuarioCrm, strEntidad, bidCanal, bidNivelCanal, bidProvinciaPbe, bidPaisRiesgo, bidPaisOperacion, bidPaisGarantia, bidSubrogacionOtraEntidad, bidDomicialicionExterna, bidMdi, bidOrdenImputacionPagos, bidPermiteAdelantar, bidPermiteCancelar, bidConsideraFestivos, bidDiaAplicar, bidDiasGracia, bidEnvioBo, bidHipotecaVivienda, bidCuadroAmortizacionIrregular, bidCuadroSaldoDispuesto, bidRecargable, bidEstadoSolicitud, bidCobroInteresesDemora, bidCobroInteresesAdelanto, strFechaFinalMaxima, strFechaMaximaCarencia, strFechaMaximaDiferimiento, strFechaMaximaDesembolso, bidCondicionesADquirientePromotor, strUsuario, bidInmuebleEspana, bidExclusividad, strTitularidad, strDisponibilidad, strComprobacionLtv, strTecleoCuentas);
+                break;
+            case 2:
+                BigDecimal bidImporteTasacionEstimado = new BigDecimal(strPaso2.substring(BigDecimal.ZERO.intValue(), 16));
+                String strMonedaTasacion = strPaso2.substring(16, 19);
+                BigDecimal bidImporteInversion = new BigDecimal(strPaso2.substring(19, 35));
+                String strMonedaInversion = strPaso2.substring(35, 38);
+                BigDecimal bidImporteSolicitado = new BigDecimal(strPaso2.substring(38, 54));
+                String StrMonedaSolicitado = strPaso2.substring(54, 57);
+                BigDecimal bidNivelImporteSolicitado = new BigDecimal(strPaso2.substring(57, 62));
+                BigDecimal bidImporteProductosFinanciar = new BigDecimal(strPaso2.substring(62, 78));
+                String strMonedaImporteProductosFinanciar = strPaso2.substring(78, 81);
+                BigDecimal bidImporteTotal = new BigDecimal(strPaso2.substring(81, 97));
+                String strMonedaImporteTotal = strPaso2.substring(97, 100);
+                BigDecimal bidPlazoCarencia = new BigDecimal(strPaso2.substring(100, 105));
+                BigDecimal bidNivelPlazoCarencia = new BigDecimal(strPaso2.substring(106, 110));
+                BigDecimal bidPlazoDiferimiento = new BigDecimal(strPaso2.substring(110, 115));
+                BigDecimal bidNivelPlazoDiferimiento = new BigDecimal(strPaso2.substring(115, 120));
+                BigDecimal bidPlazoDesembolso = new BigDecimal(strPaso2.substring(120, 125));
+                BigDecimal bidNivelPlazoDesembolso = new BigDecimal(strPaso2.substring(125, 130));
+                BigDecimal bidPlazoTotal = new BigDecimal(strPaso2.substring(130, 135));
+                BigDecimal bidNivelPlazoTotal = new BigDecimal(strPaso2.substring(135, 140));
+                String strUnidadPlazo = strPaso2.substring(140, 141);
+                String strDeposito = strPaso2.substring(141, 142);
+                BigDecimal bidFuncionamientoDesposito = new BigDecimal(strPaso2.substring(142, 143));
+                BigDecimal bidPorcentajeDesposito = new BigDecimal(strPaso2.substring(143, 151));
+                BigDecimal bidImporteDesposito = new BigDecimal(strPaso2.substring(151, 167));
+                BigDecimal bidCondicionesDesembolso = new BigDecimal(strPaso2.substring(167, 168));
+                // 24-08-2012 (P7279). Importe y moneda referente al importe de los gastos de la inversion
+                BigDecimal bidImporteGastosInversion = new BigDecimal(strPaso2.substring(168, 184));
+                String strMonedaGastosInversion = strPaso2.substring(184, 187);
+                // 03-09-2012 (P7279). Importe y moneda referente al importe de los impuestos de la inversion
+                BigDecimal bidImporteImpuestosInversion = new BigDecimal(strPaso2.substring(187, 203));
+                String strMonedaImpuestosInversion = strPaso2.substring(203, 206);
+                // Nuevos campos para hipoteca ABANCA
+                // Comprobamos que el valor recibido es distinto de nulo y su conversion es un numerico
+                String strTipoCarenciaCapitalDuranteAmortiz = new String();
+                String strTipoCarenciaInteresDuranteAmortiz = new String();
+                String strTipoPeriodoMaximoCarencia = new String();
+                // BigDecimal que representan estos string
+                BigDecimal bidTipoCarenciaCapitalDuranteAmortiz = BigDecimal.ZERO;
+                BigDecimal bidTipoCarenciaInteresDuranteAmortiz = BigDecimal.ZERO;
+                BigDecimal bidTipoPeriodoMaximoCarencia = BigDecimal.ZERO;
+                // Tipo carencia capital durante amortizacion
+                if (!es.caixagalicia.ifrt.util.Helper.isNullOrEmpty(strPaso2.substring(206, 207))) {
+                    // Si lo que viene en la cadena no es nulo ni vacio, lo asigno a un string
+                    // Maximo uno
+                    strTipoCarenciaCapitalDuranteAmortiz = strPaso2.substring(206, 207);
+                    // Si el resultado de la conversion de ese valor es numerico actualizo el bigDecimal
+                    if (StringUtils.isNumeric(strTipoCarenciaCapitalDuranteAmortiz)) {
+                        bidTipoCarenciaCapitalDuranteAmortiz = new BigDecimal(strTipoCarenciaCapitalDuranteAmortiz);
+                    }
+                }
+                // Tipo carencia interes durante amortizacion
+                if (!es.caixagalicia.ifrt.util.Helper.isNullOrEmpty(strPaso2.substring(207, 208))) {
+                    // Si lo que viene en la cadena no es nulo ni vacio, lo asigno a un string
+                    // Maximo uno
+                    strTipoCarenciaInteresDuranteAmortiz = strPaso2.substring(207, 208);
+                    // Si el resultado de la conversion de ese valor es numerico actualizo el bigDecimal
+                    if (StringUtils.isNumeric(strTipoCarenciaInteresDuranteAmortiz)) {
+                        bidTipoCarenciaInteresDuranteAmortiz = new BigDecimal(strTipoCarenciaInteresDuranteAmortiz);
+                    }
+                }
+                // Tipo periodo maxima carencia
+                if (!es.caixagalicia.ifrt.util.Helper.isNullOrEmpty(strPaso2.substring(208, 211))) {
+                    // Si lo que viene en la cadena no es nulo ni vacio, lo asigno a un string
+                    // Maximo uno
+                    strTipoPeriodoMaximoCarencia = strPaso2.substring(208, 211);
+                    // Si el resultado de la conversion de ese valor es numerico actualizo el bigDecimal
+                    if (StringUtils.isNumeric(strTipoPeriodoMaximoCarencia)) {
+                        bidTipoPeriodoMaximoCarencia = new BigDecimal(strTipoPeriodoMaximoCarencia);
+                    }
+                }
+                // BigDecimal bidTipoCarenciaCapitalDuranteAmortiz = new BigDecimal(strPaso2.substring(206,207)); //Maximo uno
+                // BigDecimal bidTipoCarenciaInteresDuranteAmortiz = new BigDecimal(strPaso2.substring(207,208)); //Maximo uno
+                // BigDecimal bidTipoPeriodoMaximoCarencia = new BigDecimal(strPaso2.substring(208,211)); //Maximo cinco
+                solicitud = new DatosSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, bidImporteTasacionEstimado, strMonedaTasacion, bidImporteInversion, strMonedaInversion, bidImporteSolicitado, StrMonedaSolicitado, bidNivelImporteSolicitado, bidImporteProductosFinanciar, strMonedaImporteProductosFinanciar, bidImporteTotal, strMonedaImporteTotal, bidPlazoCarencia, bidNivelPlazoCarencia, bidPlazoDiferimiento, bidNivelPlazoDiferimiento, bidPlazoDesembolso, bidNivelPlazoDesembolso, bidPlazoTotal, bidNivelPlazoTotal, strUnidadPlazo, strDeposito, bidFuncionamientoDesposito, bidPorcentajeDesposito, bidImporteDesposito, bidCondicionesDesembolso, bidImporteGastosInversion, strMonedaGastosInversion, bidImporteImpuestosInversion, strMonedaImpuestosInversion, strUsuario, bidTipoCarenciaCapitalDuranteAmortiz, bidTipoCarenciaInteresDuranteAmortiz, bidTipoPeriodoMaximoCarencia, bidIncrementoDuranteAmortizacion);
+                break;
+            case 4:
+                BigDecimal bidTipoDiferimiento = new BigDecimal(strPaso4.substring(BigDecimal.ZERO.intValue(), BigDecimal.ONE.intValue()));
+                BigDecimal bidDiferimientoInteres = new BigDecimal(strPaso4.substring(BigDecimal.ONE.intValue(), 9));
+                BigDecimal bidDiferimientoCuota = new BigDecimal(strPaso4.substring(9, 25));
+                BigDecimal bidTipoCarenciaCap = new BigDecimal(strPaso4.substring(25, 27));
+                BigDecimal bidTipoCarenciaInt = new BigDecimal(strPaso4.substring(27, 29));
+                BigDecimal bidPeriodoMaxCarencia = new BigDecimal(strPaso4.substring(29, 34));
+                BigDecimal bidFechaPago = new BigDecimal(strPaso4.substring(34, 35));
+                BigDecimal bidFechaLiquidacion = new BigDecimal(strPaso4.substring(35, 36));
+                BigDecimal bidDevengoInteresesDisposicion = new BigDecimal(strPaso4.substring(36, 37));
+                BigDecimal bidDevengoInteresesPagos = new BigDecimal(strPaso4.substring(37, 38));
+                BigDecimal bidDiaDeterminadoPago = new BigDecimal(strPaso4.substring(38, 40));
+                BigDecimal bidMesDeterminadoPago = new BigDecimal(strPaso4.substring(40, 42));
+                solicitud = new DatosSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, bidTipoDiferimiento, bidDiferimientoInteres, bidDiferimientoCuota, bidTipoCarenciaCap, bidTipoCarenciaInt, bidPeriodoMaxCarencia, bidFechaPago, bidFechaLiquidacion, bidDevengoInteresesDisposicion, bidDevengoInteresesPagos, bidDiaDeterminadoPago, bidMesDeterminadoPago, strUsuario);
+                break;
+            case 5:
+                String strFechaSolicitud = strPaso5.substring(BigDecimal.ZERO.intValue(), BigDecimal.TEN.intValue());
+                BigDecimal bidTie = new BigDecimal(strPaso5.substring(BigDecimal.TEN.intValue(), 18)).setScale(CTE_CUATRO);
+                BigDecimal bidTipoReferenciaTie = new BigDecimal(strPaso5.substring(18, 22));
+                String strIntervencionPoliza = strPaso5.substring(22, 23);
+                BigDecimal bidNivelIntervencionPoliza = new BigDecimal(strPaso5.substring(23, 28));
+                String strIndicadorAutorizacion = strPaso5.substring(28, 29);
+                BigDecimal bidIndicadorAutorizacion;
+                if (Constantes.SI.equalsIgnoreCase(strIndicadorAutorizacion)) {
+                    bidIndicadorAutorizacion = BigDecimal.ONE;
+                } else {
+                    bidIndicadorAutorizacion = BigDecimal.ZERO;
+                }
+                String strUsuario2 = strPaso5.substring(29, 37).trim();
+                String strNecesidadInfPrevia = strPaso5.substring(37, 38);
+                String strNecesidadFiper = strPaso5.substring(71, 72);
+                solicitud = new DatosSolicitudC(bidOficinaSolicitud, bidNumeroSolicutud, bidVersionSolicitud, bidNumeroExpediente, bidDivisionSolicitud, bidSubdivisionSolicitud, bidDigitoSolicitud, bidCodigoProducto, bidCodigoSubproducto, bidVersionGeneral, bidColectivo, strFechaSolicitud, bidTie, bidTipoReferenciaTie, strIntervencionPoliza, bidNivelIntervencionPoliza, bidIndicadorAutorizacion, strUsuario2, strNecesidadInfPrevia, strNecesidadFiper);
+                // solicitud.setNecesidadInfo(strNecesidadInfPrevia);
+                break;
+            default:
+                break;
+        }
+        return solicitud;
+    }
+
+    /**
+     * Método de validación de los datos de entrada al servicio de alta/modificacion solicitud.
+     * @param contexto, contexto de ejecución del servicio de negocio (para invocar
+     * otros servicios de negocio externos si es necesario)
+     * @param solicitud, datos de la solicitud a actualizar
+     * @param paso número de paso de la guía de pasos que se va a actualizar
+     * @param garantiaHipotecaria, indicador de si la garantía es hipotecaria (para validaciones
+     * del paso 2 - Datos económicos)
+     * @return ResultadoVO, resultado de la validación
+     */
+    private ResultadoVO validarDatosSolicitud(IContextoEjecucion contexto, DatosSolicitudC solicitud, int paso, String garantiaHipotecaria) {
+        ResultadoVO res = new ResultadoVO();
+        res.setCodigoResultado(CodigosError.NO_ERROR);
+        if (solicitud == null || paso < 1 || paso > 5) {
+            res.setCodigoResultado(CodigosError.ERROR_SIN_DATOS);
+        } else {
+            // Llamamos al servicio de consulta de subproductos para coger los datos
+            // del catálogo para el producto seleccionado
+            IDatosEntradaTx datosEntradaSrvCatalogo = getPrograma(contexto, IConstantesTramitacion.CTE_CC_CONSULTA_CATALOGO, IConstantesTramitacion.CTE_CO_CONSULTA_CATALOGO);
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_PRODUCTO, solicitud.getProducto());
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_SUBPRODUCTO, solicitud.getSubproducto());
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_COLECTIVO, solicitud.getLineaColectivo());
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_VERSIONGENERAL, solicitud.getVersionGeneral());
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_IND_FILTRARNIVEL, Constantes.SI);
+            // Si el campo es distinto de vacio y de nulo se recoge
+            if (null != solicitud.getMarcaBO() && "" != solicitud.getMarcaBO()) {
+                datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_MARCA_BO, solicitud.getMarcaBO());
+            }
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_NUC_EXPEDIENTE, solicitud.getDatosSolicitudKey().getNucExpediente());
+            datosEntradaSrvCatalogo.addCampo(IConstantesTramitacion.CTE_CAMPO_COD_COLECTIVO, solicitud.getIdColectivo());
+            IContexto[] salidaSrvCatalogo = invocarServicio(contexto, datosEntradaSrvCatalogo);
+            // de campo obligatorio al no estar informado
+            if (salidaSrvCatalogo == null || BigDecimal.ZERO.intValue() >= salidaSrvCatalogo.length) {
+                res.setCodigoResultado(CodigosError.ERROR_SIN_DATOS);
+            } else {
+                switch(paso) {
+                    case CTE_UNO:
+                        DestinosC dest = solicitud.getDestinoPrincipal();
+                        res = validarDatosPaso1(contexto, solicitud, salidaSrvCatalogo, dest);
+                        break;
+                    case CTE_DOS:
+                        res = validarDatosPaso2(solicitud, salidaSrvCatalogo, garantiaHipotecaria);
+                        break;
+                    case CTE_TRES:
+                        break;
+                    case CTE_CUATRO:
+                        break;
+                    case CTE_CINCO:
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        return res;
+    }
+
+    /**
+     * Método de validación de los datos de entrada al servicio de alta/modificacion solicitud
+     * para el paso 1 - Clasificación.
+     * @param contexto, contexto de ejecución del servicio de negocio (para invocar
+     * otros servicios de negocio externos si es necesario)
+     * @param solicitud, datos de la solicitud a actualizar
+     * @param datosCatalogo, datos del catálogo para el producto de la solicitud
+     * @param destino, datos del destino principal de la solicitud
+     * @return ResultadoVO, resultado de la validación
+     */
+    private ResultadoVO validarDatosPaso1(IContextoEjecucion contexto, DatosSolicitudC solicitud, IContexto[] datosCatalogo, DestinosC destino) {
+        ResultadoVO res = new ResultadoVO();
+        res.setCodigoResultado(CTE_CERO);
+        boolean ind = false;
+        // Cogemos el contexto del catálogo que contiene información sobre condiciones económicas (ANPMN013)
+        IContexto ctx = UtilidadesTramitacion.getContexto(datosCatalogo, "ANPMN013");
+        // Se valida --> CNAE
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013070"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && UtilidadesTramitacion.isBlankOrNull(solicitud.getCnae())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Destino principal
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013100"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && (destino == null || UtilidadesTramitacion.isBlankOrNull(destino.getDestino()))) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Subdestino principal
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013120"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        // Hay que tener en cuenta que existen destinos principales sin subdestinos.
+        if (!ind && (destino != null && destino.getDestino() != null) && (UtilidadesTramitacion.isBlankOrNull(destino.getSubdestino()) || !ind && CTE_SIN_SUBDESTINO.equalsIgnoreCase(destino.getSubdestino()))) {
+            // Comprobamos si se trata de un destino principal sin posibles subdestinos
+            // Llamamos al servicio de consulta de parámetros para obtener la lista
+            // de destinos
+            IDatosEntradaTx datosEntradaSrvParam = getPrograma(contexto, IConstantesTramitacion.CTE_CC_CONSULTA_PARAM, IConstantesTramitacion.CTE_CO_CONSULTA_PARAM);
+            datosEntradaSrvParam.addCampo("OPERACION", IConstantesTramitacion.CTE_OPERACION_CONSULTA_PARAM);
+            datosEntradaSrvParam.addCampo("PASO", new BigDecimal(CTE_UNO));
+            IContexto[] salidaSrvParam = invocarServicio(contexto, datosEntradaSrvParam);
+            // de campo obligatorio al no estar informado
+            if (salidaSrvParam != null && BigDecimal.ZERO.intValue() < salidaSrvParam.length) {
+                final int iSize = salidaSrvParam.length;
+                for (int i = 0; i < iSize; i++) {
+                    if (salidaSrvParam[i].getString(IConstantesTramitacion.CTE_CAMPO_ID_PARAM).equalsIgnoreCase(IConstantesTramitacion.CTE_ID_DESTINO) && salidaSrvParam[i].getString(IConstantesTramitacion.CTE_CAMPO_VAL_PARAM).equalsIgnoreCase(destino.getDestino()) && !UtilidadesTramitacion.isBlankOrNull(salidaSrvParam[i].getString(IConstantesTramitacion.CTE_CAMPO_IND_SUBDESTINO))) {
+                        res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+                        break;
+                    }
+                }
+            }
+        }
+        // Se valida --> Tipo de garantía
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013150"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && UtilidadesTramitacion.isBlankOrNull(solicitud.getTipoGarantia())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Sector
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013490"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && UtilidadesTramitacion.isBlankOrNull(solicitud.getSector())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Clase de riesgo
+        if (UtilidadesTramitacion.isBlankOrNull(solicitud.getClaseRiesgo())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Hipoteca vivienda
+        if (UtilidadesTramitacion.isBlankOrNull(solicitud.getHipotecaVivienda())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Orden de imputación de pagos
+        if (UtilidadesTramitacion.isBlankOrNull(solicitud.getOrdenImputacionPagos())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Se valida --> Subrogación otra entidad
+        if (UtilidadesTramitacion.isBlankOrNull(solicitud.getSubrogacionOtraEntidad())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        return res;
+    }
+
+    /**
+     * Método de validación de los datos de entrada al servicio de alta/modificacion solicitud
+     * para el paso 2 - Condiciones económicas.
+     * @param solicitud, datos de la solicitud a actualizar
+     * @param datosCatalogo, datos del catálogo para el producto de la solicitud
+     * @param garantiaHipotecaria, indicador de si la garantía es hipotecaria (para validaciones
+     * del paso 2 - Datos económicos)
+     * @return ResultadoVO, resultado de la validación
+     */
+    private ResultadoVO validarDatosPaso2(DatosSolicitudC solicitud, IContexto[] datosCatalogo, String garantiaHipotecaria) {
+        ResultadoVO res = new ResultadoVO();
+        res.setCodigoResultado(CTE_CERO);
+        boolean ind = false;
+        // Cogemos el contexto del catálogo que contiene información sobre condiciones económicas (ANPMN013)
+        IContexto ctx = UtilidadesTramitacion.getContexto(datosCatalogo, "ANPMN013");
+        // El importe solicitado debe estar informado y ser > 0
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013190"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteSolicitado())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (!ind && !(-1 == BigDecimal.ZERO.compareTo(solicitud.getImporteSolicitado()))) {
+            res.setCodigoResultado(CodigosError.ERROR_IMPORTE_INCORRECTO);
+        }
+        // Comprobamos que esten informadas las monedas
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013460"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        // Moneda importe solicitado
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getMonedaImporteSolicitado())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Moneda importe productos a financiar
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteProductosFinanciar()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getMonedaProductosFinanciar())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Moneda importe total
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getMonedaImporteTotal())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Moneda importe inversión
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getMonedaInversion())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Moneda importe tasación
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getMonedaTasacion())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Comprobamos que si esta informado el importe de productos a informar sea > 0
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteProductosFinanciar()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getImporteProductosFinanciar()))) {
+            res.setCodigoResultado(CodigosError.ERROR_IMPORTE_INCORRECTO);
+        }
+        // importe solicitado + importe productos a financiar + importe ampliado
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteTotal())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado())) {
+            final BigDecimal impTotal = (solicitud.getImporteTotal() != null) ? solicitud.getImporteTotal() : Constantes.CTE_CERO_DOUBLE;
+            final BigDecimal impSol = (solicitud.getImporteSolicitado() != null) ? solicitud.getImporteSolicitado() : Constantes.CTE_CERO_DOUBLE;
+            final BigDecimal impProdFin = (solicitud.getImporteProductosFinanciar() != null) ? solicitud.getImporteProductosFinanciar() : Constantes.CTE_CERO_DOUBLE;
+            final BigDecimal impAmpliado = (solicitud.getImporteAmpliado() != null) ? solicitud.getImporteAmpliado() : Constantes.CTE_CERO_DOUBLE;
+            if (Constantes.CTE_CERO != impTotal.compareTo(impSol.add(impProdFin.add(impAmpliado)))) {
+                res.setCodigoResultado(CodigosError.ERROR_IMPORTE_TOTAL_INCORRECTO_SUMA);
+            }
+        }
+        // Comprobamos que este informado el deposito
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getDeposito())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Comprobamos que este informado el porcentaje de deposito
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getPorcentajeDeposito())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getPorcentajeDeposito())) && !(0 < BigDecimal.valueOf(CTE_MIL).compareTo(solicitud.getPorcentajeDeposito()))) {
+            res.setCodigoResultado(CodigosError.ERROR_PORCENTAJE_INCORRECTO);
+        }
+        // Comprobamos que el importe deposito esté informado y sea > 0
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteDeposito())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getImporteDeposito()))) {
+            res.setCodigoResultado(CodigosError.ERROR_IMPORTE_INCORRECTO);
+        }
+        // Comprobamos que este informado condiciones desembolso
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getCondicionDesembolso())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        // Comprobamos que este informado importe inversion
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteInversion())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(-1 == BigDecimal.ZERO.compareTo(solicitud.getImporteInversion()))) {
+            res.setCodigoResultado(CodigosError.ERROR_IMPORTE_INCORRECTO);
+        }
+        /*
+		 * Corregido el 09-Febrero-2012
+		 * El importe de tasación estimado es optativo cuando el tipo de garantía
+		 * es no hipotecaria.
+		 */
+        if (!UtilidadesTramitacion.isBlankOrNull(garantiaHipotecaria) && (CTE_GARANTIA_HIPOTECARIA1.equalsIgnoreCase(garantiaHipotecaria) || CTE_GARANTIA_HIPOTECARIA2.equalsIgnoreCase(garantiaHipotecaria))) {
+            if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getImporteTasacionEstimado())) {
+                res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+            } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(-1 == BigDecimal.ZERO.compareTo(solicitud.getImporteTasacionEstimado()))) {
+                res.setCodigoResultado(CodigosError.ERROR_IMPORTE_INCORRECTO);
+            }
+        }
+        // Comprobamos que este informado el plazo total y sea > 0
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013230"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getPlazoTotal())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(-1 == BigDecimal.ZERO.compareTo(solicitud.getPlazoTotal()))) {
+            res.setCodigoResultado(CodigosError.ERROR_PLAZO_INCORRECTO);
+        }
+        // Comprobamos que este informado el plazo de carencia y que sea >= 0
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013290"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getPlazoCarencia())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getPlazoCarencia()))) {
+            res.setCodigoResultado(CodigosError.ERROR_PLAZO_INCORRECTO);
+        }
+        // Comprobamos que este informado el plazo de diferimiento y que sea >= 0
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013350"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getPlazoDiferimiento())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getPlazoDiferimiento()))) {
+            res.setCodigoResultado(CodigosError.ERROR_PLAZO_INCORRECTO);
+        }
+        // Comprobamos que este informado el plazo de desembolso y que sea >= 0
+        try {
+            if (ctx != null) {
+                ind = Constantes.CTE_CERO == Integer.parseInt(ctx.getString("ANPMN013410"));
+            } else {
+                ind = false;
+            }
+        } catch (NumberFormatException nEx) {
+            ind = false;
+        }
+        if (!ind && CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getPlazoDesembolso())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        } else if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && !(0 >= BigDecimal.ZERO.compareTo(solicitud.getPlazoDesembolso()))) {
+            res.setCodigoResultado(CodigosError.ERROR_PLAZO_INCORRECTO);
+        }
+        // Comprobamos que este informada la unidad de plazos
+        if (CodigosError.NO_ERROR.equals(res.getCodigoResultado()) && UtilidadesTramitacion.isBlankOrNull(solicitud.getUnidadPlazo())) {
+            res.setCodigoResultado(CodigosError.ERROR_FALTAN_CAMPOS_OBLIGATORIOS);
+        }
+        return res;
+    }
+
+    /**
+     * Invoca el servicio de comparación de datos de autorización entre dos versiones
+     * distintas de una solicitud de préstamo. Dicho servicio ejecuta la lógica de negocio
+     * de mantenimiento de versiones de datos de autorizaciones.
+     * @param solicitud Datos de la solicitud
+     * @param contexto contexto de ejecucion
+     */
+    private void invocarComparacionDatosAutorizacion(DatosSolicitudC solicitud, IContextoEjecucion contexto) {
+        // Llamamos al servicio de anulación de autorización en la aplicación AGEN.
+        final IDatosEntradaTx datosEntradaSrvComparacionAutorizacion = getPrograma(contexto, CTE_CUENTA_CONTABLE_APLICACION_ANPM, CTE_COD_OPERACION_COMPARACION_AUTORIZACION_SRV);
+        datosEntradaSrvComparacionAutorizacion.addCampo(CTE_OPCOMP_CAMPO_OFICINA_SOLICITUD, solicitud.getDatosSolicitudKey().getOficinaSolicitud());
+        datosEntradaSrvComparacionAutorizacion.addCampo(CTE_OPCOMP_CAMPO_NUM_SOLICITUD, solicitud.getDatosSolicitudKey().getNumSolicitud());
+        datosEntradaSrvComparacionAutorizacion.addCampo(CTE_OPCOMP_CAMPO_VERSION_SOLICITUD, solicitud.getDatosSolicitudKey().getVersionSolicitud());
+        datosEntradaSrvComparacionAutorizacion.addCampo(CTE_OPCOMP_CAMPO_NUM_EXPEDIENTE, solicitud.getDatosSolicitudKey().getNucExpediente());
+        // final IContexto[] salidaSrvComparacionAutorizacion = invocarServicio(contexto, datosEntradaSrvComparacionAutorizacion);
+        invocarServicio(contexto, datosEntradaSrvComparacionAutorizacion);
+    }
+
+    /**
+     * Invoca el servicio de comprobación de si una solicitud necesita autorización.
+     * @param solicitud Datos de la solicitud
+     * @param contexto contexto de ejecucion
+     * @return Indicador de si necesita autorización o no.
+     */
+    private BigDecimal invocarCheckAutorizacion(DatosSolicitudC solicitud, IContextoEjecucion contexto) {
+        BigDecimal resultado = BigDecimal.ZERO;
+        // Llamamos al servicio de comprobación de autorización requerida
+        // para la solicitud de préstamo.
+        IDatosEntradaTx datosEntradaSrvAutorizacion = getPrograma(contexto, CTE_CUENTA_CONTABLE_APLICACION_ANPM, CTE_COD_OPERACION_CHECK_AUTORIZACION_SRV);
+        datosEntradaSrvAutorizacion.addCampo(CTE_OPCHECK_CAMPO_OFICINA_SOLICITUD, solicitud.getDatosSolicitudKey().getOficinaSolicitud());
+        datosEntradaSrvAutorizacion.addCampo(CTE_OPCHECK_CAMPO_NUM_SOLICITUD, solicitud.getDatosSolicitudKey().getNumSolicitud());
+        datosEntradaSrvAutorizacion.addCampo(CTE_OPCHECK_CAMPO_VERSION_SOLICITUD, solicitud.getDatosSolicitudKey().getVersionSolicitud());
+        datosEntradaSrvAutorizacion.addCampo(CTE_OPCHECK_CAMPO_NUM_EXPEDIENTE, solicitud.getDatosSolicitudKey().getNucExpediente());
+        IContexto[] salidaSrvAutorizacion = invocarServicio(contexto, datosEntradaSrvAutorizacion);
+        if (salidaSrvAutorizacion != null && BigDecimal.ZERO.intValue() < salidaSrvAutorizacion.length) {
+            resultado = salidaSrvAutorizacion[0].getBigDecimal(CTE_TIRA_IND_NECESITA_AUTORIZACION);
+        } else {
+            resultado = BigDecimal.ZERO;
+        }
+        return resultado;
+    }
+
+    /**
+     * @param solicitud
+     * @param contexto
+     */
+    public String tipoDeExpediente(DatosSolicitudC solicitud, IContextoEjecucion contexto) {
+        IDatosEntradaTx datosEntradaSrvTipoExpediente = getPrograma(contexto, IConstantesTramitacion.CTE_CC_CONSULTA_TIPO_EXPEDIENTE, IConstantesTramitacion.CTE_CO_CONSULTA_TIPO_EXPEDIENTE);
+        datosEntradaSrvTipoExpediente.addCampo(IConstantesTramitacion.CTE_CAMPO_TIPO_EXPEDIENTE, solicitud.getTipoExpediente().toString());
+        String hipo = new String();
+        IContexto[] salidaSrvTipoExpediente = invocarServicio(contexto, datosEntradaSrvTipoExpediente);
+        if (!UtilidadesTramitacion.isBlankOrNull(salidaSrvTipoExpediente)) {
+            hipo = salidaSrvTipoExpediente[0].getString(CTE_TIPO_EXPEDIENTE);
+        }
+        return hipo;
+    }
+
+    /**
+     * Programador: Ivan Paz G000857
+     * Utilidad: Realiza en envio de correo a BO cuando se inicia una tramitacion de prestamo hipotecario en divisa
+     * @param datosSolicitud
+     */
+    public void enviarCorreoBO(DatosSolicitudC datosSolicitud) {
+        String asunto = new String();
+        // String destinatario = new String();
+        List<String> destinatarios = new ArrayList<String>();
+        String autor = new String();
+        // Recuperar los parametros de correo BO
+        // Llamar al servicio de negocio de recuperacion de parametros
+        IDatosEntradaTx datosEntradaSrvConsultaParametrosNombre = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), IConstantesTramitacion.CTE_CC_CONSULTA_PARAMETRO, IConstantesTramitacion.CTE_CO_CONSULTA_PARAMETRO);
+        datosEntradaSrvConsultaParametrosNombre.addCampo("AGRUPACION_PARAMETRO", IConstantesTramitacion.CTE_NOMBRE_AGRUPACION_CORREO_BO);
+        IContexto[] salidaSrvParamNombre = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaSrvConsultaParametrosNombre);
+        for (IContexto contexto : salidaSrvParamNombre) {
+            if (contexto.getString(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO).equals(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO_ASUNTO)) {
+                asunto = contexto.getString(IConstantesTramitacion.CTE_VALOR_PARAMETRO);
+            }
+            if (contexto.getString(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO).equals(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO_AUTOR)) {
+                autor = contexto.getString(IConstantesTramitacion.CTE_VALOR_PARAMETRO);
+            }
+            if (contexto.getString(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO).equals(IConstantesTramitacion.CTE_NOMBRE_PARAMETRO_DESTINATAR)) {
+                // destinatario = contexto.getString(IConstantesTramitacion.CTE_VALOR_PARAMETRO);
+                destinatarios.add(contexto.getString(IConstantesTramitacion.CTE_VALOR_PARAMETRO));
+            }
+        }
+        // Crear una instancia
+        IMailSender mailSender = MailSenderImpl.getInstance();
+        Mail mail = new Mail();
+        // Se añade el destinatario
+        String[] to = new String[destinatarios.size()];
+        // Añadir un destinatario o varios
+        for (int i = 0; i < destinatarios.size(); i++) {
+            to[i] = destinatarios.get(i);
+        }
+        // Añadir el destinatario al email
+        mail.setTo(to);
+        // Se añade el emisor
+        String from = new String();
+        // Se inicializa el emisor
+        from = autor;
+        // Añadir el emisor al email
+        mail.setFrom(from);
+        // Asunto de la alerta
+        String subject = new String();
+        // Informar el asunto
+        subject = asunto;
+        // Añadir al mail el asunto
+        mail.setSubject(subject);
+        // Poner los datos de la plantilla
+        @SuppressWarnings("unchecked") Map<String, Object> model = new HashedMap();
+        // model.put("nuc",datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+        // Añadir al mail el modelo con los datos del mapa
+        mail.getTemplate().setData(model);
+        // Añadir la plantilla que se utilizará
+        mail.getTemplate().setIdApp("ANPM");
+        // Añadir el identificador de la plantilla
+        mail.getTemplate().setCodPlantilla("ALERT01");
+        // Se envia el mail
+        mailSender.deliverMail(mail);
+    }
+
+    /**
+     * Método de validación de los datos de entrada al servicio de alta/modificacion solicitud. Comprueba
+     * que la fecha de la solicitud no exceda la fecha tope de solicitud del subproducto seleccionado.
+     * @param solicitud, datos de la solicitud a actualizar
+     * @return ResultadoVO, resultado de la validación
+     */
+    private ResultadoVO validarFechaTopeSolicitud(DatosSolicitudC solicitud) {
+        ResultadoVO res = new ResultadoVO();
+        res.setCodigoResultado(CodigosError.NO_ERROR);
+        if (solicitud == null) {
+            res.setCodigoResultado(CodigosError.ERROR_SIN_DATOS);
+        } else {
+            // Obtenemos la fecha tope de solicitud del subproducto seleccionado
+            final List<String> listaTablas = new ArrayList<String>(Constantes.CTE_CERO);
+            listaTablas.add(Constantes.CTE_TBL_SUBPRODUCTO);
+            final List<CEcc> lista = GestionVersiones.obtenerDatosVersion(solicitud.getProducto().intValue(), solicitud.getSubproducto().intValue(), solicitud.getLineaColectivo().intValue(), solicitud.getVersionGeneral().intValue(), listaTablas);
+            for (CEcc subprd : lista) {
+                final SubProductoC subproducto = (SubProductoC) subprd;
+                // devolvemos error
+                if (!DateUtils.getSoloFecha(subproducto.getFechaSolicitud()).equals(DateUtils.getSoloFecha(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO))) && DateUtils.isDateGreater(solicitud.getFechaSolicitud(), subproducto.getFechaSolicitud())) {
+                    res.setCodigoResultado(CodigosError.ERROR_FECHA_TOPE_SOLICITUD);
+                    res.setDescripcionParams(new String[] { DateUtils.formatDate(subproducto.getFechaSolicitud(), DateUtils.FORMATO_FECHAHORA_LARGO) });
+                    break;
+                }
+            }
+        }
+        return res;
+    }
+
+    /**
+     * Método que comprueba si la fecha de alta de expediente es superior a la fecha parametrizada en la AN82TB01, agrupación GENERAL y parámetro FECHVALHMC.
+     * Si es así lanzamos error controlado.
+     *
+     * @param nuc
+     */
+    private static void comprobarFechaValidezMaximaHMC(BigDecimal nuc, BigDecimal codProducto) {
+        Date fechaAltaExp = null;
+        String fechaAltaExpStr = null;
+        // En formato YYYY-MM-DD
+        String fechaValidezMaximaHMC = null;
+        String fechaValidezMaximaHMCUsuario = null;
+        /*Si estamos tramitando una Maricarmen antigua: */
+        if (0 == Constantes.CTE_COD_PROD_HIP_VAR_BONIF.compareTo(codProducto)) {
+            fechaAltaExp = UtilidadesTramitacion.obtenerFechaAltaExpediente(nuc);
+            fechaAltaExpStr = DateHelper.sqlDateToString(fechaAltaExp, DateHelper.FORMATO_YYYY_MM_DD_GUION);
+            fechaValidezMaximaHMC = UtilidadesTramitacion.obtenerParametroUnicoANPM(Constantes.CTE_PARAMETRO_AGRUPACION_GENERAL, Constantes.CTE_PARAMETRO_NOMBRE_FECHA_VALIDEZ_MAXIMA_HMC);
+            if (!StringUtils.isBlank(fechaValidezMaximaHMC)) {
+                fechaValidezMaximaHMCUsuario = DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_YYYY_MM_DD_GUION, DateHelper.FORMATO_DD_MM_YYYY_BARRA, fechaValidezMaximaHMC);
+                /*Si la fecha de alta expediente es superior a la fecha de validez máxima cascamos.*/
+                if (0 < fechaAltaExpStr.compareTo(fechaValidezMaximaHMC)) {
+                    ServicioNegocio.rollback(CodigosError.CTE_ERROR_FECHA_VALIDEZ_HMC, null, new String[] { codProducto.toString(), fechaValidezMaximaHMCUsuario }, null);
+                }
+            } else {
+                ServicioNegocio.rollback(CodigosError.CTE_ERROR_PARAMETRO_ANPM_NO_EXISTE, null, new String[] { Constantes.CTE_PARAMETRO_AGRUPACION_GENERAL, Constantes.CTE_PARAMETRO_NOMBRE_FECHA_VALIDEZ_MAXIMA_HMC }, null);
+            }
+        }
+    }
+
+    /**
+     * Comprueba si es necesario obtener la caducidad del precio del subproducto o no:
+     * <ul>
+     *   <li>Es necesario obtenerla siempre que se este dando un alta, o se este realizando
+     *       una modificacion con cambio de producto-subproducto.</li>
+     *
+     *   <li>Cuando se trata de una modificacion normal, la caducidad del precio debe ser
+     *       la correspondiente a la solicitud existente (la que habia cuando se dio de alta
+     *       la solicitud).</li>
+     * </ul>
+     *
+     * @param indModificacion indica si se trata de un alta (0) o una modificacion (1).
+     * @param solicitudExiste solicitud temporal.
+     * @return true si es necesario obtener la caducidad, false en caso contrario.
+     */
+    private boolean necesarioObtenerCaducidad(int indModificacion, DatosSolicitudC solicitudExiste) {
+        /*
+		 * Necesario obtener caducidad:
+		 * 1. Si indModificacion = 0 (alta)
+		 * 2. Si indModificacion = 1 (modificacion) y:
+		 *    2.1. solicitudExiste = null (modificacion con cambio de producto sin modificar destinos)
+		 *    2.2. solicitudExiste != null y producto, subproducto y version = 0 (modificacion con 
+		 *    cambio de producto modificando destinos)
+		 * Con esto se actualiza la caducidad en solicitud (datos del paso).
+		 */
+        boolean necesarioObtenerCaducidad = false;
+        if (indModificacion == CTE_CERO) {
+            // Caso 1: alta
+            necesarioObtenerCaducidad = true;
+        }
+        if (indModificacion == CTE_UNO) {
+            // Caso 2: modificacion
+            if (null == solicitudExiste) {
+                // Caso 2.1: modificacion con cambio de producto sin modificar destinos
+                necesarioObtenerCaducidad = true;
+            } else {
+                if ((solicitudExiste.getProducto().compareTo(BigDecimal.ZERO) == 0) && (solicitudExiste.getSubproducto().compareTo(BigDecimal.ZERO) == 0) && (solicitudExiste.getVersionGeneral().compareTo(BigDecimal.ZERO) == 0)) {
+                    // Caso 2.2: modificacion con cambio de producto modificando destinos
+                    // (la solicitud temporal la ha creado el servicio de destinos ANPM_160)
+                    necesarioObtenerCaducidad = true;
+                }
+            }
+        }
+        return necesarioObtenerCaducidad;
+    }
+
+    /**
+     * Método que llama al programa puente ANPMR213, encargado de llamar a su
+     * vez a la include de comprobaciones ANPMM012. Si no las supera hace rollback.
+     *
+     * @param nuc
+     * @param tarea
+     * @return
+     */
+    private IContexto[] comprobacionesSolicitud(BigDecimal nuc, String tarea, int tipoExpediente) {
+        // Constantes para el ANPM_179
+        final String TIPO_EXPEDIENTE_ENTRADA = "TIPO_EXPEDIENTE";
+        final String TIPO_EXPEDIENTE_SALIDA = "ANPMN079010";
+        final char PERSONAL = 'P';
+        final int CUENTA_CONTABLE_ANPM = 507;
+        final int CODIGO_OPERACION_179 = 179;
+        // Constantes para el ANPMR213
+        final String CONTEXTO_ENTRADA = "ANPMN213";
+        final String CODIGO_ERROR = "ANPMN213010";
+        final String DESCRIPCION_ERROR = "ANPMN213020";
+        final String NUC = "ANPMN213030";
+        final String TAREA = "ANPMN213040";
+        final String PROGRAMA = "ANPMR213";
+        IContexto[] resultado = null;
+        // Llamada al ANPM_179
+        IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+        IDatosEntradaTx entrada179 = ServicioNegocio.getPrograma(contextoEjecucion, CUENTA_CONTABLE_ANPM, CODIGO_OPERACION_179);
+        entrada179.addCampo(TIPO_EXPEDIENTE_ENTRADA, new Integer(tipoExpediente).toString());
+        IContexto[] salida = ServicioNegocio.invocarServicio(contextoEjecucion, entrada179);
+        // hipotecario no se hace nada
+        if (null != salida && 0 < salida.length && null != salida[0].getString(TIPO_EXPEDIENTE_SALIDA) && PERSONAL == salida[0].getString(TIPO_EXPEDIENTE_SALIDA).charAt(0)) {
+            IContexto entrada = ContextoFactory.getInstance().getContexto(CONTEXTO_ENTRADA);
+            entrada.put(NUC, nuc);
+            entrada.put(TAREA, "S");
+            // Llamada al ANPMR213 y la include de comprobaciones ANPMM012
+            resultado = new CtgFacade().invocarProgramaCics(entrada, PROGRAMA);
+            if (null != resultado && BigDecimal.ZERO.intValue() < resultado.length && BigDecimal.ZERO.intValue() != resultado[0].getBigDecimal(CODIGO_ERROR).intValue() && null != resultado[0].getString(DESCRIPCION_ERROR)) {
+                ServicioNegocio.rollback(CodigosError.ERROR_FINALIZAR_SOLICITUD, null, new String[] { resultado[0].getBigDecimal(CODIGO_ERROR).intValue() + " " + resultado[0].getString(DESCRIPCION_ERROR) }, null);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Invocará al servicio CGAL_307 para obtener la red/división del centro del titular
+     * @param solicitud
+     * @param contexto
+     * @return Devuelve la red/division organizativa correspondiente al centro
+     */
+    private String invocarConsultaRed(DatosSolicitudC solicitud, IContextoEjecucion contexto) {
+        String resultado = Constantes.CTE_STRING_EMPTY;
+        IDatosEntradaTx datosEntradaSrvCntro = getPrograma(contexto, CTE_CUENTA_CONTABLE_APLICACION_CGAL, CTE_COD_OPERACION_CONS_RED_SRV);
+        datosEntradaSrvCntro.addCampo(CTE_OPCNTRO_CAMPO_POSICION_CENTRO, solicitud.getDatosSolicitudKey().getOficinaSolicitud().toString());
+        IContexto[] aCntxtoSalidaCEntro = invocarServicio(contexto, datosEntradaSrvCntro);
+        if (aCntxtoSalidaCEntro != null && aCntxtoSalidaCEntro.length > 0) {
+            resultado = aCntxtoSalidaCEntro[0].getString(CTE_CNTXTO_CONS_RED_DIVISION);
+        }
+        return resultado;
+    }
+
+    /**
+     * Comprueba si la solicitud es una subrogacion de otra entidad y, en ese
+     * caso inserta una fila en la AN56TB01 indicando que no comparte gastos.
+     *
+     * @param solicitud datos de la solicitud.
+     */
+    private void comprobarComparteGastos(DatosSolicitudC solicitud) {
+        // Inicializaciones
+        GastosCompartidosEng gastosCompartidosEng = new GastosCompartidosEng();
+        // Si es una subrogacion de otra entidad, indicar en la AN56TB01 que no se comparten gastos.
+        if (solicitud.getSubrogacionOtraEntidad().compareTo(Constantes.CTE_SUBROGACION_OTRA_ENTIDAD) == 0) {
+            GastosCompartidosC gastosCompartidos = gastosCompartidosEng.obtieneGastosCompartidosPorNuc(solicitud.getDatosSolicitudKey().getNucExpediente());
+            if (null != gastosCompartidos) {
+                // Si hay fila para el NUC: actualizarla si es necesario
+                if (!gastosCompartidos.getComparteGastos().equalsIgnoreCase(Constantes.CTE_LETRA_N)) {
+                    gastosCompartidos.setComparteGastos(Constantes.CTE_LETRA_N);
+                    gastosCompartidos.update();
+                }
+            } else {
+                // Si no hay fila para el NUC: insertarla.
+                gastosCompartidosEng.insertaGastosCompartidos(solicitud.getDatosSolicitudKey().getNucExpediente(), Constantes.CTE_LETRA_N, solicitud.getUsuario());
+            }
+        }
+    }
+
+    /**
+     * Busca por nuc los gastos asociados a un expediente y elimina.
+     *
+     * @param nucExpediente
+     * @param usuario
+     */
+    private void modificarComparteGastos(BigDecimal nucExpediente, DatosSolicitudC solicitudVersionAnterior, DatosSolicitudC solicitud) {
+        GestionDatosSolicitud cambios = new GestionDatosSolicitud();
+        // Comprobamos si tenemos que eliminar o no
+        if (cambios.compararProductoVersionSolicitudActualConAnterior(solicitudVersionAnterior, solicitud)) {
+            // Si ha cambiado el producto, hay que eliminar la fila de la AN56TB01
+            GastosCompartidosEng gastosCompartidosEng = new GastosCompartidosEng();
+            GastosCompartidosC gastosCompartidosC = gastosCompartidosEng.findById(nucExpediente);
+            if (null != gastosCompartidosC) {
+                // - Si el cambio de producto es de subrogacion a no subrogacion,
+                if (("ANPM009".equals(gastosCompartidosC.getUsuario().trim())) || ((solicitudVersionAnterior.getSubrogacionOtraEntidad().compareTo(Constantes.CTE_SUBROGACION_OTRA_ENTIDAD) == 0) && (solicitud.getSubrogacionOtraEntidad().compareTo(Constantes.CTE_SUBROGACION_OTRA_ENTIDAD) != 0))) {
+                    gastosCompartidosC.markForDelete();
+                    gastosCompartidosC.persist();
+                }
+            }
+        }
+    }
+    /**
+     * * Esta función comprueba si los campos AN250080, AN250090 y AN250100 de la versión actual de la solicitud
+     * han sido modificados respecto con la versión anterior.
+     * @param solicitudActual
+     * @param solicitudExiste
+     * @return true or false segun a cambiado o no
+     */
+    /**
+     *private boolean compararProductoVersionSolicitudActualConAnterior(DatosSolicitudC solicitudActual,DatosSolicitudC solicitudExiste)
+     *	{
+     *		//Boolean modificado=false;
+     *		//GestionDatosSolicitud gds = new GestionDatosSolicitud();
+     *
+     *		//DatosSolicitudC solicitudAnterior = gds.buscarVersionAnterior(solicitudActual.getDatosSolicitudKey().getOficinaSolicitud(),
+     *		//				null,solicitudActual.getDatosSolicitudKey().getVersionSolicitud(), solicitudActual.getDatosSolicitudKey().getNucExpediente());
+     *
+     *		//modificado = eliminarComparteGastos(solicitudActual,solicitudAnterior);
+     *
+     *		//if ( (solicitudActual.getProducto() != solicitudAnterior.getProducto())
+     *			//|| (solicitudActual.getSubproducto() != solicitudAnterior.getSubproducto())
+     *			//|| (solicitudActual.getVersionGeneral() != solicitudAnterior.getVersionGeneral())){
+     *			//modificado = true;
+     *		//}
+     *
+     *		return  eliminarComparteGastos(solicitudActual,solicitudExiste);
+     *	}
+     */
+}

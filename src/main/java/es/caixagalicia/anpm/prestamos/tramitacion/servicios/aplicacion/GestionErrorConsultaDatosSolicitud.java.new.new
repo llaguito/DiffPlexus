@@ -1,0 +1,238 @@
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+public class GestionErrorConsultaDatosSolicitud {
+
+    public static DatosSolicitudVO rellenarErrorParametroNoExiste(DatosSolicitudVO datosSolicitudVO, String clave, String codigoEnTabla) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_PARAMETROS_NO_EXISTE);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), PAR_METRO_CLAVE_1111069600).toString());
+        textoErrorStb = textoErrorStb.append(clave);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), C_DIGO_TABLA_2078120185).toString());
+        textoErrorStb = textoErrorStb.append(codigoEnTabla);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorComisionNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficina, BigDecimal numeroSolicitud, Integer versionSolicitud, Integer ordenTramo, BigDecimal nuc, String tipoComision) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_COMISION_NO_EXISTE);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), COMISION_OFICINA_124742232).toString());
+        textoErrorStb = textoErrorStb.append(oficina.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(numeroSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(versionSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _ORDEN_TRAMO_726284347).toString());
+        textoErrorStb = textoErrorStb.append(ordenTramo);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), NUC_109436).toString());
+        textoErrorStb = textoErrorStb.append(nuc.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorCondicionInteresNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficina, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nuc) {
+        StringBuilder textoErrorStb = new StringBuilder();
+        textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_CONDICIONES_INTERES_NO_EXISTE);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), CONDICIONES_INTER_S_OFICINA_2107412021).toString());
+        textoErrorStb = textoErrorStb.append(oficina.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(numeroSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(versionSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_EXPEDIENTE_1996893089).toString());
+        textoErrorStb = textoErrorStb.append(nuc.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorCondicionInteresPrimerTramoNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficina, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nuc, Integer tipoCondicion, BigDecimal tramo) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_COND_INTERESES_NO_EXISTE);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), PRIMER_TRAMO_CONDICIONES_INTERES_OFICINA_1483825241).toString());
+        textoErrorStb = textoErrorStb.append(oficina.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(numeroSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(versionSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_41697672).toString());
+        textoErrorStb = textoErrorStb.append(nuc.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _TIPO_CONDICION_1869488980).toString());
+        textoErrorStb = textoErrorStb.append(tipoCondicion.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), TRAMO_110621317).toString());
+        textoErrorStb = textoErrorStb.append(tramo.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorCondicionInteresFijoNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficina, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nuc, Integer tipoCondicion) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_COND_INTERESES_FIJOS_NO_EXISTEN);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTEN_INTERESES_TIPO_FIJO_AN270080_IN_00_01_197823221).toString());
+        textoErrorStb = textoErrorStb.append(oficina.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(numeroSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(versionSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_41697672).toString());
+        textoErrorStb = textoErrorStb.append(nuc.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _TIPO_CONDICION_1869488980).toString());
+        textoErrorStb = textoErrorStb.append(tipoCondicion.toString());
+        textoErrorStb = textoErrorStb.append(" .");
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorCondicionInteresSustitutivoNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficina, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nuc, Integer tipoCondicion) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_COND_INTERESES_FIJOS_NO_EXISTEN);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTEN_INTERESES_SUSTITUTIVOS_OFICINA_1862980431).toString());
+        textoErrorStb = textoErrorStb.append(oficina.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(numeroSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(versionSolicitud.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_41697672).toString());
+        textoErrorStb = textoErrorStb.append(nuc.toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _TIPO_CONDICION_1869488980).toString());
+        textoErrorStb = textoErrorStb.append(tipoCondicion.toString());
+        textoErrorStb = textoErrorStb.append(".");
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorCondicionCapitalNoExiste(DatosSolicitudVO datosSolicitudVO, BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nucExpediente, BigDecimal tramo) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_CONDICION_CAPITAL_NO_EXISTE);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), CONDICI_N_CAPITAL_OFICINA_1714659579).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(oficinaSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(numeroSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(versionSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_EXPEDIENTE_1996893089).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(nucExpediente).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _TRAMO_1422210449).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(tramo).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorPeriodicidadNoEsValida(DatosSolicitudVO datosSolicitudVO, String periodicidadUnidadPeriodo, Integer periodicidadNumPeriodos, Integer tipoPeriodos) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_PERIODICIDAD_NO_ES_VALIDA);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), PERIODICIDAD_UNIDAD_PERIODO_517200980).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(periodicidadUnidadPeriodo));
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUMERO_PERIODOS_1494045429).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(periodicidadNumPeriodos).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), TIPO_PERIODO_1949647390).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(tipoPeriodos).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), V_LIDA_399188887).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorAdelantosNoExisten(DatosSolicitudVO datosSolicitudVO, BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nucExpediente) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_DATOS_ADELANTOS_NO_EXISTEN);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), ADELANTOS_OFICINA_1230435284).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(oficinaSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(numeroSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(versionSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_EXPEDIENTE_1996893089).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(nucExpediente).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTEN_2122701234).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO rellenarErrorAdelantosIncorrectos(DatosSolicitudVO datosSolicitudVO, BigDecimal oficinaSolicitud, BigDecimal numeroSolicitud, BigDecimal versionSolicitud, BigDecimal nucExpediente) {
+        StringBuilder textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+        datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_DATOS_ADELANTOS_INCORRECTOS);
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), ADELANTOS_OFICINA_1230435284).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(oficinaSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(numeroSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(versionSolicitud).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _NUC_EXPEDIENTE_1996893089).toString());
+        textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(nucExpediente).toString());
+        textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), VALORES_INCORRECTOS_770078195).toString());
+        datosSolicitudVO.setTextoError(textoErrorStb.toString());
+        return datosSolicitudVO;
+    }
+
+    private static final String _N_MERO_SOLICITUD_86517977 = "_N_MERO_SOLICITUD_86517977";
+
+    private static final String _NUC_41697672 = "_NUC_41697672";
+
+    private static final String _TIPO_CONDICION_1869488980 = "_TIPO_CONDICION_1869488980";
+
+    private static final String _VERSI_N_SOLICITUD_422041756 = "_VERSI_N_SOLICITUD_422041756";
+
+    private static final String _NUMERO_PERIODOS_1494045429 = "_NUMERO_PERIODOS_1494045429";
+
+    private static final String _NUC_EXPEDIENTE_1996893089 = "_NUC_EXPEDIENTE_1996893089";
+
+    private static final String TIPO_PERIODO_1949647390 = "TIPO_PERIODO_1949647390";
+
+    private static final String V_LIDA_399188887 = "V_LIDA_399188887";
+
+    private static final String PRIMER_TRAMO_CONDICIONES_INTERES_OFICINA_1483825241 = "PRIMER_TRAMO_CONDICIONES_INTERES_OFICINA_1483825241";
+
+    private static final String EXISTE_1315400288 = "EXISTE_1315400288";
+
+    private static final String ADELANTOS_OFICINA_1230435284 = "ADELANTOS_OFICINA_1230435284";
+
+    private static final String EXISTEN_INTERESES_SUSTITUTIVOS_OFICINA_1862980431 = "EXISTEN_INTERESES_SUSTITUTIVOS_OFICINA_1862980431";
+
+    private static final String CONDICIONES_INTER_S_OFICINA_2107412021 = "CONDICIONES_INTER_S_OFICINA_2107412021";
+
+    private static final String COMISION_OFICINA_124742232 = "COMISION_OFICINA_124742232";
+
+    private static final String _ORDEN_TRAMO_726284347 = "_ORDEN_TRAMO_726284347";
+
+    private static final String TRAMO_110621317 = "TRAMO_110621317";
+
+    private static final String CONDICI_N_CAPITAL_OFICINA_1714659579 = "CONDICI_N_CAPITAL_OFICINA_1714659579";
+
+    private static final String PERIODICIDAD_UNIDAD_PERIODO_517200980 = "PERIODICIDAD_UNIDAD_PERIODO_517200980";
+
+    private static final String NUC_109436 = "NUC_109436";
+
+    private static final String C_DIGO_TABLA_2078120185 = "C_DIGO_TABLA_2078120185";
+
+    private static final String EXISTEN_INTERESES_TIPO_FIJO_AN270080_IN_00_01_197823221 = "EXISTEN_INTERESES_TIPO_FIJO_AN270080_IN_00_01_197823221";
+
+    private static final String EXISTEN_2122701234 = "EXISTEN_2122701234";
+
+    private static final String _TRAMO_1422210449 = "_TRAMO_1422210449";
+
+    private static final String PAR_METRO_CLAVE_1111069600 = "PAR_METRO_CLAVE_1111069600";
+
+    private static final String VALORES_INCORRECTOS_770078195 = "VALORES_INCORRECTOS_770078195";
+}

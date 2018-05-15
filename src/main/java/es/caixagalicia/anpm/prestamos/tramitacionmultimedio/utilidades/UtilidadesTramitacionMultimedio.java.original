@@ -1,0 +1,1039 @@
+package es.caixagalicia.anpm.prestamos.tramitacionmultimedio.utilidades;
+
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mainframe.ctgfacade.CtgFacade;
+import es.caixagalicia.ifrt.parametros.Configuracion;
+
+/**
+ * 
+ * @author V360019
+ *
+ */
+public class UtilidadesTramitacionMultimedio
+{
+
+    // Cambiar el estado de las tareas
+    private static final String CTE_EEXPR114     = "EEXPR114";
+    private static final String E_CTX_EE114CON   = "EE114CON";
+	private static final String E_R114_OPERACION = "EE114C010";
+	private static final String EXP_OPE_MODIFICAR = "M";
+    private static final String E_R114_NUC       = "EE114C020";
+    private static final String E_R114_PROCESO   = "EE114C030";
+    private static final String E_R114_ESTADO    = "EE114C040";
+    private static final String E_R114_TIMESTAMP = "EE114C050";
+    private static final String E_R114_TERMINAL  = "EE114C060";
+	//private static final String TERMINAL 		= "I000";
+    private static final String E_R114_USUARIO   = "EE114C070";
+    private static final String E_R114_COD_ERROR = "EE114C080";
+    private static final String E_R114_TEX_ERROR = "EE114C090";
+	
+	private final static LogHelper LOGGER = LogHelper.getLog(UtilidadesTramitacionMultimedio.class);
+
+	public static final CtgFacade ctgFacade = new CtgFacade();
+
+	private static final Integer ID_CUENTA_ANPM = Integer.valueOf(507);
+	//Codigo operacion del servicio de consulta del tipo de expediente: ANPM_179	
+	private static final Integer ID_COOP_CONSULTA_TIPO_EXPEDIENTE = Integer.valueOf(179);
+	//Campo Tipo expediente
+	private static final String NOMBRE_CAMPO_TIPO_EXPEDIENTE = "TIPO_EXPEDIENTE"; // OBLIGATORIO
+	//Contexto Tipo expediente
+	private static final String CONTEXTO_CONS_TIPO_EXP = "ANPMN079";
+	
+	private static final String CONTEXTO_CONS_TIPO_EXP_CODIGO = "ANPMN079010";
+	
+	
+	
+	/**
+	 * Campos de entrada para la llamada a los sevicios de negocio de impresión de documentos.
+	 */
+	private static final Integer CTE_CUENTA_CONTABLE_ANPM = new Integer(507);
+	private static final Integer CTE_CODIGO_OPERACION_IMPR_DOC_INTERNO = new Integer(260);
+	private static final Integer CTE_CODIGO_OPERACION_IMPR_FIPPER = new Integer(261);
+	private static final Integer CTE_CODIGO_OPERACION_IMPR_OV_HIPOT = new Integer(264);
+	private static final Integer CTE_CODIGO_OPERACION_IMPR_INFO_PREVIA = new Integer(256);
+	
+	private static final String CTE_OFICINA_DAT_ENTRADA = "OFICINA_SOLICITUD";
+	private static final String CTE_NUMERO_DAT_ENTRADA = "NUMERO_SOLICITUD";
+	private static final String CTE_VERSION_DAT_ENTRADA = "VERSION_SOLICITUD";
+	private static final String CTE_NUC_DAT_ENTRADA = "NUC_EXPEDIENTE";
+	private static final String CTE_OPCION_DAT_ENTRADA = "OPCION";
+	private static final String CTE_IND_SOLO_GENERAR = "IND_SOLO_GENERAR";
+	
+	private static final String CTE_BOTON_ORIGEN_DAT_ENTRADA = "BOTON_ORIGEN";
+	
+	
+  /**
+	 * Constructor por defecto.
+	 */
+	private UtilidadesTramitacionMultimedio()
+	{		
+	}
+	
+	/**
+	 * Metodo que comprueba que una cadena no sea una sucesion de espacios en blanco.
+	 * @param str cadena de entrada
+	 * @return <code>boolean</code>
+	 */
+	public static boolean isEmptyOrNullString(final String str)
+	{
+		boolean ret = false;		
+		
+		if (str == null)
+		{
+			ret = true;
+		}
+		else
+		{
+			boolean success = true;
+			
+			char[] chars = str.toCharArray();			
+			final int length = chars.length;
+			
+			for (int cont = 0; cont < length; cont++)
+			{
+				if (chars[cont] != ' ')
+				{
+					success = false;
+					break;
+				}
+			}
+			
+			ret = success;
+		}
+		
+		return ret;
+	}
+	
+	
+	/**
+	 * Rellena con ceros la parte entera y la parte decimal
+	 * @param pOriginal
+	 * @param tamañoEntero
+	 * @param tamañoDecimal
+	 * @return
+	 */
+	public static String rellenarCerosBigDecimal(String pOriginal, int tamanoEntero, int tamanoDecimal)
+	{
+		final int posicionPunto = pOriginal.indexOf(".");
+		String parteEntera = "";
+		String parteDecimal = "";
+		String salida = "";
+		if (posicionPunto == -1)
+		{
+			String sFinalEntero = rellenarCerosDelante(pOriginal, tamanoEntero);
+			String sFinalDecimal = rellenarCerosDetras(parteDecimal, tamanoDecimal);
+			
+			salida = String.format("%s.%s", sFinalEntero, sFinalDecimal);
+		}
+		else
+		{
+			parteEntera = pOriginal.substring(0, posicionPunto);
+			parteDecimal = pOriginal.substring(posicionPunto + 1);
+			
+			String sFinalEntero = rellenarCerosDelante(parteEntera, tamanoEntero);
+			String sFinalDecimal = rellenarCerosDetras(parteDecimal, tamanoDecimal);
+			
+			salida = String.format("%s.%s", sFinalEntero, sFinalDecimal);
+		}
+		return salida;
+	}	
+	
+	/**
+	 * @param pOriginal
+	 * @param pTam
+	 * @return
+	 */
+	public static String rellenarCerosDelante(String pOriginal, int pTam)
+	{
+		int i = 0;
+		
+		String sFinal = "";
+		
+		
+		for (i = pOriginal.length(); i < pTam; i++)
+		{
+			sFinal = sFinal + "0";
+		}
+		
+		sFinal = sFinal + pOriginal;
+		
+		return sFinal;
+	}	
+	
+	/**
+	 * @param pOriginal
+	 * @param pTam
+	 * @return
+	 */
+	public static String rellenarCerosDetras(String pOriginal, int pTam)
+	{
+		int i = 0;
+		
+		String sFinal = "";
+		
+		
+		for (i = pOriginal.length(); i < pTam; i++)
+		{
+			sFinal = sFinal + "0";
+		}
+		
+		pOriginal +=  sFinal;
+		
+		return pOriginal;
+	}
+	
+	/**
+	 * Busca un contexto determinado dentro de una lista de contextos
+	 * resultantes de la invocacion de una transacción.
+	 * @param lCtx, lista de contextos de salida.
+	 * @param nombreCtx, nombre del contexto buscado.
+	 * @return IContexto, contexto buscado si existe; null en caso contrario.
+	 */
+	public static final IContexto getContexto(IContexto[] lCtx, String nombreCtx)
+	{
+		IContexto resultado = null;
+		
+		for (IContexto ctx : lCtx) 
+		{
+			if (ctx.getNombre().equalsIgnoreCase(nombreCtx))
+			{
+				resultado = ctx;
+				break;
+			}
+		}
+		
+		return resultado;
+	}
+	
+	/**
+	 * Comprueba si el objeto es nulo o vacío.
+	 * <br/>
+	 * En el caso de las cadenas de caracteres {@link String} mira si hay algun caracter no blanco.
+	 * <br/>
+	 * En el caso de las fechas {@link Date} se compara con la fecha mas baja en Java.
+	 * <br/>
+	 * En el caso de las colecciones, {@link Collection} {@link Set} {@link Map},
+	 * mira si esta no tiene elementos.
+	 * <br/>
+	 * En el caso de los datos arquitectura se resuelve su valor y se comprueba si esta vacio
+	 * 
+	 * @param obj - Objeto a comprobar
+	 * @return Cierto si el objeto es nulo o vacío
+	 */
+	public static boolean isBlankOrNull(final Object obj)
+	{
+		boolean ret = false;
+		
+		if (obj == null) 
+		{
+			ret = true;
+		}
+		else if (obj instanceof String) 
+		{
+			ret = (obj == null) || "".equals(((String) obj).trim());
+		}
+		else if (obj instanceof Boolean)
+		{
+			ret = false;
+		}
+		else if (obj instanceof Character)
+		{
+			ret = Character.isWhitespace(((Character) obj).charValue());
+		}
+		else if (obj instanceof Number)
+		{
+			ret = false;
+		}
+		else if (obj instanceof Date)
+		{
+			final Date dLow = DateUtils.dateLowest();
+			ret = dLow.after((Date) obj) || dLow.equals(obj);
+		}
+		else 
+		{
+			ret = 0 == length(obj);
+		}
+		
+		return ret;
+	}
+	
+	/**
+	 * Averigual el numero de elementos de una coleccion o el numero de caracteres
+	 * de una cadena de texto (si el objeto es un {@link String} o un {@link StringBuffer}
+	 * 
+	 * @param obj - objeto a comprobar su longitud
+	 * @return Longitud del objecto
+	 * @throws IllegalArgumentException  - si el objeto no es compatible
+	 */
+	@SuppressWarnings("rawtypes")
+	public static int length(final Object obj)
+	{
+		int l;
+		
+		if (obj == null) 
+		{
+			l = 0;
+		}
+		else if (obj instanceof String) 
+		{
+			l = ((String) obj).length();
+		}
+		else if (obj instanceof StringBuffer) 
+		{
+			l = ((StringBuffer) obj).length();
+		}
+		else if (obj instanceof Collection) 
+		{
+			l = ((Collection) obj).size();
+		}
+		else if (obj instanceof Map) 
+		{
+			l = ((Map) obj).size();
+		}
+		else if (obj instanceof Set) 
+		{
+			l = ((Set) obj).size();
+		}
+		else
+		{
+			int count = 0;
+			if (obj instanceof Iterator)
+			{
+				final Iterator it = (Iterator) obj;
+				boolean bHayMas = it.hasNext();
+				while (bHayMas) 
+				{
+					it.next();
+					bHayMas = it.hasNext();
+					count++;
+				}
+				l = count;
+			}
+			else if (obj instanceof Enumeration)
+			{
+				Enumeration en = (Enumeration) obj;
+				boolean bHayMas = en.hasMoreElements(); 
+				while (bHayMas) 
+				{
+					en.nextElement();
+					bHayMas = en.hasMoreElements();
+					count++;
+				}
+				l = count;
+			}
+			else
+			{
+				try 
+				{
+					l = Array.getLength(obj);
+				} 
+				catch (IllegalArgumentException e) 
+				{
+					throw new IllegalArgumentException(
+							"Inconsistent Object Type: " + obj.getClass());
+				}
+			}
+		}
+		return l;
+	}
+	
+	/**
+	 * 
+	 * @param flotante Valor a formatear
+	 * @param parteEntera Número de dígitos enteros que tendrá el valor formateado
+	 * @param parteDecimal Número de dígitos decimales que tendrá el valor formateado
+	 * @param bConPorcentajeFinal Si true se añade el símbolo porcentaje al final
+	 * @return Flotante formateado con parte entera 
+	 */
+	public static String bigDecimalToString(BigDecimal flotante, int iParteEntera, int iParteDecimal, boolean bConPorcentajeFinal)
+	{
+		final NumberFormat formatter = NumberFormat.getInstance(Locale.getDefault());
+		formatter.setMinimumFractionDigits(iParteDecimal);
+		formatter.setMaximumIntegerDigits(iParteEntera);
+		String result = formatter.format(flotante);
+		if (bConPorcentajeFinal)
+		{
+			result += Constantes.SIGNO_PORCENTAJE;
+		}
+		return result;
+	}
+	
+	/** Convierte un valor String en un BigDecimal
+	 * @param formattedString Cadena a formatear
+	 * @param locale Configuracion regional
+	 * */
+	public static BigDecimal stringToBigDecimal(final String formattedString,
+                                                 final Locale locale)
+    {
+        final DecimalFormatSymbols symbols;
+        final char                 groupSeparatorChar;
+        final String               groupSeparator;
+        final char                 decimalSeparatorChar;
+        final String               decimalSeparator;
+        String                     fixedString;
+        final BigDecimal           number;
+
+        symbols              = new DecimalFormatSymbols(locale);
+        groupSeparatorChar   = symbols.getGroupingSeparator();
+        decimalSeparatorChar = symbols.getDecimalSeparator();
+
+        if(groupSeparatorChar == '.')
+        {
+            groupSeparator = "\\" + groupSeparatorChar;
+        }
+        else
+        {
+            groupSeparator = Character.toString(groupSeparatorChar);
+        }
+
+        if(decimalSeparatorChar == '.')
+        {
+            decimalSeparator = "\\" + decimalSeparatorChar;
+        }
+        else
+        {
+            decimalSeparator = Character.toString(decimalSeparatorChar);
+        }
+
+        //Eliminamos los caracteres no numericos
+        fixedString = formattedString.replaceAll("[^\\d.,]", "");
+        fixedString = fixedString.trim().replaceAll(groupSeparator , "");
+        fixedString = fixedString.replaceAll(decimalSeparator , ".");
+        number      = new BigDecimal(fixedString);
+
+        return (number);
+    }
+
+	/**
+	 * Si el dato es nulo devuelve la cadena vacía.
+	 * @param dato
+	 * @return
+	 */
+	public static String comprobarDatoNull(String dato)
+	{
+		String resultado = StringUtils.EMPTY;
+		if (null != dato)
+		{
+			resultado = dato.trim();
+		}
+		return resultado;
+	}
+
+	/**
+	 * Si el dato es nulo devuelve un 0.
+	 * @param dato
+	 * @return
+	 */
+	public static BigDecimal comprobarDatoNull(BigDecimal dato)
+	{
+		BigDecimal resultado = BigDecimal.ZERO;
+		if (null != dato)
+		{
+			resultado = dato;
+		}
+		return resultado;
+	}
+	
+	/**
+	 * Obtiene el nombre del parámetro de la tabla de parámetros generales de la aplicación (AN82, ParametroC).
+	 * Devuelve siempre el primer nombre que encuentra, aunque haya más de un resultado.
+	 * 
+	 * @param agrupacion
+	 * @param nombre
+	 * 
+	 * @return codigoEntidadEvo
+	 */
+	public static String obtenerValorParametroUnico(String agrupacion, String nombre)
+	{
+		String codigoEntidadEvo = null;
+		IDatosEntradaTx datosEntradaBusquedaParametro = null;
+		IContexto[] arrayContextosBusquedaParametro = null;
+		
+		/*Obtenemos el código de entidad de EVO*/
+		datosEntradaBusquedaParametro = ServicioNegocio.getPrograma(
+			ServicioNegocio.getContexto(),
+			Constantes.CTE_SN_BUSQ_PARAM_CC,
+			Constantes.CTE_SN_BUSQ_PARAM_CO);
+		
+		if (! StringUtils.isBlank(agrupacion))
+		{
+			datosEntradaBusquedaParametro.addCampo(
+				Constantes.CTE_SN_BUSQ_PARAM_ENT_AGRUP,
+				agrupacion);
+		}
+		
+		if (! StringUtils.isBlank(nombre))
+		{
+			datosEntradaBusquedaParametro.addCampo(
+				Constantes.CTE_SN_BUSQ_PARAM_ENT_NOMBRE,
+				nombre);
+		}
+		
+		arrayContextosBusquedaParametro = ServicioNegocio.invocarServicio(
+			ServicioNegocio.getContexto(),
+			datosEntradaBusquedaParametro);
+		
+		if (! isBlankOrNull(arrayContextosBusquedaParametro))
+		{
+			codigoEntidadEvo = comprobarDatoNull(
+				arrayContextosBusquedaParametro[0].getString(Constantes.CTE_SN_BUSQ_PARAM_SAL_VALOR));
+		}
+		return codigoEntidadEvo;
+	}
+	/**
+	 * Método que comprueba si el servicio de negocio que se está ejecutando se encuentra
+	 * en un entorno de EVO (preexplotacion/explotación).
+	 * Para ello consulta la tabla AN82TB01 para obtener el código de entidad de EVO y
+	 * lo compara con el código de la entidad donde se está ejecutando, obtenido mediante
+	 * el parámetro de configuración ANPMCFG_ENTIDAD_COD.
+	 * 
+	 *  
+	 * @return true si se está ejecutando en un entorno de EVO, false en caso contrario.
+	 */
+	public static boolean esEntornoEvo()
+	{
+		String codigoEntidadActual = null;
+		String codigoEntidadEvo = null;
+		
+		/*Obtenemos el código de la entidad en la que se está ejecutando el servicio*/
+		codigoEntidadActual = Configuracion.getInstance().getValor(
+			Constantes.CTE_APLICACION_COD_ENT_ACT,
+			Constantes.CTE_GRUPO_CONFIG_COD_ENT_ACT,
+			Constantes.CTE_PARAM_CONFIG_COD_ENT_ACT).trim();
+
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("PARAMETRO_EVO parametro de configuracion, aplicacion ANPM, grupo ENTIDAD, parametro COD : ".concat(codigoEntidadActual));
+
+		}
+		
+		
+		/*Obtenemos el código de entidad de EVO de la tabla de parámetros generales de la aplicación (AN82, ParametroC)*/
+		codigoEntidadEvo = UtilidadesTramitacionMultimedio.obtenerValorParametroUnico(
+			Constantes.CTE_PARAMETRO_AGRUPACION_GENERAL,
+			Constantes.CTE_PARAMETRO_NOMBRE_CODIGO_ENTIDAD_EVO);
+		if(LOGGER.isDebugEnabled()) {
+					LOGGER.debug("PARAMETRO_EVO codigo entidad EVO sacado de la CAG.AN82TB01: ".concat(codigoEntidadEvo));
+		}
+		
+		
+		return codigoEntidadActual.equals(codigoEntidadEvo);
+	}
+	
+	public static boolean esEntornoAbanca()
+	{
+		String codigoEntidadActual = null;
+		
+		/*Obtenemos el código de la entidad en la que se está ejecutando el servicio*/
+		codigoEntidadActual = Configuracion.getInstance().getValor(
+			Constantes.CTE_APLICACION_COD_ENT_ACT,
+			Constantes.CTE_GRUPO_CONFIG_COD_ENT_ACT,
+			Constantes.CTE_PARAM_CONFIG_COD_ENT_ACT).trim();
+
+		if(LOGGER.isDebugEnabled()) {
+				LOGGER.debug("PARAMETRO_EVO parametro de configuracion, aplicacion ANPM, grupo ENTIDAD, parametro COD : ".concat(codigoEntidadActual));
+		}
+		
+		
+		return Constantes.CTE_COD_ENTIDAD_ABANCA.equals(codigoEntidadActual);
+	}
+	
+	/**
+	 * 
+	 * @param idContexto nombre del contexto a buscar
+	 * @param aContextos
+	 * @return Retorna un array de contextos que coincidan con el nombre que se pasa como parametro
+	 */
+	public static IContexto[] getArrayContexto(String idContexto, IContexto[] aContextos)
+	{
+		List<IContexto> lstContexto = new ArrayList<IContexto>(0);
+		for (IContexto contexto : aContextos)
+		{
+			if (idContexto.equals(contexto.getNombre()))
+			{
+				lstContexto.add(contexto);
+			}
+		}
+		return lstContexto.toArray(new IContexto[0]);
+	}	
+	
+	/**
+	 * Borramos las solicitudes incompletas que pueda haber invocando el ANPM_176
+	 * @param bidNucExpediente
+	 */
+	public static void borrarSolicitudesIncompletas(BigDecimal bidNucExpediente)
+	{
+		IDatosEntradaTx datosEntrada = null;
+		IContexto[] resultado = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		
+		datosEntrada = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			Constantes.CTE_CC_BORRAR_SOLIC_INCOMP,
+			Constantes.CTE_CO_BORRAR_SOLIC_INCOMP);
+		
+		datosEntrada.addCampo("NUC", bidNucExpediente);
+		
+		resultado = ServicioNegocio.invocarServicio(
+			contextoEjecucion,
+			datosEntrada);
+		
+		
+	}
+	
+	/**
+	 * Proceso que actualiza los datos de la solicitud ANPM 
+	 * en tabla registro reapertura (llama al programa EEXPR526)
+	 * @param operacion
+	 * @param nuc	
+	 */
+	
+	public static void actualizarTablaReaperturasExpediente(String operacion, BigDecimal nuc)
+	{
+			
+		final Integer CTE_CC = new Integer(502);
+		final Integer CTE_CO = new Integer(996);
+			
+		IContextoEjecucion contextoEjecucion = null;
+		IDatosEntradaTx datosEntradaSN = null;
+		IContexto[] arrayContextos = new IContexto[] {}; 
+		          
+		contextoEjecucion = ServicioNegocio.getContexto();
+		
+		datosEntradaSN = ServicioNegocio.getPrograma(contextoEjecucion, CTE_CC, CTE_CO);
+		
+		datosEntradaSN.addCampo(0, operacion);
+		datosEntradaSN.addCampo(1, nuc);		
+	
+		arrayContextos = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntradaSN);
+	
+	}	
+	
+	public static String obtenerEstadoTarea(BigDecimal nucExpediente, BigDecimal codigoProceso)
+	{
+		String estadoTarea = null;
+		
+		IContexto[] resultado = null;
+		IDatosEntradaTx datosEntrada = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		
+		datosEntrada = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			Constantes.CTE_SN_CONSULTA_ESTADO_TAREA_EEXP_CC,
+			Constantes.CTE_SN_CONSULTA_ESTADO_TAREA_EEXP_CO);
+		
+		
+		datosEntrada.addCampo(Constantes.CTE_NUC, nucExpediente);
+		datosEntrada.addCampo(Constantes.CTE_CODIGO_PROCESO, codigoProceso);
+		
+		resultado = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntrada);
+		
+		if (! isBlankOrNull(resultado))
+		{
+			if (Constantes.CTE_STR_0.equals(resultado[0].getString(Constantes.CTE_SALIDA_CONS_ESTADO_TAREA_COD_ERROR)))
+			{
+				estadoTarea = resultado[0].getString(Constantes.CTE_SALIDA_CONS_ESTADO_TAREA_ESTADO);
+			}
+		}
+		
+		return estadoTarea;
+	}
+	
+	/**
+	 * Se llama al servicio EEXP_273 que actualiza el estado de la tarea
+	 * @param datosSolicitud
+	 */
+	public static void actualizarEstadoTarea(BigDecimal nuc, BigDecimal codigoProceso, String estadoTarea)
+	{
+		if(LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("INICIO Actualizar estado de la tarea");
+		}
+		
+		/*Finalmente se va a invocar al programa host EEXPR114*/
+		
+		IContexto ctxEntrada = null;
+		Timestamp timestamp = null;
+		String timestampStr = null;
+		IContextoEjecucion ctxEjecucion = null;
+		
+		timestamp = DateHelper.getInstance().askTimestampFromDB2();
+		timestampStr = DateHelper.timestampToString(timestamp, DateHelper.FORMATO_DB2_TIMESTAMP);
+		ctxEjecucion = ServicioNegocio.getContexto();
+		
+		/*Informamos el contexto de entrada*/
+        ctxEntrada = ContextoFactory.getInstance().getContexto(E_CTX_EE114CON);
+        ctxEntrada.put(E_R114_OPERACION, EXP_OPE_MODIFICAR);
+        ctxEntrada.put(E_R114_NUC, nuc);
+        ctxEntrada.put(E_R114_PROCESO, codigoProceso);
+        ctxEntrada.put(E_R114_ESTADO, estadoTarea);
+        ctxEntrada.put(E_R114_TIMESTAMP, timestampStr);
+        ctxEntrada.put(E_R114_TERMINAL, ctxEjecucion.getTerminal());
+        ctxEntrada.put(E_R114_USUARIO, ctxEjecucion.getUsuario());
+        //ctxEntrada.put(E_R114_COD_ERROR, BigDecimal.ZERO);
+        //ctxEntrada.put(E_R114_TEX_ERROR, StringUtils.EMPTY); 
+        
+        /*Invocamos el EEXPR114*/
+        IContexto[] salidaServicio = ctgFacade.invocarProgramaCics(ctxEntrada, CTE_EEXPR114);
+
+        if ((null == salidaServicio) || (!BigDecimal.ZERO.equals(salidaServicio[0].getBigDecimal(E_R114_COD_ERROR))))
+		{
+			ServicioNegocio.rollback(CodigosError.CTE_ERROR_NO_CAMBIO_ESTADO_EEXP,
+									 null,
+									 new String[] {nuc.toString()},
+									 null);
+		}
+		
+	}
+	
+	/**
+	 * Método que consulta la tabla de parámetros (CG32TB01) a través del
+	 * servicio CGAL_373 (CC 100).
+	 * Si no hay ninguna fila o hay más de una lanza un rollback.
+	 * 
+	 * @param tabla columna CG320010
+	 * @param claveDentroTabla columna CG320020
+	 * @param lanzarRollback, en caso de que no exista el parámetro, si este parámetro
+	 * 			está a true se lanza rollback, en caso contrario devuelve null.
+	 * @return Devuelve el contexto CG151CON.
+	 */
+	public static IContexto getParametroUnico(String tabla, String claveDentroTabla, boolean lanzarRollback)
+	{
+		IDatosEntradaTx datosEntradaConsultaParam = null;
+		IContexto[] resultadoConsultaParam = null;
+		IContexto resultado = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		
+		datosEntradaConsultaParam = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			Constantes.CTE_CC_GESTION_PARAM,
+			Constantes.CTE_CO_GESTION_PARAM);
+		
+		datosEntradaConsultaParam.addCampo(
+			Constantes.CTE_INT_0, Constantes.CTE_STR_C);
+		datosEntradaConsultaParam.addCampo(
+			Constantes.CTE_INT_1, tabla);
+		
+		datosEntradaConsultaParam.addCampo(
+			Constantes.CTE_INT_2, claveDentroTabla);
+		
+		resultadoConsultaParam = ServicioNegocio.invocarServicio(
+			contextoEjecucion,
+			datosEntradaConsultaParam);
+		
+		if (lanzarRollback)
+		{
+			if (isBlankOrNull(resultadoConsultaParam))
+			{
+				ServicioNegocio.rollback(
+					Constantes.CTE_PARAMETRO_NO_EXISTE,
+					null,
+					new String[] {tabla, claveDentroTabla},
+					null);
+			}
+			if (! BigDecimal.ZERO.equals(resultadoConsultaParam[0].getBigDecimal("CG151C010")))
+			{
+				ServicioNegocio.rollback(
+					Constantes.CTE_PARAMETRO_NO_EXISTE,
+					null,
+					new String[] {tabla, claveDentroTabla},
+					null);
+			}
+			resultado = resultadoConsultaParam[0];
+		}
+		else
+		{
+			if ((! isBlankOrNull(resultadoConsultaParam)) &&
+				BigDecimal.ZERO.equals(resultadoConsultaParam[0].getBigDecimal("CG151C010")))
+			{
+				resultado = resultadoConsultaParam[0];
+			}
+			//si no existe devolvemos nulo.
+		}
+		return resultado;
+	}
+	
+	/**
+	 * Método que consulta la tabla de parámetros (CG32TB01) a través del
+	 * servicio CGAL_373 (CC 100).
+	 * Si no hay ninguna fila o hay más de una lanza un rollback.
+	 * 
+	 * @param tabla columna CG320010
+	 * @param claveDentroTabla columna CG320020
+	 * @return Devuelve el campo CG151C160 del contexto CG151CON (columna CG320140).
+	 */
+	public static String getParametroUnicoIndicador2(String tabla, String claveDentroTabla, boolean lanzarRollback)
+	{
+		IContexto contexto = null;
+		String ind1 = null;
+		
+		contexto = getParametroUnico(tabla, claveDentroTabla, lanzarRollback);
+		
+		if (null != contexto)
+		{
+			ind1 = contexto.getString("CG151C160").trim();
+		}
+		
+		return ind1;
+	}
+
+	/**
+	 * Método que obtiene la necesidad de documentos para un expediente.
+	 * Para ello invoca el programa PL1 ANPMR205, a través del contexto de comunicación
+	 * ANPMN111.
+	 * 
+	 * @param nuc
+	 * @return
+	 */
+	
+	public static NecesidadDocumentosVO obtenerNecesidadDocumentos(BigDecimal nuc)
+	{
+		NecesidadDocumentosVO necesidadDocumentos = null;
+		IContexto contextoEntrada = null;
+		IContexto[] listaContextoSalida = null;
+		IContexto contextoSalida = null;
+		String codError = null;
+		String descrError = null;
+		
+		
+		contextoEntrada = ContextoFactory.getInstance().getContexto(Constantes.CTE_CTX_COMM_ANPMR205);
+		
+		contextoEntrada.put(Constantes.CTE_CTX_COMM_ANPMR205_ENT_NUC, nuc);
+		
+		listaContextoSalida = ctgFacade.invocarProgramaCics(contextoEntrada, Constantes.CTE_PROG_ANPMR205);
+		
+		if (isBlankOrNull(listaContextoSalida))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_NECESIDAD_DOCS_ANPMR205_NO_CTX,
+				null,
+				new String[] {nuc.toString()},
+				null);
+		}
+		else
+		{
+			contextoSalida = listaContextoSalida[0];
+			
+			codError = contextoSalida.getString(Constantes.CTE_CTX_COMM_ANPMR205_SAL_COD_ERROR);
+			descrError = comprobarDatoNull(contextoSalida.getString(Constantes.CTE_CTX_COMM_ANPMR205_SAL_DESCR_ERROR));
+			if (! Constantes.CTE_CODIGO_RETORNO_OK_0.equals(codError))
+			{
+				
+				ServicioNegocio.rollback(
+					CodigosError.CTE_ERROR_NECESIDAD_DOCS_ANPMR205_ERROR,
+					null,
+					new String[] {nuc.toString(), codError, descrError},
+					null
+					);
+			}
+			else
+			{
+				necesidadDocumentos = new NecesidadDocumentosVO();
+				
+				necesidadDocumentos.setIndNecesidadFiper(contextoSalida.getString(Constantes.CTE_CTX_COMM_ANPMR205_SAL_IND_NEC_FIPER));
+				necesidadDocumentos.setIndNecesidadInfoPrevia(contextoSalida.getString(Constantes.CTE_CTX_COMM_ANPMR205_SAL_IND_NEC_INFO_PREVIA));
+			}
+		}
+		
+		return necesidadDocumentos;
+	}
+
+	/**
+	 * Llama a la impresion de la fiper SN ANPM_261
+	 * @param oficina
+	 * @param numero
+	 * @param version
+	 * @param nuc
+	 * @param opcion 0 Imprimir y generar 1 Generar
+	 * @param ctx
+	 * @return El contexto devuelto por el servicio de impresion de la fiper
+	 */
+	public static void actualizarFiper(BigDecimal oficina,BigDecimal numero,BigDecimal version,BigDecimal nuc, String opcion) {
+			
+		IDatosEntradaTx datosEntradaServicioNegocioFiper = ServicioNegocio.getPrograma(
+			ServicioNegocio.getContexto(),
+			CTE_CUENTA_CONTABLE_ANPM,
+			CTE_CODIGO_OPERACION_IMPR_FIPPER);
+		
+		if (null != oficina)
+		{
+			datosEntradaServicioNegocioFiper.addCampo(CTE_OFICINA_DAT_ENTRADA, oficina);
+		}
+		if (null != numero)
+		{
+			datosEntradaServicioNegocioFiper.addCampo(CTE_NUMERO_DAT_ENTRADA, numero);
+		}
+		if (null != version)
+		{
+			datosEntradaServicioNegocioFiper.addCampo(CTE_VERSION_DAT_ENTRADA, version);
+		}
+		datosEntradaServicioNegocioFiper.addCampo(CTE_NUC_DAT_ENTRADA, nuc);
+		
+		if (null != opcion)
+		{
+			datosEntradaServicioNegocioFiper.addCampo(CTE_OPCION_DAT_ENTRADA, opcion);
+		}
+		
+		IContexto[] salidaSrvCatalogo = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaServicioNegocioFiper);
+		
+	}
+	
+	
+	/**
+	 * Llama a la impresión de la oferta vinculante hipotecaria (ANPM_264)
+	 * @param bidOficinaSolicitud
+	 * @param bidNumeroSolicitud
+	 * @param bidVersionSolicitud
+	 * @param bidNucExpediente
+	 */
+	public static void adjuntarOVHipotecarios(final BigDecimal bidOficinaSolicitud,
+			final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud,
+			final BigDecimal bidNucExpediente, String opcion)
+	{
+		final IDatosEntradaTx datosEntradaOVHipotecariosSrv = 
+			ServicioNegocio.getPrograma(
+					ServicioNegocio.getContexto(),
+					CTE_CUENTA_CONTABLE_ANPM, 
+					CTE_CODIGO_OPERACION_IMPR_OV_HIPOT);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_OFICINA_DAT_ENTRADA, bidOficinaSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_NUMERO_DAT_ENTRADA, bidNumeroSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_VERSION_DAT_ENTRADA, bidVersionSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_NUC_DAT_ENTRADA, bidNucExpediente);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_BOTON_ORIGEN_DAT_ENTRADA, opcion); 
+		
+		final IContexto[] aContextoSolicitud = ServicioNegocio.invocarServicio(
+				ServicioNegocio.getContexto(), datosEntradaOVHipotecariosSrv);
+		
+		//return aContextoSolicitud;
+		
+	}
+
+	/**
+	 * Llama a la impresión del documento interno (ANPM_260)
+	 * @param bidOficinaSolicitud
+	 * @param bidNumeroSolicitud
+	 * @param bidVersionSolicitud
+	 * @param bidNucExpediente
+	 */
+	public static void adjuntarDocInterno(final BigDecimal bidOficinaSolicitud,
+			final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud,
+			final BigDecimal bidNucExpediente)
+	{
+		final IDatosEntradaTx datosEntradaOVHipotecariosSrv = 
+			ServicioNegocio.getPrograma(
+					ServicioNegocio.getContexto(),
+					CTE_CUENTA_CONTABLE_ANPM, 
+					CTE_CODIGO_OPERACION_IMPR_DOC_INTERNO);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_OFICINA_DAT_ENTRADA, bidOficinaSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_NUMERO_DAT_ENTRADA, bidNumeroSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_VERSION_DAT_ENTRADA, bidVersionSolicitud);
+		datosEntradaOVHipotecariosSrv.addCampo(
+				CTE_NUC_DAT_ENTRADA, bidNucExpediente);
+		
+		final IContexto[] aContextoSolicitud = ServicioNegocio.invocarServicio(
+				ServicioNegocio.getContexto(), datosEntradaOVHipotecariosSrv);
+		
+		//return aContextoSolicitud;
+		
+	}
+	
+	
+	/**
+	 * Método que imprime la Info Previa. Se puede usar para generarla sin imprimirla.
+	 * 
+	 * @param nuc
+	 * @param soloGenerar true: sólo genera, false: genera e imprime.
+	 */
+	public static void generarInfoPrevia(BigDecimal nuc, boolean soloGenerar)
+	{
+		IDatosEntradaTx datosEntrada = null;
+		IContexto[] resultado = null;
+		IContextoEjecucion contextoEjecucion = ServicioNegocio.getContexto();
+		
+		datosEntrada = ServicioNegocio.getPrograma(
+			contextoEjecucion,
+			CTE_CUENTA_CONTABLE_ANPM,
+			CTE_CODIGO_OPERACION_IMPR_INFO_PREVIA);
+		
+		
+		datosEntrada.addCampo(CTE_NUC_DAT_ENTRADA, nuc);
+		if (soloGenerar)
+		{
+			datosEntrada.addCampo(CTE_IND_SOLO_GENERAR, Constantes.CTE_UNO_STR);
+		}
+		
+		resultado = ServicioNegocio.invocarServicio(contextoEjecucion, datosEntrada);
+		
+		
+	}
+	
+	/** Indica si un expediente es hipotecario. Devuelve True si el expediente es hipotecario, false en otro caso 
+	 * @param bidTipoExpediente Codigo del tipo de expediente
+	 */
+	public static boolean esHipotecario(final BigDecimal bidTipoExpediente)
+	{
+		boolean esHipotecario = false;
+		String codExpediente;
+		
+		if(LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("INICIO esHipotecario");
+		}
+		// Servicio de edicion de datos de formalizacion de una solicitud DatosSolicitudFormalizacionEdicionSrv
+		final IDatosEntradaTx datosTipoExpedienteSrv = 
+			ServicioNegocio.getPrograma(
+					ServicioNegocio.getContexto(), 
+					ID_CUENTA_ANPM, 
+					ID_COOP_CONSULTA_TIPO_EXPEDIENTE);		
+		datosTipoExpedienteSrv.addCampo(
+				NOMBRE_CAMPO_TIPO_EXPEDIENTE, StringUtils.leftPad(bidTipoExpediente.toString(), 4, '0'));
+		
+		final IContexto[] aContextoSolicitud = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosTipoExpedienteSrv);
+		
+		IContexto ctx = getContexto(aContextoSolicitud, CONTEXTO_CONS_TIPO_EXP);
+		if (ctx != null)
+		{
+			codExpediente = aContextoSolicitud[0].getString(CONTEXTO_CONS_TIPO_EXP_CODIGO);
+			if (codExpediente.equals("H"))
+			{
+				esHipotecario = true;
+			}
+		}
+		
+		if(LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("FIN esHipotecario");
+		}		
+		return esHipotecario;
+	}
+}

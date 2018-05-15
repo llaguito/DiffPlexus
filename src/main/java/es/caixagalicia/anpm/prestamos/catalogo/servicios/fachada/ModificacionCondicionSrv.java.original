@@ -1,0 +1,231 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condicionantecondicion.CondicionantecondicionC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condicionantes.CondicionantesC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condiciones.CondicionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionCondicionantes;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextoModificaCondiciones;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+
+
+/**
+ * @author v361466 and V361465
+ * CO: 	ANPM_105
+ * CTX:	ANPMN110
+ * TRX:	ANVR
+ *
+ */
+public class ModificacionCondicionSrv extends ServicioNegocio
+{
+
+	/* 
+	 *Contexto: ANPMN110
+	 *Transacción: ANVR
+	 *Cod_Operación: ANPM_105
+	 *
+	 *Servicio de negocio que realiza la modificación de valor, valor desde y valor hasta de la tabla AN18TB01
+	 * @see es.caixagalicia.ifrt.core.ServicioNegocio#ejecutar(es.caixagalicia.ifrt.core.IContextoEjecucion, es.caixagalicia.ifrt.core.IDatosEntradaTx)
+	 */
+	private static final LogHelper LOGGER = LogHelper.getLog(ModificacionCondicionSrv.class);
+	
+	private static final String CTE_VALOR_ESTANDAR = "VALORESTANDAR"; 
+	private static final String CTE_VALOR_DESDE = "VALORDESDE"; 
+	private static final String CTE_VALOR_HASTA = "VALORHASTA";  
+	private static final String CTE_NUMERO_CONDICION = "NUMEROCONDICION"; 
+	private static final String CTE_FECHAHASTA = "FECHAHASTA";
+	private static final String CTE_FECHADESDE = "FECHADESDE";
+	private static final String CTE_FECHADESDEANTERIOR = "FECHADESDEANTERIOR";
+	private static final String CTE_HORAVIGENCIADESDE = "HORAVIGENCIADESDE";
+	private static final String CTE_IDPRODUCTO = "IDPRODUCTO";
+	private static final String CTE_IDSUBPRODUCTO = "IDSUBPRODUCTO";
+	private static final String CTE_IDVERSION = "IDVERSION";
+	
+	
+	
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		
+		//Inicializadas variables
+		BigDecimal valor = null;
+		BigDecimal valorDesde = null;
+		BigDecimal valorHasta = null;
+		BigDecimal numCondicion = null;
+		BigDecimal version = null;
+		BigDecimal producto = null;
+		BigDecimal subproducto = null;
+		String fechaHasta = null;
+		String fechaDesde = null;
+		String fechaDesdeAnterior = null;
+		String horaVigenciaDesde = null;
+//		String horaVigenciaHasta = null;
+		List<IContexto> listaContextos = null;
+		IContexto[] arrayContextos = null;
+		List<CondicionantesC> listaCondicionantes = null;
+		List<CondicionesC> listaCondiciones = new ArrayList<CondicionesC>();
+		
+		// Set diario Electrónico
+		contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+		// Datos de entrada
+		
+		valor = datosEntrada.getDecimal(CTE_VALOR_ESTANDAR);		
+		valorDesde = datosEntrada.getDecimal(CTE_VALOR_DESDE);
+		valorHasta = datosEntrada.getDecimal(CTE_VALOR_HASTA);
+		// Redondeo hacia arriba con 7 decimales
+		valor.setScale(7, RoundingMode.HALF_UP);
+		valorDesde.setScale(7, RoundingMode.HALF_UP);
+		valorHasta.setScale(7, RoundingMode.HALF_UP);
+		
+		numCondicion = datosEntrada.getDecimal(CTE_NUMERO_CONDICION);
+		fechaHasta = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHAHASTA));
+		fechaDesde = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHADESDE));
+		fechaDesdeAnterior = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHADESDEANTERIOR));
+		horaVigenciaDesde = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_HORAVIGENCIADESDE));
+		Timestamp timestampActual = DateHelper.getInstance().askTimestampFromSystem();
+		Date fechaActual = new Date(timestampActual.getTime());
+		
+		producto = datosEntrada.getDecimal(CTE_IDPRODUCTO);
+		subproducto = datosEntrada.getDecimal(CTE_IDSUBPRODUCTO);
+		version = datosEntrada.getDecimal(CTE_IDVERSION);
+		
+		
+		/* 20150921 
+		 * 
+		 * Cuando la fecha hasta no viene informada ponemos la fecha mínima EN FORMATO DLL: DD-MM-AAAA
+		 * 
+		*/
+		
+		if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug(fechaHasta);
+			}
+		
+		if (Utilidades.isBlankOrNull(fechaHasta))
+		{
+			fechaHasta = "01-01-0001";
+		}
+		
+			
+		/* 20151104
+		 * 
+		 * Se transforman las fechas para poder compararlas
+		 * 
+		*/
+		
+		String fechaDesdeStrDb2 = null;
+		String fechaHastaStrDb2 = null;
+		
+		fechaDesdeStrDb2 = DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION, 
+				DateHelper.FORMATO_YYYY_MM_DD_GUION, fechaDesde);
+		fechaHastaStrDb2 = DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION, 
+				DateHelper.FORMATO_YYYY_MM_DD_GUION, fechaHasta);
+		
+		
+		/* 20151104 
+		 * 
+		 * Si la fecha desde es menor que la fecha actual
+		 * sacará un mensaje de error
+		 * ya que no se va a permitir modificar 
+		 * un precio a una fecha pasada y por lo tanto
+		 * se envia un rollback y se termina el servicio.
+		 *    
+		*/
+		
+		if(0 > fechaDesdeStrDb2.compareTo(fechaActual.toString()))
+		{
+				ServicioNegocio.rollback(
+					
+						CodigosError.CTE_ERROR_MODIF_PRECIOS_F_DESDE_MENOR_F_ACTUAL,
+						null,
+						null,
+						null);
+		}
+		
+		
+		
+		/* 20151104
+		 * 
+		 *  Si la fecha hasta es distinta de "01-01-0001" se comprueba
+		 * 	si la fecha hasta es menor que la desde. Si esto ocurre, se envia 
+		 *  un rollback y se termina el servicio.
+		 * 
+		*/
+		
+		if (! DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaHastaStrDb2))
+		{
+			if (0 > fechaHastaStrDb2.compareTo(fechaDesdeStrDb2))
+			{
+				ServicioNegocio.rollback(
+					CodigosError.CTE_ERROR_MODIF_PRECIOS_F_HASTA_MENOR_F_DESDE,
+					null,
+					null,
+					null);
+			}
+		}
+		
+				
+		//Traigo los datos de la condicion
+		
+		listaCondiciones = GestionCondicionantes.ModificaCondicion(valor, valorDesde, valorHasta, numCondicion, fechaHasta, fechaDesde, fechaDesdeAnterior, horaVigenciaDesde, fechaActual.toString());
+		
+		listaCondicionantes = GestionCondicionantes.consultaListaCondicionante(producto,subproducto, version,listaCondiciones);
+		
+		
+		if(5005 == producto.intValue()
+		&& 496 == subproducto.intValue())
+		{
+			List<CondicionantecondicionC> listaRelaciones = GestionCondicionantes.consultaTarifa(
+																							producto,
+																							subproducto,
+																							version);
+			
+			for(CondicionantecondicionC relacion : listaRelaciones)
+			{
+				if(3 == relacion.getTarifa().intValue()
+				&& 0 == numCondicion.compareTo(relacion.getCondicion()))
+				{
+					UtilidadesComun.enviarCorreo(
+											"MOD_TARIF", 
+											"Se ha modificado la tarifa: "+ relacion.getTarifa().intValue()
+											+ ", con valor: " + valor
+											+ ", desde: " + valorDesde
+											+ ", hasta: " + valorHasta
+											+ ", con numCondicion: " + numCondicion
+											+ ", producto: " + producto
+											+ ", subproducto: " + subproducto
+											+ ", version: " + version
+											+ ", fecha desde: " + fechaDesde
+											+ ", fecha hasta: " + fechaHasta
+											+ " y hora vigencia: " + horaVigenciaDesde);
+				}
+			}
+		}
+		
+		//Relleno el contexto
+		
+		listaContextos = ContextoModificaCondiciones.contextoRellenarCondiciones(listaCondiciones, listaCondicionantes);
+		arrayContextos = listaContextos.toArray(new IContexto[listaContextos.size()]);
+		
+		return arrayContextos;
+	}
+}

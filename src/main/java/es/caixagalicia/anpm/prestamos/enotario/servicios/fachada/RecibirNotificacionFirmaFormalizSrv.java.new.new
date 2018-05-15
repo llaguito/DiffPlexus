@@ -1,0 +1,641 @@
+/**
+ */
+package es.caixagalicia.anpm.prestamos.enotario.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudC;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionDatosGeneralesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion.GestionEnvioMensajesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoDistribuidorEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioEntradaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DistribuidorEnotarioSalidaVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.util.Helper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Operación 534 (Notif. firma formaliz.) del distribuidor de E-Notario.
+ * Código de operación: ANPM_193
+ * Cuenta contable: 507
+ * Contexto: ANPMN193
+ *
+ * Sentido de la operación ANCERT -> ANPM
+ *
+ * @author V360144
+ */
+public class RecibirNotificacionFirmaFormalizSrv extends ServicioNegocio {
+
+    // PMNOT010
+    private static final String CTE_ENTRADA_CODIGO_APLICACION = "CODIGO_APLICACION";
+
+    // 2
+    // PMNOT020
+    private static final String CTE_ENTRADA_CODIGO_OPERACION_E_NOTARIO = "CODIGO_OPERACION_E_NOTARIO";
+
+    // 2
+    // PMNOT030
+    private static final String CTE_ENTRADA_NODO_RE_EMISOR = "NODO_RE_EMISOR";
+
+    // 1
+    // PMNOT040
+    private static final String CTE_ENTRADA_NODO_ORIGINAL = "NODO_ORIGINAL";
+
+    // 1
+    // PMNOT050
+    private static final String CTE_ENTRADA_TIPO_OPERACION = "TIPO_OPERACION";
+
+    // 1
+    // PMNOT060
+    private static final String CTE_ENTRADA_CODIGO_PAIS = "CODIGO_PAIS";
+
+    // 3
+    // PMNOT070
+    private static final String CTE_ENTRADA_CODIGO_ENTIDAD = "CODIGO_ENTIDAD";
+
+    // 4
+    // PMNOT080
+    private static final String CTE_ENTRADA_TIPO_PRESTAMO = "TIPO_PRESTAMO";
+
+    // 2
+    // PMNOT090
+    private static final String CTE_ENTRADA_CONTRATO_PRESTAMO = "CONTRATO_PRESTAMO";
+
+    // 20
+    // PMNOT100
+    private static final String CTE_ENTRADA_DESCRIPCION = "DESCRIPCION";
+
+    // 255
+    // private static final String CTE_ENTRADA_FECHA_FORMALIZACION = "FECHA_FORMALIZACION";	//provisional para consultarVigenciaProducto()
+    // 8
+    // PMNOT05010
+    private static final String CTE_ENTRADA_COLEG_TITULAR = "COLEG_TITULAR";
+
+    // 15
+    // PMNOT05020
+    private static final String CTE_ENTRADA_NIF_COLEG_FIRMANTE = "NIF_COLEG_FIRMANTE";
+
+    // 10
+    // PMNOT05030
+    private static final String CTE_ENTRADA_CUENTA_ABONO = "CUENTA_ABONO";
+
+    // 20
+    // PMNOT05040
+    private static final String FECHA_FIRMA = "FECHA_FIRMA";
+
+    // 8
+    // PMNOT05060
+    private static final String NUM_PROTOCOLO = "NUM_PROTOCOLO";
+
+    // 10
+    // PMNOT05070
+    private static final String IMP_HONORARIOS = "IMP_HONORARIOS";
+
+    // 15
+    private static final String CTE_ENTRADA_CONTRATO_IBAN = "CONTRATO_IBAN";
+
+    // 24
+    private static final String CTE_ENTRADA_CODIGO_BIC = "CODIGO_BIC";
+
+    // 11
+    private static final String CTE_ENTRADA_CONTRATO_IBAN_COLEGIADO = "CONTRATO_IBAN_COLEG";
+
+    // 24
+    private static final String CTE_ENTRADA_CODIGO_BIC_COLEGIADO = "CODIGO_BIC_COLEG";
+
+    // 11
+    private static final String CTE_COP_SERVICIO = "ANPM_193";
+
+    // Generacion aviso
+    private static final Integer ID_CUENTA_CGAL = Integer.valueOf(100);
+
+    private static final Integer ID_CODIGO_OPERACION_AVISOS = Integer.valueOf(304);
+
+    // Campos de entrada de generar aviso
+    private static final int CTE_CAMPO_POSICION_ID_APLICACION = 0;
+
+    private static final int CTE_CAMPO_POSICION_ID_PROYECTO = 1;
+
+    private static final int CTE_CAMPO_POSICION_ID_PROCESO = 2;
+
+    private static final int CTE_CAMPO_POSICION_ID_TAREA = 3;
+
+    private static final int CTE_CAMPO_POSICION_DELEGABLE = 4;
+
+    private static final int CTE_CAMPO_POSICION_TIPO_DESTINO = 5;
+
+    /*20150604 Faltaba el campo EMPLEADO DESTINO, que tambien se usa para meterle el usuario al que se le envia en aviso.*/
+    private static final int CTE_CAMPO_POSICION_EMPLEADO_DESTINO = 6;
+
+    private static final int CTE_CAMPO_POSICION_CENTRO_DESTINO = 7;
+
+    /*20150608 Campos que faltaba por informar*/
+    private static final int CTE_CAMPO_POSICION_PUESTO_DESTINO = 8;
+
+    private static final int CTE_CAMPO_POSICION_TIPO_APLICA_ARRAN = 9;
+
+    private static final int CTE_CAMPO_POSICION_APLICA_ARRAN = 10;
+
+    /*Fin campos que faltaban*/
+    private static final int CTE_CAMPO_POSICION_TIPO_AVISO = 11;
+
+    private static final int CTE_CAMPO_POSICION_TEXTO_AVISO = 12;
+
+    private static final int CTE_CAMPO_POSICION_ICONO = 13;
+
+    private static final int CTE_CAMPO_POSICION_USUARIO_ALTA = 14;
+
+    private static final int CTE_CAMPO_POSICION_TERMINAL_ALTA = 15;
+
+    private static final int CTE_CAMPO_POSICION_FECHA_INICIO_AVISO = 16;
+
+    private static final int CTE_CAMPO_POSICION_FECHA_FIN_AVISO = 17;
+
+    private static final int CTE_CAMPO_POSICION_A_OFICINA_2K = 18;
+
+    private static final int CTE_CAMPO_POSICION_ALTA_AVISOS_MULTIPLES = 19;
+
+    private static final int CTE_CAMPO_POSICION_CORREO_S_N = 20;
+
+    private static final int CTE_CAMPO_POSICION_IR_SUPERIOR = 21;
+
+    private static final int CTE_CAMPO_POSICION_TIRA_TERMINAL = 22;
+
+    private static final int CTE_CAMPO_POSICION_TRATA_GLOBAL = 23;
+
+    private static final int CTE_CAMPO_POSICION_AVISO_ANULA = 24;
+
+    private static final int CTE_CAMPO_POSICION_CLAVE_APLICA_ANULA = 25;
+
+    private static final int CTE_CAMPO_POSICION_TIENE_FICHERO_HOST = 26;
+
+    private static final int CTE_CAMPO_POSICION_FICHERO_HOST = 27;
+
+    /**
+     * @param contextoEjecucion Contexto de ejecución.
+     * @param datosEntrada Datos de entrada del servicio de negocio (en él se encuentran
+     *   los campos de entrada del código de operación).
+     *
+     * @return arrayContextos Array de contextos, aunque sólo se devolverá uno.
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada) {
+        // enviarCorreoError("asunto: error E-notario", "texto: error E-notario");
+        contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+        IContexto[] arrayContextos = new IContexto[IConstantesEnotario.CTE_TAM_INICIAL_ARRAYS];
+        List<IContexto> listaContextos = new ArrayList<IContexto>(IConstantesEnotario.CTE_TAM_INICIAL_ARRAYS);
+        String codigoAplicacion = datosEntrada.getString(CTE_ENTRADA_CODIGO_APLICACION);
+        String codigoOperacionEnotario = datosEntrada.getString(CTE_ENTRADA_CODIGO_OPERACION_E_NOTARIO);
+        String nodoReEmisor = datosEntrada.getString(CTE_ENTRADA_NODO_RE_EMISOR);
+        String nodoOriginal = datosEntrada.getString(CTE_ENTRADA_NODO_ORIGINAL);
+        String tipoOperacion = datosEntrada.getString(CTE_ENTRADA_TIPO_OPERACION);
+        String codigoPais = datosEntrada.getString(CTE_ENTRADA_CODIGO_PAIS);
+        String codigoEntidadEntrada = datosEntrada.getString(CTE_ENTRADA_CODIGO_ENTIDAD);
+        String tipoPrestamo = datosEntrada.getString(CTE_ENTRADA_TIPO_PRESTAMO);
+        String contratoPrestamo = datosEntrada.getString(CTE_ENTRADA_CONTRATO_PRESTAMO);
+        String descripcion = datosEntrada.getString(CTE_ENTRADA_DESCRIPCION);
+        String colegiadoTitular = datosEntrada.getString(CTE_ENTRADA_COLEG_TITULAR);
+        String nifColegiadoFirmante = datosEntrada.getString(CTE_ENTRADA_NIF_COLEG_FIRMANTE);
+        String cuentaAbono = datosEntrada.getString(CTE_ENTRADA_CUENTA_ABONO);
+        String fechaFirma = datosEntrada.getString(FECHA_FIRMA);
+        String numeroProtocolo = StringUtils.EMPTY;
+        if (null != datosEntrada.getString(NUM_PROTOCOLO)) {
+            numeroProtocolo = datosEntrada.getString(NUM_PROTOCOLO);
+        }
+        String importeHonorarios = datosEntrada.getString(IMP_HONORARIOS);
+        // String fechaFormalizacion = datosEntrada.getString(CTE_ENTRADA_FECHA_FORMALIZACION);	//provisional
+        String contratoIban = datosEntrada.getString(CTE_ENTRADA_CONTRATO_IBAN);
+        String codigoBic = datosEntrada.getString(CTE_ENTRADA_CODIGO_BIC);
+        String contratoIbanColegiado = datosEntrada.getString(CTE_ENTRADA_CONTRATO_IBAN_COLEGIADO);
+        String codigoBicColegiado = datosEntrada.getString(CTE_ENTRADA_CODIGO_BIC_COLEGIADO);
+        // codigoOperacionDistribuidor = PMNOT002
+        if (null != descripcion) {
+            descripcion = descripcion.trim();
+        }
+        if (null != colegiadoTitular) {
+            colegiadoTitular = colegiadoTitular.trim();
+        }
+        if (null != nifColegiadoFirmante) {
+            nifColegiadoFirmante = nifColegiadoFirmante.trim();
+        }
+        if (null != numeroProtocolo) {
+            numeroProtocolo = numeroProtocolo.trim();
+        }
+        if (null != importeHonorarios) {
+            importeHonorarios = importeHonorarios.trim();
+        }
+        /*
+		if (! IConstantesEnotario.CTE_OCHO_INT.equals(codigoErrorNoop10Reply.length()))
+		{
+			//error: codigoError debe tener ocho carácteres.
+		}
+*/
+        // Creamos el value object para los campos de entrada.
+        DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO = new DistribuidorEnotarioEntradaVO();
+        distrEnotarioEntradaVO.setCodigoAplicacion(codigoAplicacion);
+        distrEnotarioEntradaVO.setCodigoOperacionEnotario(codigoOperacionEnotario);
+        distrEnotarioEntradaVO.setNodoReEmisor(nodoReEmisor);
+        distrEnotarioEntradaVO.setNodoOriginal(nodoOriginal);
+        distrEnotarioEntradaVO.setTipoOperacion(tipoOperacion);
+        distrEnotarioEntradaVO.setCodigoPais(codigoPais);
+        distrEnotarioEntradaVO.setCodigoEntidadEntrada(codigoEntidadEntrada);
+        distrEnotarioEntradaVO.setTipoPrestamo(tipoPrestamo);
+        distrEnotarioEntradaVO.setContratoPrestamo(contratoPrestamo);
+        distrEnotarioEntradaVO.setDescripcion(descripcion);
+        distrEnotarioEntradaVO.setColegiadoTitular(colegiadoTitular);
+        distrEnotarioEntradaVO.setNifColegiadoFirmante(nifColegiadoFirmante);
+        distrEnotarioEntradaVO.setCuentaAbono(cuentaAbono);
+        distrEnotarioEntradaVO.setFechaFirma(fechaFirma);
+        distrEnotarioEntradaVO.setNumeroProtocolo(numeroProtocolo);
+        distrEnotarioEntradaVO.setImporteHonorarios(importeHonorarios);
+        distrEnotarioEntradaVO.setContratoIban(contratoIban);
+        distrEnotarioEntradaVO.setCodigoBic(codigoBic);
+        distrEnotarioEntradaVO.setContratoIbanColegiado(contratoIbanColegiado);
+        distrEnotarioEntradaVO.setCodigoBicColegiado(codigoBicColegiado);
+        distrEnotarioEntradaVO.setCopServicio(CTE_COP_SERVICIO);
+        /*Obtenemos los datos del préstamo a partir del contrato:
+		 *  codigoEntidad
+		 *  codigoOficina
+		 *  digitosControl
+		 *  cuentaContable
+		 *  numeroSolicitud
+		 *  digitoSolicitud
+		*/
+        distrEnotarioEntradaVO = UtilidadesEnotario.obtenerDatosPrestamo(distrEnotarioEntradaVO);
+        distrEnotarioEntradaVO.setCopServicio(CTE_COP_SERVICIO);
+        GestionEnvioMensajesEnotario geme = new GestionEnvioMensajesEnotario();
+        // Creamos el value object para los campos de salida.
+        DistribuidorEnotarioSalidaVO distrEnotarioSalidaVO = new DistribuidorEnotarioSalidaVO();
+        distrEnotarioSalidaVO = UtilidadesEnotario.obtenerCamposSalidaIguales(distrEnotarioEntradaVO, distrEnotarioSalidaVO);
+        GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        BigDecimal version = null;
+        BigDecimal codigoOficina = distrEnotarioEntradaVO.getCodigoOficina();
+        BigDecimal numeroSolicitud = distrEnotarioEntradaVO.getNumeroSolicitud();
+        /*obtenemos los objetos datosGenerales y datosSolicitud a partir del
+		 * código de oficina y el número de solicitud*/
+        DatosgeneralesC datosGenerales = gdge.obtenerDatosGeneralesPorOficinaNumSolVersion(codigoOficina, numeroSolicitud, version);
+        DatosSolicitudC datosSolicitud = gds.obtenerDatosSolicitudPorOficinaNumSolVersion(codigoOficina, numeroSolicitud, version);
+        if (null == datosGenerales) {
+            distrEnotarioSalidaVO = UtilidadesEnotario.prevError(distrEnotarioEntradaVO, distrEnotarioSalidaVO, // IConstantesEnotario.CTE_SQLCODE_ERROR_GENERICO,
+            IConstantesEnotario.CTE_LIT_NUC_NO_EXISTE_40, IConstantesEnotario.CTE_CERO_STR, datosGenerales);
+            distrEnotarioEntradaVO.setDescripcion(IConstantesEnotario.CTE_LIT_NUC_NO_EXISTE_40);
+        // geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+        } else if (null == datosSolicitud) {
+            distrEnotarioSalidaVO = UtilidadesEnotario.prevError(distrEnotarioEntradaVO, distrEnotarioSalidaVO, // IConstantesEnotario.CTE_SQLCODE_ERROR_GENERICO,
+            IConstantesEnotario.CTE_LIT_NUC_NO_EXISTE_25, IConstantesEnotario.CTE_CERO_STR, datosGenerales);
+            distrEnotarioEntradaVO.setDescripcion(IConstantesEnotario.CTE_LIT_NUC_NO_EXISTE_25);
+            geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+        }
+        // Si faltan datos se completan
+        if (null != datosGenerales && null != distrEnotarioEntradaVO.getColegiadoTitular() && null != distrEnotarioEntradaVO.getNifColegiadoFirmante()) {
+            datosGenerales.setClaveNotario(distrEnotarioEntradaVO.getColegiadoTitular());
+            datosGenerales.setCodigoNotaria(distrEnotarioEntradaVO.getNifColegiadoFirmante());
+        }
+        distrEnotarioEntradaVO.setNucSolicitud(datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+        distrEnotarioEntradaVO.setDescripcion(IConstantesEnotario.CTE_LIT_FIRMA_TOTAL_RECIBIDA_CORRECTAMENTE);
+        if (StringUtils.isBlank(distrEnotarioEntradaVO.getNodoReEmisor()) || StringUtils.isBlank(distrEnotarioEntradaVO.getNodoOriginal()) || StringUtils.isBlank(distrEnotarioEntradaVO.getTipoOperacion())) {
+            distrEnotarioEntradaVO.setNodoReEmisor(new String("2"));
+            distrEnotarioEntradaVO.setNodoOriginal(new String("3"));
+            distrEnotarioEntradaVO.setTipoOperacion(new String("1"));
+        }
+        // Llamada al servicio ANPM_476
+        geme.registrarComunicacionEnotarioPrevio(distrEnotarioEntradaVO, restoBloquesPrevio(colegiadoTitular, nifColegiadoFirmante, cuentaAbono, fechaFirma, numeroProtocolo, importeHonorarios), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+        /*	
+		Si están informados los campos codigoError o textoError en teoria ya no se deberia seguir
+		ejecutando el servicio de negocio, así que, como no podemos hacer rollbacks,  
+		se "encauza" el flujo de ejecución del servicio para que no entre a ejecutar la
+		operación y devuelva el contexto sin hacer nada más.
+		*/
+        if ((Helper.isNullOrEmpty(distrEnotarioSalidaVO.getCodigoError())) && (Helper.isNullOrEmpty(distrEnotarioSalidaVO.getTextoError()))) {
+            // Escritura excepcional para que quede un segundo registro en la 39
+            geme.registrarComunicacionEnotarioFormalizacion(distrEnotarioEntradaVO, datosSolicitud);
+            // Formalización
+            distrEnotarioSalidaVO = opNotificacionFirmaFormalizacion(distrEnotarioEntradaVO, distrEnotarioSalidaVO, contextoEjecucion, datosGenerales, datosSolicitud, geme);
+        }
+        // Llamada al servicio ANPM_476
+        /*geme.registrarComunicacionEnotarioPosterior(
+											distrEnotarioSalidaVO, 
+											datosGenerales,
+											CTE_COP_SERVICIO,
+											geme.restoBloquesGeneralPosterior(distrEnotarioSalidaVO),
+											datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());*/
+        // Actualiza la tabla AN40TB01 y volcado a PMOS
+        /*geme.actualizaDatosGenerales(
+								datosGenerales, 
+								datosSolicitud);*/
+        listaContextos = ContextoDistribuidorEnotario.rellenarContextoDistribuidor(distrEnotarioSalidaVO, IConstantesEnotario.CTE_OP_DISTR_NOTIF_FIRMA_FORMALIZ);
+        arrayContextos = listaContextos.toArray(new IContexto[listaContextos.size()]);
+        return arrayContextos;
+    }
+
+    /**
+     * PMNOT002 = 534
+     *
+     * @param distrEnotarioEntradaVO
+     * @param distrEnotarioSalidaVO
+     * @param contextoEjecucion Contexto de ejecución para poder invocar otro servicio de negocio.
+     * @param datosGenerales
+     * @param datosSolicitud
+     *
+     * @return distrEnotarioSalidaVO Value Object que contiene los campos de salida
+     * del servicio de negocio.
+     */
+    public static DistribuidorEnotarioSalidaVO opNotificacionFirmaFormalizacion(DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO, DistribuidorEnotarioSalidaVO distrEnotarioSalidaVO, IContextoEjecucion contextoEjecucion, DatosgeneralesC datosGenerales, DatosSolicitudC datosSolicitud, GestionEnvioMensajesEnotario geme) {
+        String estadoPrestamo = datosGenerales.getEstado();
+        String fechaFirma = distrEnotarioEntradaVO.getFechaFirma();
+        String codigoAplicacion = distrEnotarioEntradaVO.getCodigoAplicacion();
+        String codigoOperacionEnotario = distrEnotarioEntradaVO.getCodigoOperacionEnotario();
+        String nodoOriginal = distrEnotarioEntradaVO.getNodoOriginal();
+        String tipoOperacion = distrEnotarioEntradaVO.getTipoOperacion();
+        String codigoPais = distrEnotarioEntradaVO.getCodigoPais();
+        BigDecimal codigoEntidad = distrEnotarioEntradaVO.getCodigoEntidad();
+        String tipoPrestamo = distrEnotarioEntradaVO.getTipoPrestamo();
+        String contratoIban = distrEnotarioEntradaVO.getContratoIban();
+        String codigoBic = distrEnotarioEntradaVO.getCodigoBic();
+        String nifNotario = distrEnotarioEntradaVO.getNifColegiadoFirmante();
+        distrEnotarioSalidaVO.setCodigoAplicacion(codigoAplicacion);
+        distrEnotarioSalidaVO.setCodigoOperacionEnotario(codigoOperacionEnotario);
+        distrEnotarioSalidaVO.setNodoOriginal(nodoOriginal);
+        distrEnotarioSalidaVO.setTipoOperacion(tipoOperacion);
+        distrEnotarioSalidaVO.setCodigoPais(codigoPais);
+        if (null != codigoEntidad) {
+            distrEnotarioSalidaVO.setCodigoEntidad(codigoEntidad.toString());
+        }
+        distrEnotarioSalidaVO.setTipoPrestamo(tipoPrestamo);
+        if (!StringUtils.isBlank(contratoIban)) {
+            distrEnotarioSalidaVO.setContratoPrestamo(contratoIban.concat(codigoBic));
+        }
+        distrEnotarioSalidaVO.setContratoIban(contratoIban);
+        distrEnotarioSalidaVO.setCodigoBic(codigoBic);
+        if ((IConstantesEnotario.CTE_DATOS_GEN_ESTADO_POLIZA_ENVIADA.equals(estadoPrestamo)) || (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_FORMALIZADO_PARCIAL.equals(estadoPrestamo)) || (IConstantesEnotario.CTE_DATOS_GEN_ESTADO_SUSPENDIDO.equals(estadoPrestamo))) {
+            if ((IConstantesEnotario.CTE_OCHO_CEROS.equals(fechaFirma)) || (IConstantesEnotario.CTE_UN_BLANCO.equals(fechaFirma))) {
+                String msgErr = IConstantesEnotario.CTE_LIT_FECHA_NO_VALIDA.concat(fechaFirma);
+                distrEnotarioSalidaVO = UtilidadesEnotario.prevError(distrEnotarioEntradaVO, distrEnotarioSalidaVO, msgErr, // BigDecimal.ZERO,
+                IConstantesEnotario.CTE_TRES_STR, datosGenerales);
+                distrEnotarioEntradaVO.setDescripcion(msgErr);
+                // geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+                UtilidadesEnotario.enviarCorreoError(IConstantesEnotario.CTE_ERROR_ENOT, msgErr);
+            } else {
+                actualizarFormalizacionNotarioSolicitud(datosSolicitud, nifNotario);
+                distrEnotarioSalidaVO = formalizacion(distrEnotarioEntradaVO, distrEnotarioSalidaVO, contextoEjecucion, datosGenerales, datosSolicitud);
+                // geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+                enviarAvisoAplicacion(distrEnotarioEntradaVO, datosGenerales);
+                // Vuelca los datos a PMOS.
+                // UtilidadesEnotario.volcadoDatosPmos(datosSolicitud);
+                // Actualizar estado tarea formalizacion
+                UtilidadesComun.actualizarEstadoTarea(datosSolicitud.getDatosSolicitudKey().getNucExpediente(), ConstantesComun.CTE_CODIGO_PROCESO_FORMALIZACION, "F");
+            }
+        } else {
+            String descrEstado = UtilidadesEnotario.descripcionEstado(estadoPrestamo);
+            String msgErr = IConstantesEnotario.CTE_LIT_ESTADO_NO_VALIDO.concat(estadoPrestamo).concat(descrEstado);
+            distrEnotarioSalidaVO = UtilidadesEnotario.prevError(distrEnotarioEntradaVO, distrEnotarioSalidaVO, msgErr, // BigDecimal.ZERO,
+            IConstantesEnotario.CTE_CERO_STR, datosGenerales);
+            distrEnotarioEntradaVO.setDescripcion(msgErr);
+        // geme.grabarLog(distrEnotarioEntradaVO, datosGenerales);
+        }
+        return distrEnotarioSalidaVO;
+    }
+
+    /**
+     * Actualiza en la tabla cag.an49 el campo formalizacion, indica que notario formaliza que solicitud
+     * @param datosSolicitud
+     * @param nifNotario
+     */
+    public static void actualizarFormalizacionNotarioSolicitud(DatosSolicitudC datosSolicitud, String nifNotario) {
+        List<NotarioSolicitudC> notarioSolicitud = datosSolicitud.getNotarioSolicitud();
+        Date fechaMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWEST, DateUtils.FORMATO_FECHA_CORTO));
+        for (NotarioSolicitudC notario : notarioSolicitud) {
+            // El notario tiene que estar dado de alta baja igual a fecha minima
+            if (notario.getFechaBaja().equals(fechaMinima)) {
+                if (nifNotario.trim().equals(notario.getNifNotario().trim())) {
+                    notario.setFormalizacion("S");
+                }
+            }
+        }
+    }
+
+    /**
+     * Método equivalente al procedimiento PL/I ENVIAR_AVISO_APLICACION
+     * TODO: Falta por saber qué servicio de negocio es equivalente al programa PMOSR542:
+     * "ENVIAR AVISO DE LOS PRÉSTAMOS FORMALIZADOS AL RESPONSABLE DE
+     * RIESGOS DE LA OFICINA CON LA CG@ALAVI. (SE LLAMA DESDE EL PMOSR527)."
+     *
+     * @param distrEnotarioEntradaVO
+     * @param datosGenerales
+     */
+    public static void enviarAvisoAplicacion(DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO, DatosgeneralesC datosGenerales) {
+        java.util.Date fechaInicio = null;
+        Date fechaInicioSqlDate = null;
+        String fechaInicioStr = null;
+        String textoAviso = null;
+        final String CTE_BLANCO = " ";
+        java.util.Date fechaFin = null;
+        Date fechaFinSqlDate = null;
+        String fechaFinStr = null;
+        fechaInicio = DateUtils.dateNow();
+        fechaInicioSqlDate = new java.sql.Date(fechaInicio.getTime());
+        fechaInicioStr = DateHelper.sqlDateToString(fechaInicioSqlDate, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+        fechaFin = DateUtils.addDays(fechaInicio, 15);
+        fechaFinSqlDate = new java.sql.Date(fechaFin.getTime());
+        fechaFinStr = DateHelper.sqlDateToString(fechaFinSqlDate, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+        IDatosEntradaTx datosEntradaGeneracionAviso = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_CGAL, ID_CODIGO_OPERACION_AVISOS);
+        // pos  1 nsdk: id aplicación
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_APLICACION, "PMOS");
+        // pos  2 nsdk: id proyecto
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_PROYECTO, new BigDecimal(137));
+        // pos  3 nsdk: id proceso
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_PROCESO, new BigDecimal(154));
+        // pos  4 nsdk: id tarea
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_TAREA, new BigDecimal(162));
+        // pos  5 nsdk: ind delegable
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_DELEGABLE, Constantes.CTE_STR_S);
+        // tipo destino:						//pos  6 nsdk: tipo destino C- Centro
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_DESTINO, "C");
+        // pos  8 nsdk: centro destino
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CENTRO_DESTINO, distrEnotarioEntradaVO.getCodigoOficina());
+        // pos 12 nsdk: tipo aviso
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_AVISO, Constantes.CTE_STR_NO);
+        String datos_prestamo = distrEnotarioEntradaVO.getCodigoEntidad().toString() + distrEnotarioEntradaVO.getCodigoOficina().toPlainString() + distrEnotarioEntradaVO.getDigitosControl().toString() + distrEnotarioEntradaVO.getCuentaContable().toString() + distrEnotarioEntradaVO.getNumeroSolicitud().toString() + distrEnotarioEntradaVO.getDigitoSolicitud().toString();
+        // $OP-LBL-NL-2$
+        textoAviso = new Mensaje(ServicioNegocio.getContexto(), E_NOTARIO_POLIZA_527350234).toString() + datos_prestamo + new Mensaje(ServicioNegocio.getContexto(), FORMALIZADA_CORRECTAMENTE_277639328).toString();
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TEXTO_AVISO, // pos 13 nsdk: texto aviso
+        textoAviso.toString());
+        // pos 15  usuario alta
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_USUARIO_ALTA, "U000");
+        // pos 16 nsdk: terminal alta
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TERMINAL_ALTA, ServicioNegocio.getContexto().getTerminal());
+        // pos 17 nsdk: fecha ini aviso
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FECHA_INICIO_AVISO, fechaInicioStr);
+        // pos 18 nsdk: fecha fin aviso
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FECHA_FIN_AVISO, fechaFinStr);
+        // pos 19 nsdk: ind a of2k
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_A_OFICINA_2K, Constantes.CTE_STR_S);
+        // pos 20 nsdk: ind avisos multiples
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ALTA_AVISOS_MULTIPLES, Constantes.CTE_STR_N);
+        // EN LA CGALM342 PONE QUE CUANDO ES AVISO SIMPLE SE ENVIA A BLANCO
+        // pos 21 nsdk: ind correo S/N
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CORREO_S_N, Constantes.CTE_STR_N);
+        // pos 22 nsdk: ir superior
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_IR_SUPERIOR, "R");
+        // pos 23 nsdk: tira terminal
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIRA_TERMINAL, CTE_BLANCO);
+        // pos 24 nsdk: trata global
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TRATA_GLOBAL, CTE_BLANCO);
+        // pos 25 nsdk: aviso anula
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_AVISO_ANULA, CTE_BLANCO);
+        // pos 26 nsdk: clave aplica anula
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CLAVE_APLICA_ANULA, CTE_BLANCO);
+        // pos 27 nsdk: tiene fichero host
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIENE_FICHERO_HOST, Constantes.CTE_STR_N);
+        // pos 28 nsdk: fichero host
+        datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FICHERO_HOST, CTE_BLANCO);
+        ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaGeneracionAviso);
+    }
+
+    /**
+     * Método equivalente al procedimiento PL/I FORMALIZACION
+     * Formalización de un préstamo.
+     * @param distrEnotarioEntradaVO
+     * @param distrEnotarioSalidaVO
+     * @param contextoEjecucion Contexto de ejecución para poder invocar otro,
+     *  servicio de negocio, en este caso el servicio con cuenta contable 507 y código de operación 255.
+     * @param datosGenerales
+     * @param datosSolicitud
+     *
+     * @return distrEnotarioSalidaVO Value Object que contiene los campos de salida
+     * del servicio de negocio.
+     */
+    public static DistribuidorEnotarioSalidaVO formalizacion(DistribuidorEnotarioEntradaVO distrEnotarioEntradaVO, DistribuidorEnotarioSalidaVO distrEnotarioSalidaVO, IContextoEjecucion contextoEjecucion, DatosgeneralesC datosGenerales, DatosSolicitudC datosSolicitud) {
+        GestionDatosGeneralesEnotario gdge = new GestionDatosGeneralesEnotario();
+        DatosgeneralesEng datosGeneralesDao = new DatosgeneralesEng();
+        BigDecimal codigoOficina = distrEnotarioEntradaVO.getCodigoOficina();
+        BigDecimal numeroSolicitud = distrEnotarioEntradaVO.getNumeroSolicitud();
+        BigDecimal version = null;
+        BigDecimal nuc = distrEnotarioEntradaVO.getNucSolicitud();
+        // MIRAR ISTO
+        BigDecimal indicadorEnvio = BigDecimal.ZERO;
+        // PMNOT05010
+        String colegiadoTitular = distrEnotarioEntradaVO.getColegiadoTitular();
+        // PMNOT05020
+        String nifColegiadoFirmante = distrEnotarioEntradaVO.getNifColegiadoFirmante();
+        // PMNOT05030
+        String cuentaAbono = distrEnotarioEntradaVO.getCuentaAbono();
+        // PMNOT05040
+        String fechaFirma = distrEnotarioEntradaVO.getFechaFirma();
+        Date fechaFirmaDate = DateHelper.stringASqlDate(fechaFirma, DateHelper.FORMATO_DDMMYYYY);
+        String fechaStr = DateHelper.sqlDateToString(fechaFirmaDate, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+        // PMNOT05060
+        String numeroProtocolo = distrEnotarioEntradaVO.getNumeroProtocolo();
+        // PMNOT05070
+        String importeHonorarios = distrEnotarioEntradaVO.getImporteHonorarios();
+        BigDecimal importeHonorariosBid = BigDecimal.ZERO;
+        distrEnotarioSalidaVO.setCuentaAbono(cuentaAbono);
+        if (null != importeHonorarios) {
+            importeHonorarios = importeHonorarios.trim();
+            importeHonorariosBid = new BigDecimal(importeHonorarios).divide(IConstantesEnotario.CTE_100_BID);
+            importeHonorariosBid.setScale(IConstantesEnotario.CTE_DOS_INT, RoundingMode.UP);
+        }
+        // TODO: Repasar esto (importeHonorariosNoop3Request/100).
+        DatosgeneralesC datosGeneralesActualizar = datosGeneralesDao.obtenerDatosGeneralesPorNucVersion(nuc, version);
+        if (null != datosGeneralesActualizar) {
+            gdge.actualizarDatosGeneralesFormalizacion(colegiadoTitular, nifColegiadoFirmante, importeHonorariosBid, numeroProtocolo, fechaFirmaDate, datosGeneralesActualizar);
+            // Actualiza la AN40TB01 los datos disponibles justo antes de la llamada al ANPM_255
+            GestionEnvioMensajesEnotario geme = new GestionEnvioMensajesEnotario();
+            geme.actualizaDatosGenerales(datosGenerales, datosSolicitud);
+            // Actualiza el estado de la 40
+            gdge.actualizarDatosGeneralesError(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_FORMALIZADO, StringUtils.EMPTY, StringUtils.EMPTY, StringUtils.EMPTY, datosGenerales);
+            /*En canto a FORMALIZACION (PMOSR068) debemola facer pero chanado ao SERVIZO de negocio ANPM_255
+			 *  c. ctble: 507
+			 *  c. op:    255
+			 *  alta datos formalizacion
+		package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+		Class AltaFormalizacionSrv
+			 */
+            IDatosEntradaTx datosEntradaAltaDatosFormalizacion = ServicioNegocio.getPrograma(contextoEjecucion, // 507
+            IConstantesEnotario.CTE_CC_FORMALIZACION, // 255
+            IConstantesEnotario.CTE_CO_FORMALIZACION);
+            datosEntradaAltaDatosFormalizacion.addCampo("OFICINA_SOLICITUD", codigoOficina);
+            datosEntradaAltaDatosFormalizacion.addCampo("NUMERO_SOLICITUD", numeroSolicitud);
+            // AQUI VAI UN NULO, MIRAR ISTO
+            datosEntradaAltaDatosFormalizacion.addCampo("VERSION_SOLICITUD", datosGenerales.getId().getVersionSolicitud());
+            datosEntradaAltaDatosFormalizacion.addCampo("NUC_EXPEDIENTE", nuc);
+            datosEntradaAltaDatosFormalizacion.addCampo("ENVIO_CORRESPONDENCIA", indicadorEnvio);
+            datosEntradaAltaDatosFormalizacion.addCampo("FECHA_FORMALIZACION", fechaStr);
+            /*La firma no es lo mismo que la formalización, pero en este caso se da la circunstancia
+			 * de que el día de la firma es el mismo que el de la formalización del préstamo, por ese sólo
+			 * necesitamos un campo de entrada para el dia de firma/formalización.
+			 * Si no fuese el mismo día necesitaríamos dos, uno para la firma y otro para la formalización.
+			 * */
+            // fechaFormalizacion: char(10), probablemente DD-MM-YYYY
+            ServicioNegocio.invocarServicio(contextoEjecucion, datosEntradaAltaDatosFormalizacion);
+            distrEnotarioSalidaVO.setDescripcion(StringUtils.EMPTY);
+            distrEnotarioSalidaVO.setCodigoRetorno(IConstantesEnotario.CTE_CODIGO_RETORNO_OK_0000);
+            distrEnotarioSalidaVO.setCodigoError(StringUtils.EMPTY);
+            distrEnotarioSalidaVO.setTextoError(IConstantesEnotario.CTE_LIT_POLIZA_REALIZADA_CORRECTAMENTE);
+            UtilidadesEnotario.actualizarExpediente(contextoEjecucion, distrEnotarioEntradaVO, distrEnotarioSalidaVO, IConstantesEnotario.CTE_ESTADO_EXPEDIENTE_FORMALIZADO);
+            distrEnotarioSalidaVO.setNodoReEmisor(IConstantesEnotario.CTE_NODO_HOST);
+            distrEnotarioSalidaVO.setTipoOperacion(IConstantesEnotario.CTE_TIPO_OPERACION_REPLY);
+        // CALL ENVIO_COLA_MQ;
+        } else {
+            distrEnotarioSalidaVO = UtilidadesEnotario.prevError(distrEnotarioEntradaVO, distrEnotarioSalidaVO, // IConstantesEnotario.CTE_SQLCODE_ERROR_GENERICO,
+            IConstantesEnotario.CTE_LIT_NO_EXISTE_PRESTAMO, IConstantesEnotario.CTE_CERO_STR, datosGenerales);
+        }
+        return distrEnotarioSalidaVO;
+    }
+
+    /**
+     * Método que formatea el campo restoBloques para la llamada al ANPM_476 previa a la ejecución del presente servicio
+     *
+     * @param colegiadoTitular
+     * @param nifColegiadoFirmante
+     * @param cuentaAbono
+     * @param fechaFirma
+     * @param numeroProtocolo
+     * @param importeHonorarios
+     */
+    private String restoBloquesPrevio(String colegiadoTitular, String nifColegiadoFirmante, String cuentaAbono, String fechaFirma, String numeroProtocolo, String importeHonorarios) {
+        if (null == colegiadoTitular) {
+            colegiadoTitular = new String();
+        }
+        if (null == nifColegiadoFirmante) {
+            colegiadoTitular = new String();
+        }
+        if (null == cuentaAbono) {
+            cuentaAbono = new String();
+        }
+        if (null == fechaFirma) {
+            fechaFirma = new String();
+        }
+        if (null == numeroProtocolo) {
+            numeroProtocolo = new String();
+        }
+        if (null == importeHonorarios) {
+            importeHonorarios = new String();
+        }
+        return StringUtils.rightPad(colegiadoTitular, 15).substring(0, 15) + StringUtils.rightPad(nifColegiadoFirmante, 10).substring(0, 10) + StringUtils.rightPad(cuentaAbono, 20).substring(0, 20) + StringUtils.rightPad(fechaFirma, 8).substring(0, 8) + StringUtils.rightPad(numeroProtocolo, 10).substring(0, 10) + StringUtils.rightPad(importeHonorarios, 15).substring(0, 15);
+    }
+
+    private static final String FORMALIZADA_CORRECTAMENTE_277639328 = "FORMALIZADA_CORRECTAMENTE_277639328";
+
+    private static final String E_NOTARIO_POLIZA_527350234 = "E_NOTARIO_POLIZA_527350234";
+}

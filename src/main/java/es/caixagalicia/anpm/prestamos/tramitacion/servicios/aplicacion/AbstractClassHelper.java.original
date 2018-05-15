@@ -1,0 +1,76 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+/**
+ * Clase que contendrá funcionalidad común utilizada por clases abstractas de 
+ * la aplicación
+ */
+
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+
+/**
+ * @author G2510
+ *
+ */
+public final class AbstractClassHelper
+{
+	/**
+	 * Nombre de la clase
+	 */
+	private static final String NOMBRE_CLASE = AbstractClassHelper.class.getSimpleName();
+	
+	/**
+	 * Objeto que utilizaremos para escribir mensajes en el LOG de la plataforma
+	 */
+	private static final LogHelper OBLOGHELPER = UtilidadesTramitacion.getLoggerANPM(NOMBRE_CLASE);
+	
+	/**
+	 * Constructor de la clase
+	 */
+	private AbstractClassHelper()
+	{
+		
+	}
+	
+	/**
+	 * Metodo que lanza una excepción por no estar contemplada una determinada opción
+	 * en una clase factoria
+	 * 
+	 * @param strOpcion La opción que no está contemplada en la clase factoria
+	 * @param strNombreClase El nombre de la clase donde se produce el error
+	 * @param strDescripcionClase La descripción de la clase donde se produce el error
+	 */
+	public static void forzarLanzamientoExcepcionNoOpcionFactoria(
+			String strOpcion, 
+			String strNombreClase, 
+			String strDescripcionClase)
+	{
+		final String strNombreParOpc = "strOpcion";
+		final String strNombreParNomClase = "strNombreClase";
+		final String strNombreParDescClase = "strDescripcionClase";
+		String strMensaje = null;
+		
+		
+		//Comprobamos que el valor de los parámetros no sea nulo
+		UtilidadesTramitacion.comprobarParametroNulo(strOpcion, strNombreParOpc, NOMBRE_CLASE);
+		UtilidadesTramitacion.comprobarParametroNulo(strNombreClase, strNombreParNomClase, NOMBRE_CLASE);
+		UtilidadesTramitacion.comprobarParametroNulo(strDescripcionClase, strNombreParDescClase, NOMBRE_CLASE);
+		
+		//Escribimos un mensaje en el LOG de la plataforma
+		if (OBLOGHELPER.isDebugEnabled())
+		{
+			strMensaje = String.format("La opción %s no está contemplada en la clase factoria %s", 
+					strOpcion, strNombreClase);
+			
+			OBLOGHELPER.warn(strMensaje);			
+		}
+		
+		//Lanzamos una excepcion y hacemos rollback del servicio de negocio
+		ServicioNegocio.rollback(CodigosError.CTE_CLAVE_MENSAJE_NO_EXISTE_CLASE_PARA_FACTORIA, 
+				null, new String[] {strOpcion, strNombreClase}, null);
+		
+	}
+}

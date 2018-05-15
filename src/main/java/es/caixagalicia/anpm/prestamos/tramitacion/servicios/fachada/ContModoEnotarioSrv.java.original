@@ -1,0 +1,127 @@
+
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.fachada;
+
+import java.math.BigDecimal;
+
+import org.apache.commons.lang.StringUtils;
+
+import es.caixagalicia.anpm.prestamos.comun.constantes.ConstantesComun;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+
+
+/**
+ *  Servicio que permite que aunque sea apto para E-notario (AN2501620 = 1) por control de operatoria permite cambiar el modo de envío de la solicitud
+ *  pudiendo ir por Oficina
+ *  
+ *  Transacción: ANT7
+ *  Cod_operación: ANPM_295
+ *  CNTX = ANPMN295
+ *  
+ *  @author V361749
+ *  
+ */
+
+public class ContModoEnotarioSrv extends ServicioNegocio
+{
+	// Datos de entrada
+	private static final String MODO_SOLICITUD = "MODO";
+	private static final String CTE_ENTRADA_NUC = "NUC";
+	private static final String CTE_ENTRADA_POLIZA_INTERVENIDA = "POLIZA_INTERVENIDA";
+	
+	// Codigos de error
+	private static final String CTE_OK = "1";
+	private static final String CTE_NOK = "0";
+	
+	private static final String CTE_OPERACION_PERMITIDA = "Operación permitida ";
+	private static final String CTE_OPERACION_NO_PERMITIDA = "Operación no permitida para este número de expediente";
+	
+	private static final String CTE_ERROR = "Error procesando el número de expediente.";
+	
+
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		BigDecimal nuc = null;
+		String modo = null;
+		String polizaIntervenida = null;
+		
+		boolean controlOperatoria = false;
+		String CTE_MODO_N = "N"; // N --> E-Notario
+		String resultado  = CTE_OK;
+		String mensajeError = CTE_ERROR;
+		
+		// Establecemos el  diario Electrónico
+		contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_CONSULTA));
+		
+		//Se obtienen las entradas
+		nuc = datosEntrada.getDecimal(CTE_ENTRADA_NUC);
+		modo = datosEntrada.getString(MODO_SOLICITUD); //N or O (Notario o oficina)
+		polizaIntervenida = datosEntrada.getString(CTE_ENTRADA_POLIZA_INTERVENIDA); 
+		
+		if ((!UtilidadesTramitacion.isBlankOrNull(modo))&&
+				(null != nuc) && CTE_MODO_N.equals(modo)) // el modo tiene que ser de E-notario;
+		{
+			// E-Notario
+			resultado  = CTE_OK;
+			mensajeError = CTE_OPERACION_PERMITIDA;
+		}
+		else // si no es notario controlamos si ese nuc puede ir por CO
+		{
+			// Oficina
+			
+			// 2016-08-05 - Si va por oficina y la poliza no esta intervenida, se permite la
+			// operacion (no se llama a control de operatoria)
+			if (StringUtils.isBlank(polizaIntervenida))
+			{
+				polizaIntervenida = "S";
+			}
+			
+			
+			if (StringUtils.isNotBlank(polizaIntervenida) && polizaIntervenida.equals(Constantes.CTE_LETRA_N))
+			{
+				resultado  = CTE_OK;
+				mensajeError = CTE_OPERACION_PERMITIDA;
+			}
+			else
+			{
+			
+				GestionDatosSolicitud gds = new GestionDatosSolicitud();
+				DatosSolicitudC datosSolicitud = gds.getUltimaVersionCompleta(nuc);
+				
+				if (null != datosSolicitud ) 
+				{
+					controlOperatoria = UtilidadesTramitacion.comprobarControlOperatoria(
+							nuc, ConstantesComun.CTE_CONTROL_OPERATORIA_MODO_ENOTARIO, true);
+					
+					if (controlOperatoria) 
+					{
+						resultado = CTE_NOK;
+						mensajeError = CTE_OPERACION_NO_PERMITIDA;
+					}
+					else 
+					{
+						resultado  = CTE_OK;
+						mensajeError = CTE_OPERACION_PERMITIDA;
+					}
+				}
+			}
+		}
+		
+		IContexto[] salida = new IContexto[1];
+		salida[0] = ContextoFactory.getInstance().getContexto("ANPMN295");
+		salida[0].put("ANPMN295010", resultado);
+		salida[0].put("ANPMN295020", mensajeError);
+		
+		return salida;
+	}
+}

@@ -1,0 +1,47 @@
+package es.caixagalicia.anpm.prestamos.tramitacionmultimedio.servicios.fachada.contextos;
+
+import java.math.BigDecimal;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+public class ContextoAltaTramitacionMultimedio {
+
+    private static final String CTE_RETORNO_ALTA_CONTEXTO = "ANPMN004";
+
+    private static final String CTE_RETORNO_CODIGO = "ANPMN004010";
+
+    private static final String CTE_RETORNO_DESCRICION = "ANPMN004020";
+
+    /**
+     * Rellena el contexto de salida del proceso de alta de solicitud de
+     * tramitación automática
+     * @param error
+     * @param resultadoDatosSolicitudVO
+     * @return IContexto
+     */
+    public static IContexto rellenarContextosGeneracionSolicitud(ResultadoDatosSolicitudVO resultadoDatosSolicitudVO, BigDecimal error) {
+        IContexto contextoRstdo = ContextoFactory.getInstance().getContexto(CTE_RETORNO_ALTA_CONTEXTO);
+        contextoRstdo.put(CTE_RETORNO_CODIGO, error);
+        if (null != resultadoDatosSolicitudVO) {
+            if (error.equals(BigDecimal.ZERO))
+                // $OP-LBL-NL-2$
+                contextoRstdo.put(CTE_RETORNO_DESCRICION, new Mensaje(ServicioNegocio.getContexto(), ALTA_SOLICITUD_1408741468).toString() + resultadoDatosSolicitudVO.getDatos().getDatosSolicitudKey().getNumSolicitud() + new Mensaje(ServicioNegocio.getContexto(), REALIZADA_CORRECTAMENTE_1861530497).toString());
+            else
+                contextoRstdo.put(CTE_RETORNO_DESCRICION, new Mensaje(ServicioNegocio.getContexto(), PRODUCIDO_ERROR_ALTA_SOLICITUD_859521157).toString() + resultadoDatosSolicitudVO.getDatos().getDatosSolicitudKey().getNumSolicitud());
+        } else {
+            contextoRstdo.put(CTE_RETORNO_DESCRICION, new Mensaje(ServicioNegocio.getContexto(), PRODUCIDO_ERROR_DURANTE_EJECUCI_N_84002359).toString());
+        }
+        return contextoRstdo;
+    }
+
+    private static final String REALIZADA_CORRECTAMENTE_1861530497 = "REALIZADA_CORRECTAMENTE_1861530497";
+
+    private static final String PRODUCIDO_ERROR_DURANTE_EJECUCI_N_84002359 = "PRODUCIDO_ERROR_DURANTE_EJECUCI_N_84002359";
+
+    private static final String PRODUCIDO_ERROR_ALTA_SOLICITUD_859521157 = "PRODUCIDO_ERROR_ALTA_SOLICITUD_859521157";
+
+    private static final String ALTA_SOLICITUD_1408741468 = "ALTA_SOLICITUD_1408741468";
+}
