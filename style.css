@@ -17,9 +17,9 @@ html, body, table, tbody, tr, td {
 }
 table {
 	table-layout: fixed;
-	width: 98%;
-	height:90%;
-	margin-left:1%;
+	width: 100%;
+	height:auto;
+
 }
 ul{
 	padding: 3px 4px;
@@ -32,8 +32,6 @@ td {
 	font: 1em monospace;
 	text-align: left;
 	white-space: pre-wrap;
-	
-	
 }
 h1 {
 	display: inline;
@@ -92,7 +90,7 @@ ins {
 	}
 }
 .trHead { 
-	height:10%;
+	height:1%;
 	background-color:#E0F8F1;
 }
 	
@@ -103,4 +101,5 @@ ins {
 
 th {
 	font-size: 2em;
+	height: 20%;
 }
