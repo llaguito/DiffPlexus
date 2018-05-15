@@ -1,0 +1,521 @@
+/**
+ * Aplicacion de Activo
+ * Caixa Galicia © 2009-2010
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.sql.Date;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.datEconomicos.ClausulaRestringuidaC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.datEconomicos.DatEcoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionClausulasRestringuidas;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionDatEco;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionSubProducto;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextosDatEco;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.ControlVersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.DatEcoVO;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.colectivos.persistencia.colectivo.VinculacionColectivoC;
+import es.caixagalicia.anpm.prestamos.colectivos.servicios.aplicacion.GestionVinculacionColectivo;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Servicio para el listado de las condiciones de capital
+ * de un determinado subproducto.
+ *
+ * @author u7336
+ */
+public class DatosEconomicosLstSrv extends ServicioNegocio {
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_PRODUCTO = 0;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_SUBPRODUCTO = 1;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_COLECTIVO = 2;
+
+    // OBLIGATORIO
+    private static final int CTE_POSICION_TIRA_ID_VG = 3;
+
+    // private static final int CTE_POSICION_TIRA_ID_VG2 = 4; // OPTATIVO
+    /**
+     * Log de la clase.
+     */
+    private static final LogHelper LOGGER = LogHelper.getLog(DatosEconomicosLstSrv.class);
+
+    /**
+     *  Constructor sin parametros.
+     */
+    public DatosEconomicosLstSrv() {
+        super();
+    }
+
+    /**
+     * Ejecuta la logica de negocio del servicio
+     *
+     * @see es.caixagalicia.ifrt.core.ServicioNegocio
+     * 		#ejecutar(
+     * 			es.caixagalicia.ifrt.core.IContextoEjecucion,
+     * 			es.caixagalicia.ifrt.core.IDatosEntradaTx)
+     * @param contexto contexto de ejecucion
+     * @param datosEntrada datos de entrada
+     * @return <code>IContexto[]</code>
+     */
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contexto, IDatosEntradaTx datosEntrada) {
+        final long lInicio = System.currentTimeMillis();
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("INICIO SNANPM032: Listado de los datos económicos.");
+        }
+        contexto.setDiarioElectronico(new DiarioElectronico(Constantes.CTE_OPERACION_AC, Integer.valueOf(0), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Constantes.CTE_STRING_EMPTY, Constantes.CTE_STRING_EMPTY, BigDecimal.ZERO, BigDecimal.ZERO, Integer.valueOf(0)));
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Obtenemos los parametros de entrada");
+        }
+        GestionDatEco gde = new GestionDatEco();
+        // OBLIGATORIO
+        BigDecimal bidIdProducto = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_PRODUCTO);
+        // OBLIGATORIO
+        BigDecimal bidIdSubProducto = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_SUBPRODUCTO);
+        // OBLIGATORIO
+        BigDecimal bidColectivo = datosEntrada.getDecimal(CTE_POSICION_TIRA_COLECTIVO);
+        // OBLIGATORIO
+        BigDecimal bidVG = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VG);
+        // BigDecimal bidVG2 = datosEntrada.getDecimal(CTE_POSICION_TIRA_ID_VG2); // OPTATIVO
+        List<DatEcoC> datos = new ArrayList<DatEcoC>();
+        List<DatEcoVO> datosVO = new ArrayList<DatEcoVO>();
+        ArrayList<String> redes;
+        List<ParametrosC> niveles = new ArrayList<ParametrosC>(Constantes.CTE_CERO.intValue());
+        String red;
+        int iSize;
+        int i;
+        VersionesC versionGeneral = null;
+        VersionesC versionGeneralAux = null;
+        VersionesC versionGeneralAnterior = null;
+        List<VersionesC> versionesTodos;
+        VersionesC versionesTodosAnterior;
+        versionGeneral = GestionVersiones.obtenerVersion(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), new Integer(bidVG.intValue()), new Integer(bidColectivo.intValue()));
+        versionGeneralAnterior = GestionVersiones.obtenerGeneralAnterior(versionGeneral);
+        Integer colectivo = new Integer(bidColectivo.intValue());
+        if (versionGeneral.getAn03tb01().equals(Constantes.CTE_CERO) && !colectivo.equals(Constantes.CTE_CERO)) {
+            VinculacionColectivoC vinculo = GestionVinculacionColectivo.obtenerVinculacionColectivo(colectivo, new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), new Integer(bidVG.intValue()));
+            VersionesC versionesC = GestionVersiones.obtenerGeneralAnteriorPorFechas(versionGeneral);
+            if (null != versionesC && !versionesC.getAn03tb01().equals(Constantes.CTE_CERO)) {
+                datos = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), colectivo, versionesC.getAn03tb01(), true);
+            } else {
+                versionesC = vinculo.obtenerVersionCondGeneral();
+                if (null != versionesC) {
+                    datos = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), Constantes.CTE_CERO, versionesC.getAn03tb01(), true);
+                }
+            }
+        } else {
+            // obtenemos los datos para un subproducto
+            datos = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), colectivo, versionGeneral.getAn03tb01(), true);
+        }
+        // debemos obtener la descripción de los niveles para el subproducto pedido.
+        // una vez llegado a este punto hay que mirar en que estado se encuentra la versión
+        redes = new ArrayList<String>();
+        redes.add(Constantes.CTE_RED_COMERCIAL);
+        // if(Constantes.CTE_CERO.intValue() == redes.size())
+        // {
+        // red = "";
+        // }
+        // else
+        // {
+        // // con las redes obtenidas debemos ver cual utilizar para obtener los niveles
+        // if(redes.contains(Constantes.CTE_RED_COMERCIAL) || redes.contains(Constantes.CTE_RED_DIRECCION_GENERAL))
+        // {
+        // red = Constantes.CTE_RED_COMERCIAL;
+        // }
+        // else if(redes.contains(Constantes.CTE_RED_EMPRESAS))
+        // {
+        // red = Constantes.CTE_RED_EMPRESAS;
+        // }
+        // else if(redes.contains(Constantes.CTE_RED_ONLINE))
+        // {
+        // red = Constantes.CTE_RED_ONLINE;
+        // }
+        // else
+        // {
+        // red = Constantes.CTE_RED_COMERCIAL;
+        // }
+        // 
+        // // una vez obtenida la red hay que buscar en la CG32TB01 la información de los niveles del
+        // // subproducto.
+        // niveles = GestionSubProducto.obtenerNivelesRed(red);
+        // 
+        // }
+        red = Constantes.CTE_RED_COMERCIAL;
+        // una vez obtenida la red hay que buscar en la CG32TB01 la información de los niveles del
+        // subproducto.
+        niveles = GestionSubProducto.obtenerNivelesRed(red);
+        datosVO = getVOs(datos, niveles, versionGeneral, null);
+        if (versionGeneralAnterior != null) {
+            datos = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), new Integer(bidColectivo.intValue()), versionGeneralAnterior.getAn03tb01(), true);
+            datosVO.addAll(getVOs(datos, niveles, versionGeneralAnterior, versionGeneral));
+        }
+        // si el subproducto no es todos entonces buscamos las de todos
+        if (!Constantes.CTE_CERO.equals(new Integer(bidIdSubProducto.intValue()))) {
+            // vemos que versiones generales del 0 entran en el rango de fechas de la versionGeneral
+            versionesTodos = GestionVersiones.obtenerVersionesEnFechas(new Integer(bidIdProducto.intValue()), new Integer(bidIdSubProducto.intValue()), new Integer(bidColectivo.intValue()), versionGeneral.getFechaInicio(), versionGeneral.getHoraIncio(), versionGeneral.getFechaFin(), versionGeneral.getHoraFin());
+            // recorremos la lista y la añadimos a las condiciones existentes hasta el momento.
+            iSize = versionesTodos.size();
+            for (i = 0; i < iSize; i++) {
+                versionGeneralAux = versionesTodos.get(i);
+                List<DatEcoC> datosVerGen = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), Constantes.CTE_CERO, new Integer(bidColectivo.intValue()), versionGeneralAux.getAn03tb01(), true);
+                Integer idProductoVO = null;
+                Integer idSubProductoVO = null;
+                Integer versionVO = null;
+                Integer colectivoVO = null;
+                Integer nivelVO = null;
+                List<DatEcoC> datosVerGenAux = new ArrayList<DatEcoC>();
+                if (datosVO.isEmpty()) {
+                    datosVerGenAux.addAll(datosVerGen);
+                } else {
+                    // Comprobar que no se esten metiendo repetidos
+                    for (DatEcoC datEcoGen : datosVerGen) {
+                        idProductoVO = datEcoGen.getDatEcoKey().getIdProducto();
+                        idSubProductoVO = datEcoGen.getDatEcoKey().getIdSubProducto();
+                        versionVO = datEcoGen.getDatEcoKey().getVersion();
+                        colectivoVO = datEcoGen.getDatEcoKey().getCodColectivo();
+                        nivelVO = datEcoGen.getDatEcoKey().getNivel();
+                        Boolean esRepetido = false;
+                        for (DatEcoVO datEco : datosVO) {
+                            if ((idProductoVO.equals(datEco.getDatos().getDatEcoKey().getIdProducto()) && idSubProductoVO.equals(datEco.getDatos().getDatEcoKey().getIdSubProducto()) && versionVO.equals(datEco.getDatos().getDatEcoKey().getVersion()) && colectivoVO.equals(datEco.getDatos().getDatEcoKey().getCodColectivo()) && nivelVO.equals(datEco.getDatos().getDatEcoKey().getNivel()))) {
+                                esRepetido = true;
+                                break;
+                            }
+                        }
+                        if (!esRepetido) {
+                            datosVerGenAux.add(datEcoGen);
+                        }
+                    }
+                }
+                if (!datosVerGenAux.isEmpty()) {
+                    datosVO.addAll(getVOs(datosVerGenAux, niveles, versionGeneralAux, null));
+                }
+                versionesTodosAnterior = GestionVersiones.obtenerGeneralAnterior(versionGeneralAux);
+                if (versionesTodosAnterior != null) {
+                    List<DatEcoC> datosVerTodosAnt = gde.obtenerDatosSubProducto(new Integer(bidIdProducto.intValue()), Constantes.CTE_CERO, new Integer(bidColectivo.intValue()), versionesTodosAnterior.getAn03tb01(), true);
+                    List<DatEcoC> datosVerTodosAntAux = new ArrayList<DatEcoC>();
+                    if (datosVO.isEmpty()) {
+                        datosVerTodosAntAux.addAll(datosVerTodosAnt);
+                    } else {
+                        // Comprobar que no se esten metiendo repetidos
+                        for (DatEcoC datEcoGen : datosVerTodosAnt) {
+                            idProductoVO = datEcoGen.getDatEcoKey().getIdProducto();
+                            idSubProductoVO = datEcoGen.getDatEcoKey().getIdSubProducto();
+                            versionVO = datEcoGen.getDatEcoKey().getVersion();
+                            colectivoVO = datEcoGen.getDatEcoKey().getCodColectivo();
+                            nivelVO = datEcoGen.getDatEcoKey().getNivel();
+                            Boolean esRepetido = false;
+                            for (DatEcoVO datEco : datosVO) {
+                                if ((idProductoVO.equals(datEco.getDatos().getDatEcoKey().getIdProducto()) && idSubProductoVO.equals(datEco.getDatos().getDatEcoKey().getIdSubProducto()) && versionVO.equals(datEco.getDatos().getDatEcoKey().getVersion()) && colectivoVO.equals(datEco.getDatos().getDatEcoKey().getCodColectivo()) && nivelVO.equals(datEco.getDatos().getDatEcoKey().getNivel()))) {
+                                    esRepetido = true;
+                                    break;
+                                }
+                            }
+                            if (!esRepetido) {
+                                datosVerTodosAntAux.add(datEcoGen);
+                            }
+                        }
+                    }
+                    if (!datosVerTodosAntAux.isEmpty()) {
+                        datosVO.addAll(getVOs(datosVerTodosAntAux, niveles, versionGeneralAux, null));
+                    }
+                }
+            }
+        }
+        // Añadir funcionalidad asumir -----------------------------------------
+        if (datosVO.size() == Constantes.CTE_CERO.intValue() && versionGeneral.getVersionKey().getIdVersionGeneral().equals(Constantes.CTE_UNO) && versionGeneral.getFechaFin().equals(new Date(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO).getTime()))) {
+            // obtenemos todos los registros generales que contengan las fecha de inicio e la versión general.
+            List<ControlVersionesC> datosV;
+            datosV = gde.obtenerVersionesEnFechas(new Integer(bidIdProducto.intValue()), Constantes.CTE_CERO, null, null, new Integer(Constantes.CTE_CERO.intValue()), null, null, versionGeneral.getFechaInicio(), versionGeneral.getHoraIncio());
+            iSize = datosV.size();
+            for (i = 0; i < iSize; i++) {
+                DatEcoC datEco = (DatEcoC) datosV.get(i);
+                // debemos corroborar que el dato tiene fecha fin null.
+                if (DateUtils.getSoloFecha(datEco.getFechaHastaVigencia()).equals(DateUtils.getSoloFecha(new Date(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO).getTime())))) {
+                    DatEcoVO datEcoVO = new DatEcoVO();
+                    datEcoVO = getVOAsumir(datEco, niveles, versionGeneral);
+                    datosVO.add(datEcoVO);
+                }
+            }
+        }
+        // FIN FUNCIONALIDAD ASUMIR----------------------------------------------
+        final IContexto[] contextoSalida = ContextosDatEco.rellenarDatosContexto(datosVO);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Se ha listado corerctamente los datos económicos de un subproducto");
+            LOGGER.debug("FIN SNANPM032: Listado de los datos económicos" + "Tiempo total: " + (System.currentTimeMillis() - lInicio) + "ms");
+        }
+        return contextoSalida;
+    }
+
+    public List<DatEcoVO> getVOs(List<DatEcoC> datos, List<ParametrosC> niveles, VersionesC version, VersionesC versionSiguiente) {
+        List<DatEcoVO> datosVO = new ArrayList<DatEcoVO>();
+        // creamos los VO
+        int iSize = datos.size();
+        for (int i = 0; i < iSize; i++) {
+            DatEcoC dato = datos.get(i);
+            DatEcoVO datoVO = new DatEcoVO();
+            // ponemos la descripcion del subproducto
+            if (Constantes.CTE_CERO.equals(dato.getDatEcoKey().getIdSubProducto())) {
+                datoVO.setDesSubproducto(Constantes.CTE_DES_NIVEL_TODOS);
+            } else {
+                datoVO.setDesSubproducto(GestionSubProducto.obtenerSubProductoVersion(dato.getDatEcoKey().getIdProducto(), dato.getDatEcoKey().getIdSubProducto(), version.getAn02tb01()).getDescripcion());
+            }
+            // ponemos la descripcion del nivel
+            if (Constantes.CTE_NIVEL_TODOS.equals(dato.getDatEcoKey().getNivel())) {
+                datoVO.setDesNivel(Constantes.CTE_DES_NIVEL_TODOS);
+            } else {
+                for (int j = 0; j < niveles.size(); j++) {
+                    ParametrosC parametro = niveles.get(j);
+                    Integer codNivel = new Integer(parametro.getParametrosKey().getCodTabla().substring(Constantes.CTE_DOS.intValue()));
+                    if (codNivel.equals(dato.getDatEcoKey().getNivel())) {
+                        // AQUi PONER LOs NIVELES EN MINUSCULA
+                        String destino = parametro.getCG320030().substring(0, 1) + parametro.getCG320030().substring(1).toLowerCase();
+                        // String dest = parametro.getCG320030().toLowerCase();
+                        // String destFin = dest.substring(0, 1).toUpperCase() + dest.substring(1);
+                        datoVO.setDesNivel(destino);
+                    }
+                }
+            }
+            ClausulaRestringuidaC clausulaPar;
+            ParametrosC clausulaGen;
+            // ponemos la descripción del destino
+            if (Constantes.CTE_DOS.toString().equals(dato.getIndDestino())) {
+                datoVO.setDesDestino(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+            // debemos buscar la descripción en las clausulas particulares
+            /*clausulaPar =GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(), 
+					dato.getDatEcoKey().getIdSubProducto(),dato.getDestino(),dato.getDestinoDefecto());
+				
+				if(clausulaPar!=null) {
+					datoVO.setDesDestino(clausulaPar.getDescripcion());
+				}else {
+					clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getDestino(),"" + dato.getDestinoDefecto());
+					if(clausulaGen!=null) {
+						datoVO.setDesDestino(clausulaGen.getCG320030());
+					}
+					//datoVO.setDesDestino(clausulaGen.getCG320030());
+				}*/
+            } else {
+                // debemos buscar la descripción en las clausulas generales
+                if (Utilidades.isBlankOrNull(dato.getDestinoDefecto())) {
+                    datoVO.setDesDestino(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+                } else {
+                    clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getDestino(), "" + dato.getDestinoDefecto());
+                    datoVO.setDesDestino(clausulaGen.getCG320030());
+                }
+            }
+            // ponemos la descripción del sector
+            if (Constantes.CTE_DOS.toString().equals(dato.getIndSector())) {
+                // // debemos buscar la descripción en las clausulas particulares
+                // clausulaPar =GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(),
+                // dato.getDatEcoKey().getIdSubProducto(),dato.getSector(),dato.getSectorDefecto());
+                // 
+                // if(clausulaPar!=null) {
+                // datoVO.setDesSector(clausulaPar.getDescripcion());
+                // }else {
+                // clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(),Utilidades.rellenarCerosDelante(""+dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+                // if(clausulaGen!=null) {
+                // datoVO.setDesSector(clausulaGen.getCG320030());
+                // }else {
+                // datoVO.setDesSector("");
+                // }
+                // 
+                // }
+                // datoVO.setDesSector(clausulaPar.getDescripcion());
+                datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+            } else if (Constantes.CTE_TRES.toString().equals(dato.getIndSector())) {
+                datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+            } else if (Constantes.CTE_UNO.toString().equals(dato.getIndSector())) {
+                if (Utilidades.isBlankOrNull(dato.getSectorDefecto()) || dato.getSectorDefecto().equals(new Integer(0)) || dato.getSectorDefecto().equals(new Integer(-1))) {
+                    datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+                } else {
+                    // debemos buscar la descripción en las clausulas generales
+                    clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(), Utilidades.rellenarCerosDelante("" + dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+                    datoVO.setDesSector(clausulaGen.getCG320030());
+                }
+            } else {
+                // debemos buscar la descripción en las clausulas generales
+                clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(), Utilidades.rellenarCerosDelante("" + dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+                datoVO.setDesSector(clausulaGen.getCG320030());
+            }
+            // ponemos la descripción del garantía
+            if (Constantes.CTE_DOS.toString().equals(dato.getIndGarantia())) {
+                // debemos buscar la descripción en las clausulas particulares
+                clausulaPar = GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(), dato.getDatEcoKey().getIdSubProducto(), dato.getGarantia(), dato.getGarantiaDefecto());
+                if (clausulaPar != null) {
+                    datoVO.setDesGarantia(clausulaPar.getDescripcion());
+                } else {
+                    clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getGarantia(), Utilidades.rellenarCerosDelante("" + dato.getGarantiaDefecto(), Constantes.CTE_CUATRO.intValue()));
+                    if (clausulaGen != null) {
+                        datoVO.setDesGarantia(clausulaGen.getCG320030());
+                    } else {
+                        datoVO.setDesGarantia(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+                    }
+                // datoVO.setDesGarantia(clausulaGen.getCG320030());
+                }
+            // datoVO.setDesGarantia(clausulaPar.getDescripcion());
+            } else if (Constantes.CTE_TRES.toString().equals(dato.getIndGarantia())) {
+                datoVO.setDesGarantia(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+            } else if (Constantes.CTE_CUATRO.toString().equals(dato.getIndGarantia()) || Constantes.CTE_UNO.toString().equals(dato.getIndGarantia())) {
+                // debemos buscar la descripción en las clausulas generales
+                clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getGarantia(), Utilidades.rellenarCerosDelante("" + dato.getGarantiaDefecto(), Constantes.CTE_CUATRO.intValue()));
+                if (clausulaGen != null) {
+                    datoVO.setDesGarantia(clausulaGen.getCG320030());
+                } else {
+                    datoVO.setDesGarantia("");
+                }
+            }
+            datoVO.setDatos(dato);
+            datoVO.setVersionGeneralTrabajo(version.getVersionKey().getIdVersionGeneral());
+            if (versionSiguiente != null) {
+                datoVO.setVersionGeneralSiguiente(versionSiguiente.getVersionKey().getIdVersionGeneral());
+            } else {
+                datoVO.setVersionGeneralSiguiente(new Integer(0));
+            }
+            datoVO.setAsumir(Constantes.NO);
+            datosVO.add(datoVO);
+        }
+        return datosVO;
+    }
+
+    public DatEcoVO getVOAsumir(DatEcoC dato, List<ParametrosC> niveles, VersionesC version) {
+        // List<DatEcoVO> datosVO = new ArrayList<DatEcoVO>();
+        DatEcoVO datoVO = new DatEcoVO();
+        // ponemos la descripcion del subproducto
+        if (Constantes.CTE_CERO.equals(dato.getDatEcoKey().getIdSubProducto())) {
+            datoVO.setDesSubproducto(Constantes.CTE_DES_NIVEL_TODOS);
+        } else {
+            datoVO.setDesSubproducto(GestionSubProducto.obtenerSubProductoVersion(dato.getDatEcoKey().getIdProducto(), dato.getDatEcoKey().getIdSubProducto(), version.getAn02tb01()).getDescripcion());
+        }
+        // ponemos la descripcion del nivel
+        if (Constantes.CTE_NIVEL_TODOS.equals(dato.getDatEcoKey().getNivel())) {
+            datoVO.setDesNivel(Constantes.CTE_DES_NIVEL_TODOS);
+        } else {
+            for (int j = 0; j < niveles.size(); j++) {
+                ParametrosC parametro = niveles.get(j);
+                Integer codNivel = new Integer(parametro.getParametrosKey().getCodTabla().substring(Constantes.CTE_DOS.intValue()));
+                if (codNivel.equals(dato.getDatEcoKey().getNivel())) {
+                    // AQUi PONER LOs NIVELES EN MINUSCULA
+                    String destino = parametro.getCG320030().substring(0, 1) + parametro.getCG320030().substring(1).toLowerCase();
+                    // String dest = parametro.getCG320030().toLowerCase();
+                    // String destFin = dest.substring(0, 1).toUpperCase() + dest.substring(1);
+                    datoVO.setDesNivel(destino);
+                }
+            }
+        }
+        ClausulaRestringuidaC clausulaPar;
+        ParametrosC clausulaGen;
+        // ponemos la descripción del destino
+        if (Constantes.CTE_DOS.toString().equals(dato.getIndDestino())) {
+            datoVO.setDesDestino(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+        // debemos buscar la descripción en las clausulas particulares
+        /*clausulaPar =GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(), 
+					dato.getDatEcoKey().getIdSubProducto(),dato.getDestino(),dato.getDestinoDefecto());
+				
+				if(clausulaPar!=null) {
+					datoVO.setDesDestino(clausulaPar.getDescripcion());
+				}else {
+					clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getDestino(),"" + dato.getDestinoDefecto());
+					if(clausulaGen!=null) {
+						datoVO.setDesDestino(clausulaGen.getCG320030());
+					}
+					//datoVO.setDesDestino(clausulaGen.getCG320030());
+				}*/
+        } else {
+            // debemos buscar la descripción en las clausulas generales
+            if (Utilidades.isBlankOrNull(dato.getDestinoDefecto())) {
+                datoVO.setDesDestino(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+            } else {
+                clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getDestino(), "" + dato.getDestinoDefecto());
+                datoVO.setDesDestino(clausulaGen.getCG320030());
+            }
+        }
+        // ponemos la descripción del sector
+        if (Constantes.CTE_DOS.toString().equals(dato.getIndSector())) {
+            // // debemos buscar la descripción en las clausulas particulares
+            // clausulaPar =GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(),
+            // dato.getDatEcoKey().getIdSubProducto(),dato.getSector(),dato.getSectorDefecto());
+            // 
+            // if(clausulaPar!=null) {
+            // datoVO.setDesSector(clausulaPar.getDescripcion());
+            // }else {
+            // clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(),Utilidades.rellenarCerosDelante(""+dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+            // if(clausulaGen!=null) {
+            // datoVO.setDesSector(clausulaGen.getCG320030());
+            // }else {
+            // datoVO.setDesSector("");
+            // }
+            // 
+            // }
+            // datoVO.setDesSector(clausulaPar.getDescripcion());
+            datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+        } else if (Constantes.CTE_TRES.toString().equals(dato.getIndSector())) {
+            datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+        } else if (Constantes.CTE_UNO.toString().equals(dato.getIndSector())) {
+            if (Utilidades.isBlankOrNull(dato.getSectorDefecto()) || dato.getSectorDefecto().equals(new Integer(0)) || dato.getSectorDefecto().equals(new Integer(-1))) {
+                datoVO.setDesSector(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+            } else {
+                // debemos buscar la descripción en las clausulas generales
+                clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(), Utilidades.rellenarCerosDelante("" + dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+                datoVO.setDesSector(clausulaGen.getCG320030());
+            }
+        } else {
+            // debemos buscar la descripción en las clausulas generales
+            clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getSector(), Utilidades.rellenarCerosDelante("" + dato.getSectorDefecto(), Constantes.CTE_CUATRO.intValue()));
+            datoVO.setDesSector(clausulaGen.getCG320030());
+        }
+        // ponemos la descripción del garantía
+        if (Constantes.CTE_DOS.toString().equals(dato.getIndGarantia())) {
+            // debemos buscar la descripción en las clausulas particulares
+            clausulaPar = GestionClausulasRestringuidas.obtenerClausulasRestringuidaParaDescripcion(dato.getDatEcoKey().getIdProducto(), dato.getDatEcoKey().getIdSubProducto(), dato.getGarantia(), dato.getGarantiaDefecto());
+            if (clausulaPar != null) {
+                datoVO.setDesGarantia(clausulaPar.getDescripcion());
+            } else {
+                clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getGarantia(), Utilidades.rellenarCerosDelante("" + dato.getGarantiaDefecto(), Constantes.CTE_CUATRO.intValue()));
+                if (clausulaGen != null) {
+                    datoVO.setDesGarantia(clausulaGen.getCG320030());
+                } else {
+                    datoVO.setDesGarantia(new Mensaje(ServicioNegocio.getContexto(), LISTA_RESTRINGIDA_1005653765).toString());
+                }
+            // datoVO.setDesGarantia(clausulaGen.getCG320030());
+            }
+        // datoVO.setDesGarantia(clausulaPar.getDescripcion());
+        } else if (Constantes.CTE_TRES.toString().equals(dato.getIndGarantia())) {
+            datoVO.setDesGarantia(new Mensaje(ServicioNegocio.getContexto(), CUALQUIERA_661124844).toString());
+        } else if (Constantes.CTE_CUATRO.toString().equals(dato.getIndGarantia()) || Constantes.CTE_UNO.toString().equals(dato.getIndGarantia())) {
+            // debemos buscar la descripción en las clausulas generales
+            clausulaGen = GestionClausulasRestringuidas.obtenerClausulaGeneral(dato.getGarantia(), Utilidades.rellenarCerosDelante("" + dato.getGarantiaDefecto(), Constantes.CTE_CUATRO.intValue()));
+            if (clausulaGen != null) {
+                datoVO.setDesGarantia(clausulaGen.getCG320030());
+            } else {
+                datoVO.setDesGarantia("");
+            }
+        }
+        datoVO.setDatos(dato);
+        datoVO.setVersionGeneralTrabajo(Constantes.CTE_CERO);
+        datoVO.setVersionGeneralSiguiente(Constantes.CTE_CERO);
+        datoVO.setAsumir(Constantes.SI);
+        return datoVO;
+    }
+
+    private static final String CUALQUIERA_661124844 = "CUALQUIERA_661124844";
+
+    private static final String LISTA_RESTRINGIDA_1005653765 = "LISTA_RESTRINGIDA_1005653765";
+}

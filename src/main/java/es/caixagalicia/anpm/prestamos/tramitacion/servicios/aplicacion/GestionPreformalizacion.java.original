@@ -1,0 +1,460 @@
+/**
+ * 
+ */
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Locale;
+
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.ofertaVinculante.OfertaVinculanteC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.ofertaVinculante.OfertaVinculanteEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.subvencion.SubvencionSolicC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.subvencion.SubvencionSolicEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesTramitacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosCuentaVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.util.Helper;
+
+/**
+ * 
+ * @author F001297
+ *
+ */
+public class GestionPreformalizacion
+{
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	
+	//Cuenta contable ITAL
+	private static final Integer ID_CUENTA_ITAL = Integer.valueOf(340);
+	//	Codigo operacion del servicio de Calculo de cambio divisa: ITAL_302
+	private static final Integer ID_COOP_CAMBIO_DIVISA = Integer.valueOf(302);
+	//Campos de entrada de ITAL_302
+	private static final String NOMBRE_CAMPO_APLICACION 		= "APLICACION"; // OBLIGATORIO
+	private static final String NOMBRE_CAMPO_ACCESO 			= "ACCESO"; // OBLIGATORIO
+	private static final String NOMBRE_CAMPO_DIVISA_COMPRA 		= "DIVISACOMPRA";
+	private static final String NOMBRE_CAMPO_TIPO_DIVISA_COMPRA = "TIPODIVISACOMPRA";
+	private static final String NOMBRE_CAMPO_DIVISA_VENTA 		= "DIVISAVENTA";
+	private static final String NOMBRE_CAMPO_TIPO_DIVISA_VENTA 	= "TIPODIVISAVENTA";
+	private static final String NOMBRE_CAMPO_IMPORTE_DIVISA_COMPRA = "IMPORTEDIVISACOMPRA";
+	private static final String NOMBRE_CAMPO_IMPORTE_DIVISA_VENTA 	= "IMPORTEDIVISAVENTA";
+	private static final String NOMBRE_CAMPO_CLASE_CAMBIO 			= "CLASECAMBIO";
+	private static final String NOMBRE_CAMPO_TIPO_CAMBIO 			= "TIPOCAMBIO";
+	//Datos de entrada a ITAL_302
+	private static final String APLICACION 	= "SNYD"; //Aplicacion que llama
+	private static final String ACCESO		= "SNYD175"; //Acceso a la CG18TB01
+	private static final String EUROS		= "EUR"; //Moneda destino
+	private static final String VALOR_TIPO_DIVISA = "D"; //Tipo divisa compra/venta
+	private static final String VALOR_CLASE_CAMBIO = "O";
+	//Contexto divisa
+	private static final String CTXTO_DIVISA_CONV = "IT006CON";
+	private static final String CTXTO_DIVISA_CONV_COD_ERROR = "IT006C010";
+	private static final String CTXTO_DIVISA_CONV_DESC_ERROR = "IT006C020";
+	private static final String CTXTO_DIVISA_CONV_TIPO_CAMBIO = "IT006C050";
+	private static final String CTXTO_DIVISA_CONV_FECHA_CAMBIO = "IT006C230";
+	//	Error. No se ha podido calcular el cambio de divisa
+	private static final Integer CTE_MSG_ERROR_CONV_DIVISA = Integer.valueOf(10882);
+	
+	/**	
+	 * Log de la clase.
+	 */
+	private final static LogHelper LOGGER = LogHelper.getLog(GestionPreformalizacion.class);
+	
+	public GestionPreformalizacion()
+	{
+		
+	}
+	
+	/**
+	 * Crea una nueva cuenta
+	 * 
+	 * @param datosCuenta Datos de la cuenta a crear
+	 * @return <code>ResultadoDatosCuentaVO</code> el resultado de la operación
+	 */
+	public ResultadoDatosCuentaVO crearDatosCuenta(DatosCuentasC datosCuenta)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Inicio");
+		}
+		
+		ResultadoDatosCuentaVO resultado = new ResultadoDatosCuentaVO();		
+		DatosCuentasEng dao = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		DatosCuentasC newDatosCuenta = dao.createNewObject();
+		newDatosCuenta.copiar(datosCuenta);
+		newDatosCuenta.getCuentasKey().setIdCuenta(dao.getSiguienteIdCuenta(
+				newDatosCuenta.getCuentasKey().getOficinaSolicitud(),
+				newDatosCuenta.getCuentasKey().getNumeroSolicitud(),
+				newDatosCuenta.getCuentasKey().getVersionSolicitud(),
+				newDatosCuenta.getCuentasKey().getNucExpediente()));
+		
+		dao.persist(newDatosCuenta);
+		
+		resultado.setDatos(datosCuenta);
+		resultado.setCodError(CodigosError.NO_ERROR);
+	
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Fin.");
+		}
+		
+		return resultado;
+	}
+	
+		/**
+	 * Crea una nueva cuenta
+	 * 
+	 * @param datosCuenta Datos de la cuenta a crear
+	 * @return <code>ResultadoDatosCuentaVO</code> el resultado de la operación
+	 */
+	public ResultadoDatosCuentaVO crearDatosCuenta(DatosCuentasC datosCuenta,DatosCuentasEng dao)
+	{
+		if(LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Inicio");
+		}
+		
+		ResultadoDatosCuentaVO resultado = new ResultadoDatosCuentaVO();		
+		//DatosCuentasEng dao = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		DatosCuentasC newDatosCuenta = dao.createNewObject();
+		newDatosCuenta.copiar(datosCuenta);
+		newDatosCuenta.getCuentasKey().setIdCuenta(dao.getSiguienteIdCuenta(
+				newDatosCuenta.getCuentasKey().getOficinaSolicitud(),
+				newDatosCuenta.getCuentasKey().getNumeroSolicitud(),
+				newDatosCuenta.getCuentasKey().getVersionSolicitud(),
+				newDatosCuenta.getCuentasKey().getNucExpediente()));
+		
+		dao.persist(newDatosCuenta);
+		
+		resultado.setDatos(datosCuenta);
+		resultado.setCodError(CodigosError.NO_ERROR);
+	
+		if(LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Fin.");
+		}
+		
+		return resultado;
+	}
+	
+	/**
+	 * Guarda los datos del notario asignado
+	 * 
+	 * @param datosCuenta Datos del notario a guardar
+	 * @return resultado de la operación
+	 */
+	public ResultadoDatosCuentaVO guardarDatosNotario(NotarioSolicitudC datosNotario)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosNotario() - Inicio");
+		}
+		
+		ResultadoDatosCuentaVO resultado = new ResultadoDatosCuentaVO();	
+		NotarioSolicitudEng dao = new NotarioSolicitudEng(CTE_JNDI_DATASOURCE);
+		
+		dao.persist(datosNotario);
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosNotario() - Fin.");
+		}
+		
+		return resultado;
+	}
+	
+	/**
+	 * Guarda los datos de la cuenta
+	 * 
+	 * @param datosCuenta Datos de la cuenta a guardar
+	 * @return <code>ResultadoDatosCuentaVO</code> el resultado de la operación
+	 */
+	public ResultadoDatosCuentaVO guardarDatosCuenta(DatosCuentasC datosCuenta)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Inicio");
+		}
+		
+		ResultadoDatosCuentaVO resultado = new ResultadoDatosCuentaVO();	
+		DatosCuentasEng dao = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		
+		dao.persist(datosCuenta);
+		
+		resultado.setDatos(datosCuenta);
+		resultado.setCodError(CodigosError.NO_ERROR);
+	
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("guardarDatosCuenta() - Fin.");
+		}
+		
+		return resultado;
+	}
+	
+	/**
+	 * Guarda el apoderado
+	 * @param apoderado
+	 */
+	public void guardarDatosApoderado(ApoderadoC apoderado) {
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("guardarDatosApoderado() - Inicio");
+		}
+		
+		ApoderadoEng dao = new ApoderadoEng();
+		
+		dao.persist(apoderado);
+		
+	}
+	
+ 	/**
+	 * Guarda la subvencion
+	 * @param apoderado
+	 */
+	public void guardarDatosSubvencion(SubvencionSolicC subvencion) {
+		
+		SubvencionSolicEng dao = new SubvencionSolicEng(CTE_JNDI_DATASOURCE);
+		
+		dao.persist(subvencion);
+		
+	}
+	
+	/**
+	 * Elimina las cuentas asociadas.
+	 * @param oficinaSolicitud
+	 * @param numSolicitud
+	 * @param versionSolicitud
+	 * @param nucExpediente
+	 */
+	public void deleteCuentas(BigDecimal oficinaSolicitud, BigDecimal numSolicitud, 
+			BigDecimal versionSolicitud, BigDecimal nucExpediente)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionPreformalizacion.deleteCuentas() - Inicio");
+		}
+		
+		DatosCuentasEng dao = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		List<DatosCuentasC> cuentas = dao.buscarInfoCuentas(oficinaSolicitud, numSolicitud, versionSolicitud, nucExpediente);
+				
+		for (DatosCuentasC cuenta : cuentas)
+		{
+			cuenta.markForDelete();
+			cuenta.persist();
+		}
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionPreformalizacion.deleteCuentas() - Fin");
+		}
+	}
+
+	/**
+	 * Elimina la cuenta que se pasa como parametro
+	 * @param datosCuentaEuros
+	 */
+	public void eliminarCuenta(DatosCuentasC datosCuentaEuros)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionPreformalizacion.eliminarCuenta() - Inicio");
+		}
+		
+		DatosCuentasEng dao = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		datosCuentaEuros.markForDelete();
+		dao.persist(datosCuentaEuros);
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("GestionPreformalizacion.eliminarCuenta() - Fin");
+		}		
+	}
+	
+	
+	/** Actualiza los campos relacionados con el cambio de divisa de la tabla CAG.AN25TB01: 1340, 1350, 1360. 
+	 * @param bidOficinaSolicitud
+	 * @param bidNumeroSolicitud
+	 * @param bidVersionSolicitud
+	 * @param bidNucExpediente
+	 */
+	//27-08-2013 - G000895
+	public void actualizarTipoCambio(final BigDecimal bidOficinaSolicitud,
+			final BigDecimal bidNumeroSolicitud, final BigDecimal bidVersionSolicitud,
+			final BigDecimal bidNucExpediente)
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("INICIO actualizar Tipo cambio");
+		}
+
+		GestionDatosSolicitud gds = new GestionDatosSolicitud();
+		DatosSolicitudC datosSolicitud = gds.obtenerDatosSolicitud(bidOficinaSolicitud, bidNumeroSolicitud, 
+				bidVersionSolicitud, bidNucExpediente);
+		
+		boolean actualizarCampos = false;
+		BigDecimal seguroFluctuacion = BigDecimal.ZERO;
+		BigDecimal tipoCambio = BigDecimal.ZERO;
+		String fechaCambio = "";
+		BigDecimal paramSeguro = BigDecimal.ZERO;
+		int result = 0;
+		
+		//Si la fecha de cambio es nula (fechaCambio = '0001-01-01')
+//		if (DateUtils.getSoloFecha(datosSolicitud.getDateFechaCambio()).equals(
+//				DateUtils.getSoloFecha(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO))))
+		
+		//Comprobamos si se ha modificado la fecha de formalizacion, en ese caso se actualizaran los campos
+		DatosSolicitudC solicVersionAnterior = gds.buscarVersionAnterior(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+				null,
+				datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(),
+				datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+			
+		if (null == solicVersionAnterior || (null != solicVersionAnterior && !datosSolicitud.getFechaFormalizacion().equals(solicVersionAnterior.getFechaFormalizacion()))) 
+		{
+			actualizarCampos = true;
+		}
+		else 
+		{
+			actualizarCampos = false;
+		}
+		
+		if (actualizarCampos)
+		{
+			final IDatosEntradaTx datosEntradaCalculoCambioSrv = 
+				ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+						ID_CUENTA_ITAL, 
+						ID_COOP_CAMBIO_DIVISA);		
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_APLICACION, APLICACION);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_ACCESO, ACCESO);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_DIVISA_COMPRA, datosSolicitud.getMonedaImporteSolicitado());
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_TIPO_DIVISA_COMPRA, VALOR_TIPO_DIVISA);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_DIVISA_VENTA, EUROS);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_TIPO_DIVISA_VENTA, VALOR_TIPO_DIVISA);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_IMPORTE_DIVISA_COMPRA, datosSolicitud.getImporteSolicitado());
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_IMPORTE_DIVISA_VENTA, BigDecimal.ZERO);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_CLASE_CAMBIO, VALOR_CLASE_CAMBIO);
+			datosEntradaCalculoCambioSrv.addCampo(NOMBRE_CAMPO_TIPO_CAMBIO, BigDecimal.ZERO);
+			
+			//Llamada al servicio ITAL_302 (->ITALR129 ->ITALM126)
+			//Contexto Cambio: IT006CON
+			final IContexto[] aContextoCambioDivisa = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaCalculoCambioSrv);
+			
+			if (0 != aContextoCambioDivisa.length && aContextoCambioDivisa[0].getNombre().equals(CTXTO_DIVISA_CONV) &&
+				(Helper.isNullOrEmpty(aContextoCambioDivisa[0].getBigDecimal(CTXTO_DIVISA_CONV_COD_ERROR)) ||
+						BigDecimal.ZERO.equals(aContextoCambioDivisa[0].getBigDecimal(CTXTO_DIVISA_CONV_COD_ERROR))))
+			{
+				result = aContextoCambioDivisa[0].getBigDecimal(CTXTO_DIVISA_CONV_COD_ERROR).intValue();
+				
+				if (0 == result)
+				{
+					//Consultamos el valor del porcentaje del seguro de fluctuacion de la tabla de parametros
+					final IDatosEntradaTx datosEntradaConsultaParametroSrv = 
+						ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), 
+								Constantes.ID_CUENTA_ANPM, 
+								IConstantesTramitacion.CTE_CO_CONSULTA_PARAMETRO);		
+					datosEntradaConsultaParametroSrv.addCampo(IConstantesTramitacion.NOMBRE_CAMPO_PARAMETRO, IConstantesTramitacion.VALOR_PARAMETRO_SEGURO);
+					
+					//Llamada al servicio ANPM_180: Recuperamos el valor del parametro "Seguro de fluctuación para la divisa en prestamos"
+					//Contexto Parametros: ANPMN080
+					final IContexto[] aContextoParametro = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaConsultaParametroSrv);
+
+					if (null != aContextoParametro && 0 != aContextoParametro.length && aContextoParametro[0].getNombre().equals(IConstantesTramitacion.CTXTO_PARAMETRO) &&
+							(!Helper.isNullOrEmpty(aContextoParametro[0].getString(IConstantesTramitacion.CTXTO_PARAMETRO_VALOR))))
+					{
+						paramSeguro = UtilidadesTramitacion.stringToBigDecimal(aContextoParametro[0].getString(IConstantesTramitacion.CTXTO_PARAMETRO_VALOR), Locale.getDefault());
+					}
+					
+					if (!Helper.isNullOrEmpty(aContextoCambioDivisa[0].getBigDecimal(CTXTO_DIVISA_CONV_TIPO_CAMBIO)))
+					{
+						tipoCambio = aContextoCambioDivisa[0].getBigDecimal(CTXTO_DIVISA_CONV_TIPO_CAMBIO);
+					}
+					
+					//Cambio_seguro_fluctuación = Cambio – (Cambio * SEGURO_CAM)/100)
+					seguroFluctuacion = tipoCambio.subtract((tipoCambio.multiply(paramSeguro).divide(new BigDecimal(100))));
+					
+					if (!Helper.isNullOrEmpty(aContextoCambioDivisa[0].getString(CTXTO_DIVISA_CONV_FECHA_CAMBIO)))
+					{
+						fechaCambio = aContextoCambioDivisa[0].getString(CTXTO_DIVISA_CONV_FECHA_CAMBIO);
+					}
+					
+					//Actualizamos los campos AN251340, AN251350 y AN251360 de la solicitud
+					datosSolicitud.setDateFechaCambio(DateUtils.toSQLDate(DateUtils.parseDate(fechaCambio, DateUtils.FORMATO_FECHA_AMERICANO))); 
+					datosSolicitud.setBidCambio(tipoCambio);
+					datosSolicitud.setBidCambioConSeguroFluctuacion(seguroFluctuacion);
+					
+					//final ResultadoDatosSolicitudVO resultado = gds.guardarSolicitud(datosSolicitud);
+					final ResultadoDatosSolicitudVO resultado = gds.updateSolicitud(datosSolicitud);
+					if (resultado.getCodError() != 0)
+					{
+						ServicioNegocio.rollback(CTE_MSG_ERROR_CONV_DIVISA, 
+								null, 
+								new String[] {"Error actualizacion datos tipo cambio de la solicitud." + resultado.getCodError()}, 
+								null);
+					}
+				}
+			}
+			else
+			{
+				ServicioNegocio.rollback(CTE_MSG_ERROR_CONV_DIVISA, 
+						null, 
+						new String[] {aContextoCambioDivisa[0].getString(CTXTO_DIVISA_CONV_DESC_ERROR)},
+						null);
+			}
+		}
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("FIN actualizar Tipo cambio");
+		}		
+	}
+	
+	/**
+	 * Comprueba si se han guardado los datos de la OV para una versión del expediente 
+	 * @param solicitudActual
+	 * @return boolean 
+	 */
+	public static boolean existeVersion(DatosSolicitudC solicitudActual){
+		OfertaVinculanteEng ofertaVinculanteEng = new OfertaVinculanteEng();
+		return ofertaVinculanteEng.existeVersionOV(solicitudActual);
+	}
+
+	/**
+	 * Comprueba si se han guardado los datos de la OV para una versión del expediente 
+	 * @param solicitudActual
+	 * @return OfertaVinculanteC
+	 */
+	public static OfertaVinculanteC obtenerVersionAnterior(DatosSolicitudC solicitudActual){
+		OfertaVinculanteEng ofertaVinculanteEng = new OfertaVinculanteEng();
+		return ofertaVinculanteEng.obtenerVersionAnterior(solicitudActual);
+	}
+	
+	/**
+	 * Obtiene la OV de esa solicitud 
+	 * @param oficina
+	 * @param numero
+	 * @param version
+	 * @param nuc
+	 * @return OfertaVinculanteC
+	 */
+	public static OfertaVinculanteC obtenerVersionOV(BigDecimal oficina,BigDecimal numero,BigDecimal version,BigDecimal nuc){
+		OfertaVinculanteEng ofertaVinculanteEng = new OfertaVinculanteEng();
+		return ofertaVinculanteEng.obtenerVersionOV(oficina,numero,version,nuc);
+	}
+
+}
+

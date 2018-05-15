@@ -1,0 +1,170 @@
+/**
+ */
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condicionantecondicion.CondicionantecondicionC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condicionantes.CondicionantesC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.condiciones.CondicionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionCondicionantes;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada.contextos.ContextoModificaCondiciones;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * @author v361466 and V361465
+ * CO: 	ANPM_105
+ * CTX:	ANPMN110
+ * TRX:	ANVR
+ */
+public class ModificacionCondicionSrv extends ServicioNegocio {
+
+    /* 
+	 *Contexto: ANPMN110
+	 *Transacción: ANVR
+	 *Cod_Operación: ANPM_105
+	 *
+	 *Servicio de negocio que realiza la modificación de valor, valor desde y valor hasta de la tabla AN18TB01
+	 * @see es.caixagalicia.ifrt.core.ServicioNegocio#ejecutar(es.caixagalicia.ifrt.core.IContextoEjecucion, es.caixagalicia.ifrt.core.IDatosEntradaTx)
+	 */
+    private static final LogHelper LOGGER = LogHelper.getLog(ModificacionCondicionSrv.class);
+
+    private static final String CTE_VALOR_ESTANDAR = "VALORESTANDAR";
+
+    private static final String CTE_VALOR_DESDE = "VALORDESDE";
+
+    private static final String CTE_VALOR_HASTA = "VALORHASTA";
+
+    private static final String CTE_NUMERO_CONDICION = "NUMEROCONDICION";
+
+    private static final String CTE_FECHAHASTA = "FECHAHASTA";
+
+    private static final String CTE_FECHADESDE = "FECHADESDE";
+
+    private static final String CTE_FECHADESDEANTERIOR = "FECHADESDEANTERIOR";
+
+    private static final String CTE_HORAVIGENCIADESDE = "HORAVIGENCIADESDE";
+
+    private static final String CTE_IDPRODUCTO = "IDPRODUCTO";
+
+    private static final String CTE_IDSUBPRODUCTO = "IDSUBPRODUCTO";
+
+    private static final String CTE_IDVERSION = "IDVERSION";
+
+    @Override
+    public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada) {
+        // Inicializadas variables
+        BigDecimal valor = null;
+        BigDecimal valorDesde = null;
+        BigDecimal valorHasta = null;
+        BigDecimal numCondicion = null;
+        BigDecimal version = null;
+        BigDecimal producto = null;
+        BigDecimal subproducto = null;
+        String fechaHasta = null;
+        String fechaDesde = null;
+        String fechaDesdeAnterior = null;
+        String horaVigenciaDesde = null;
+        // String horaVigenciaHasta = null;
+        List<IContexto> listaContextos = null;
+        IContexto[] arrayContextos = null;
+        List<CondicionantesC> listaCondicionantes = null;
+        List<CondicionesC> listaCondiciones = new ArrayList<CondicionesC>();
+        // Set diario Electrónico
+        contextoEjecucion.setDiarioElectronico(new DiarioElectronico(DiarioElectronico.TIPO_ACTUALIZA));
+        // Datos de entrada
+        valor = datosEntrada.getDecimal(CTE_VALOR_ESTANDAR);
+        valorDesde = datosEntrada.getDecimal(CTE_VALOR_DESDE);
+        valorHasta = datosEntrada.getDecimal(CTE_VALOR_HASTA);
+        // Redondeo hacia arriba con 7 decimales
+        valor.setScale(7, RoundingMode.HALF_UP);
+        valorDesde.setScale(7, RoundingMode.HALF_UP);
+        valorHasta.setScale(7, RoundingMode.HALF_UP);
+        numCondicion = datosEntrada.getDecimal(CTE_NUMERO_CONDICION);
+        fechaHasta = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHAHASTA));
+        fechaDesde = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHADESDE));
+        fechaDesdeAnterior = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_FECHADESDEANTERIOR));
+        horaVigenciaDesde = Utilidades.comprobarDatoNull(datosEntrada.getString(CTE_HORAVIGENCIADESDE));
+        Timestamp timestampActual = DateHelper.getInstance().askTimestampFromSystem();
+        Date fechaActual = new Date(timestampActual.getTime());
+        producto = datosEntrada.getDecimal(CTE_IDPRODUCTO);
+        subproducto = datosEntrada.getDecimal(CTE_IDSUBPRODUCTO);
+        version = datosEntrada.getDecimal(CTE_IDVERSION);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug(fechaHasta);
+        }
+        if (Utilidades.isBlankOrNull(fechaHasta)) {
+            fechaHasta = "01-01-0001";
+        }
+        /* 20151104
+		 * 
+		 * Se transforman las fechas para poder compararlas
+		 * 
+		*/
+        String fechaDesdeStrDb2 = null;
+        String fechaHastaStrDb2 = null;
+        fechaDesdeStrDb2 = DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_YYYY_MM_DD_GUION, fechaDesde);
+        fechaHastaStrDb2 = DateHelper.getInstance().formatearFecha(DateHelper.FORMATO_DD_MM_YYYY_GUION, DateHelper.FORMATO_YYYY_MM_DD_GUION, fechaHasta);
+        if (0 > fechaDesdeStrDb2.compareTo(fechaActual.toString())) {
+            ServicioNegocio.rollback(CodigosError.CTE_ERROR_MODIF_PRECIOS_F_DESDE_MENOR_F_ACTUAL, null, null, null);
+        }
+        if (!DateUtils.CTE_DATELOWESTONLYDAY.equals(fechaHastaStrDb2)) {
+            if (0 > fechaHastaStrDb2.compareTo(fechaDesdeStrDb2)) {
+                ServicioNegocio.rollback(CodigosError.CTE_ERROR_MODIF_PRECIOS_F_HASTA_MENOR_F_DESDE, null, null, null);
+            }
+        }
+        // Traigo los datos de la condicion
+        listaCondiciones = GestionCondicionantes.ModificaCondicion(valor, valorDesde, valorHasta, numCondicion, fechaHasta, fechaDesde, fechaDesdeAnterior, horaVigenciaDesde, fechaActual.toString());
+        listaCondicionantes = GestionCondicionantes.consultaListaCondicionante(producto, subproducto, version, listaCondiciones);
+        if (5005 == producto.intValue() && 496 == subproducto.intValue()) {
+            List<CondicionantecondicionC> listaRelaciones = GestionCondicionantes.consultaTarifa(producto, subproducto, version);
+            for (CondicionantecondicionC relacion : listaRelaciones) {
+                if (3 == relacion.getTarifa().intValue() && 0 == numCondicion.compareTo(relacion.getCondicion())) {
+                    // $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-3$ $OP-LBL-NL-2$ $OP-LBL-NL-2$
+                    UtilidadesComun.enviarCorreo("MOD_TARIF", new Mensaje(ServicioNegocio.getContexto(), MODIFICADO_TARIFA_822546670).toString() + relacion.getTarifa().intValue() + new Mensaje(ServicioNegocio.getContexto(), _VALOR_1180739178).toString() + valor + new Mensaje(ServicioNegocio.getContexto(), _DESDE_669306107).toString() + valorDesde + new Mensaje(ServicioNegocio.getContexto(), _HASTA_780143879).toString() + valorHasta + new Mensaje(ServicioNegocio.getContexto(), _NUMCONDICION_622749184).toString() + numCondicion + new Mensaje(ServicioNegocio.getContexto(), _PRODUCTO_506775578).toString() + producto + new Mensaje(ServicioNegocio.getContexto(), _SUBPRODUCTO_1765678094).toString() + subproducto + new Mensaje(ServicioNegocio.getContexto(), _VERSION_249286614).toString() + version + new Mensaje(ServicioNegocio.getContexto(), _FECHA_DESDE_818360322).toString() + fechaDesde + new Mensaje(ServicioNegocio.getContexto(), _FECHA_HASTA_707522550).toString() + fechaHasta + new Mensaje(ServicioNegocio.getContexto(), HORA_VIGENCIA_2079968754).toString() + horaVigenciaDesde);
+                }
+            }
+        }
+        // Relleno el contexto
+        listaContextos = ContextoModificaCondiciones.contextoRellenarCondiciones(listaCondiciones, listaCondicionantes);
+        arrayContextos = listaContextos.toArray(new IContexto[listaContextos.size()]);
+        return arrayContextos;
+    }
+
+    private static final String _PRODUCTO_506775578 = "_PRODUCTO_506775578";
+
+    private static final String _VERSION_249286614 = "_VERSION_249286614";
+
+    private static final String _FECHA_HASTA_707522550 = "_FECHA_HASTA_707522550";
+
+    private static final String _DESDE_669306107 = "_DESDE_669306107";
+
+    private static final String _SUBPRODUCTO_1765678094 = "_SUBPRODUCTO_1765678094";
+
+    private static final String _FECHA_DESDE_818360322 = "_FECHA_DESDE_818360322";
+
+    private static final String _HASTA_780143879 = "_HASTA_780143879";
+
+    private static final String _NUMCONDICION_622749184 = "_NUMCONDICION_622749184";
+
+    private static final String HORA_VIGENCIA_2079968754 = "HORA_VIGENCIA_2079968754";
+
+    private static final String MODIFICADO_TARIFA_822546670 = "MODIFICADO_TARIFA_822546670";
+
+    private static final String _VALOR_1180739178 = "_VALOR_1180739178";
+}

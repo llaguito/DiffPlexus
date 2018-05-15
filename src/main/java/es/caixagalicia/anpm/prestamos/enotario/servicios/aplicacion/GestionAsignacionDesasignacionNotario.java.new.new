@@ -1,0 +1,200 @@
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Date;
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesComun;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.datosgenerales.DatosgeneralesC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudKey;
+import es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos.ContextoAsignacionDesasignacionNotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.IConstantesEnotario;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion.GestionDatosSolicitud;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+
+public class GestionAsignacionDesasignacionNotario {
+
+    /**
+     * Guarda el notario asignado a una operacion
+     * @param apoderado
+     */
+    public void guardarNotarioSolicitud(NotarioSolicitudC notarioSolicitud) {
+        if (null != notarioSolicitud) {
+            NotarioSolicitudEng dao = new NotarioSolicitudEng();
+            dao.persist(notarioSolicitud);
+        }
+    }
+
+    /**
+     * Crea un nuevo objeto de tipo Notario solicitud
+     * @param datosSolicitud
+     * @param numColegiadoNotario
+     * @param numRegistro
+     * @param nifNotario
+     * @param usuario
+     * @return objeto notario solicitud con los campos  completos
+     */
+    public static IContexto[] asignarNotarioSolicitud(DatosSolicitudC datosSolicitud, String numColegiadoNotario, String nifNotario, String usuario, String codigoNotaria, String nombreCompletoNotario, String estadoOperacion) {
+        NotarioSolicitudEng dao = new NotarioSolicitudEng();
+        // Si el notario no esta asignado se asigna
+        if (!dao.estaAsignadoNotario(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente(), nifNotario)) {
+            NotarioSolicitudC newNotarioSolicud = dao.createNewObject();
+            // Recuperar la clave
+            NotarioSolicitudKey notarioSolicitudKey = new NotarioSolicitudKey();
+            // Rellenar la clave
+            notarioSolicitudKey.setDatosSolicitud(datosSolicitud);
+            notarioSolicitudKey.setNumColegiadoNotario(numColegiadoNotario);
+            notarioSolicitudKey.setNumRegistro(dao.obtenerSiguienteNumeroRegistro(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente(), numColegiadoNotario));
+            // Setear la clave
+            newNotarioSolicud.setId(notarioSolicitudKey);
+            // Construir el objeto
+            newNotarioSolicud.setFechaAlta(DateUtils.toSQLDate(DateUtils.dateNow()));
+            newNotarioSolicud.setFechaBaja(DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWEST, DateUtils.FORMATO_FECHA_CORTO)));
+            newNotarioSolicud.setFormalizacion("N");
+            newNotarioSolicud.setNifNotario(nifNotario);
+            newNotarioSolicud.setTimestamp(new Timestamp(DateUtils.dateNow().getTime()));
+            newNotarioSolicud.setUsuario("ANPM_478");
+            newNotarioSolicud.setCodigoNotaria(codigoNotaria);
+            newNotarioSolicud.setNombreCompletoNotario(nombreCompletoNotario);
+            newNotarioSolicud.setEstadoOperacion(estadoOperacion);
+            newNotarioSolicud.persist();
+            return ContextoAsignacionDesasignacionNotario.rellenarContexto(newNotarioSolicud);
+        }
+        // Si no entra se devuelve un nulo
+        return ContextoAsignacionDesasignacionNotario.rellenarContextoErrorAsignado();
+    }
+
+    /**
+     * Desasigna un notario poniendole la fecha de baja
+     * @param numeroColegiado
+     * @param numeroPrestamo
+     * @param usuario
+     * @return
+     */
+    public static IContexto[] desasignarNotarioSolicitud(String numeroColegiado, String numeroPrestamo, String usuario, String estadoOperacion) {
+        DatosSolicitudC datosSolicitud = obtenerDatosSolicitud(numeroPrestamo);
+        IContexto[] notario = desasignarNotarioDatosSolicitudNumeroColegiadoDesasignar(numeroColegiado, datosSolicitud, usuario, estadoOperacion);
+        if (1 == datosSolicitud.getMedioFormalizacion().intValue()) {
+            // $OP-LBL-NL-3$ $OP-LBL-NL-2$ $OP-LBL-NL-2$
+            UtilidadesComun.enviarCorreo("BAJA_NOTAR", new Mensaje(ServicioNegocio.getContexto(), OPERACI_N_CCC_356651555).toString() + UtilidadesEnotario.getContratoPrestamo(datosSolicitud) + new Mensaje(ServicioNegocio.getContexto(), NUC_3392574).toString() + datosSolicitud.getDatosSolicitudKey().getNucExpediente().toString() + new Mensaje(ServicioNegocio.getContexto(), _LE_DESASIGNADO_NOTARIO_P_NGASE_CONTACTO_NOTAR_A_247950165).toString());
+        }
+        return notario;
+    }
+
+    /**
+     * Desasigna un notario por numero de colegiado.
+     * @param numeroColegiado
+     * @param datosSolicitud
+     * @return
+     */
+    public static IContexto[] desasignarNotarioDatosSolicitudNumeroColegiadoDesasignar(String numeroColegiado, DatosSolicitudC datosSolicitud, String usuario, String estadoOperacion) {
+        DatosgeneralesC datoGeneral = datosSolicitud.getDatosGeneralesEnotario().get(0);
+        Date fechaMinima = DateUtils.toSQLDate(DateUtils.parseDate(DateUtils.CTE_DATELOWEST, DateUtils.FORMATO_FECHA_CORTO));
+        List<NotarioSolicitudC> notariosSolicitud = datosSolicitud.getNotarioSolicitud();
+        for (NotarioSolicitudC notario : notariosSolicitud) {
+            // Dado de alta que la fecha sea diferente de 0001-01-01
+            if (notario.getId().getNumColegiadoNotario().trim().equals(numeroColegiado.trim())) {
+                // Ademas de ser el notario que buscamos no puede estar dado de baja
+                if (notario.getFechaBaja().equals(fechaMinima)) {
+                    // Construir el objeto
+                    notario.setFechaBaja(DateUtils.toSQLDate(DateUtils.dateNow()));
+                    notario.setTimestamp(new Timestamp(DateUtils.dateNow().getTime()));
+                    notario.setUsuario("ANPM_478");
+                    notario.setEstadoOperacion(estadoOperacion);
+                    datoGeneral.setEstado(IConstantesEnotario.CTE_DATOS_GEN_ESTADO_RECHAZADO);
+                }
+            }
+        }
+        // Si viene por aqui acaba sin exito
+        return ContextoAsignacionDesasignacionNotario.rellenarContextoErrorNoAsignado();
+    }
+
+    /**
+     * Guarda en base de datos el notario de la solicitud
+     * @param notarioSolicitud
+     */
+    public static void persistirNotarioSolicitud(NotarioSolicitudC notarioSolicitud) {
+        notarioSolicitud.persist();
+        notarioSolicitud.refresh();
+    }
+
+    /**
+     * Obtiene el objeto datosSolicitud por contrato prestamo
+     * @param contratoPrestamo
+     */
+    public static DatosSolicitudC obtenerDatosSolicitud(String contratoPrestamo) {
+        BigDecimal numeroSolicitud = BigDecimal.ZERO;
+        BigDecimal codigoOficina = BigDecimal.ZERO;
+        // En prevision de formato que pudiesemos recibir contemplamos ambas posibilidades
+        if (null != contratoPrestamo && contratoPrestamo.length() == IConstantesEnotario.CTE_INT_20) {
+            codigoOficina = new BigDecimal(contratoPrestamo.substring(4, 8));
+            numeroSolicitud = new BigDecimal(contratoPrestamo.substring(13, 19));
+        } else if (null != contratoPrestamo && contratoPrestamo.length() == IConstantesEnotario.CTE_INT_24) {
+            codigoOficina = new BigDecimal(contratoPrestamo.substring(8, 12));
+            numeroSolicitud = new BigDecimal(contratoPrestamo.substring(17, 23));
+        }
+        GestionDatosSolicitud gds = new GestionDatosSolicitud();
+        DatosSolicitudC datosSolicitud = new DatosSolicitudC();
+        datosSolicitud = gds.obtenerDatosSolicitudPorOficinaNumSolVersion(codigoOficina, numeroSolicitud, null);
+        return datosSolicitud;
+    }
+
+    /**
+     * Asigna un notario a una solicitud y lo guarda en base de datos
+     * @return
+     */
+    public static IContexto[] asignarNotarioSolicitud(String numColegiadoNotario, String nifNotario, String usuario, String contratoPrestamo, String codigoNotaria, String nombreCompletoNotario, String estadoOperacion) {
+        // Recuperar la solicitud a la que pertenece
+        DatosSolicitudC datosSolicitud = obtenerDatosSolicitud(contratoPrestamo);
+        // Crear el objeto notario solicitud
+        IContexto[] notarioSolicitud = asignarNotarioSolicitud(datosSolicitud, numColegiadoNotario, nifNotario, usuario, codigoNotaria, nombreCompletoNotario, estadoOperacion);
+        return notarioSolicitud;
+    }
+
+    /**
+     */
+    public static String restoBloques(String numeroPrestamo, String nifColegiado, String codigoColegiado, String codigoNotaria, String nombreColegiado, String estado, String fechaAsignacion, String codigoBic, String codigoIban) {
+        if (null == numeroPrestamo) {
+            numeroPrestamo = StringUtils.EMPTY;
+        }
+        if (null == nifColegiado) {
+            nifColegiado = StringUtils.EMPTY;
+        }
+        if (null == codigoColegiado) {
+            codigoColegiado = StringUtils.EMPTY;
+        }
+        if (null == codigoNotaria) {
+            codigoNotaria = StringUtils.EMPTY;
+        }
+        if (null == nombreColegiado) {
+            nombreColegiado = StringUtils.EMPTY;
+        }
+        if (null == estado) {
+            estado = StringUtils.EMPTY;
+        }
+        if (null == fechaAsignacion) {
+            fechaAsignacion = StringUtils.EMPTY;
+        }
+        if (null == codigoBic) {
+            codigoBic = StringUtils.EMPTY;
+        }
+        if (null == codigoIban) {
+            codigoIban = StringUtils.EMPTY;
+        }
+        return StringUtils.rightPad(numeroPrestamo, 20).substring(0, 20) + StringUtils.rightPad(nifColegiado, 9).substring(0, 9) + StringUtils.rightPad(codigoColegiado, 7).substring(0, 7) + StringUtils.rightPad(codigoNotaria, 9).substring(0, 9) + StringUtils.rightPad(nombreColegiado, 250).substring(0, 250) + StringUtils.rightPad(estado, 1).substring(0, 1) + StringUtils.rightPad(fechaAsignacion, 8).substring(0, 8) + StringUtils.rightPad(codigoBic, 11).substring(0, 11) + StringUtils.rightPad(codigoIban, 24).substring(0, 24);
+    }
+
+    private static final String NUC_3392574 = "NUC_3392574";
+
+    private static final String OPERACI_N_CCC_356651555 = "OPERACI_N_CCC_356651555";
+
+    private static final String _LE_DESASIGNADO_NOTARIO_P_NGASE_CONTACTO_NOTAR_A_247950165 = "_LE_DESASIGNADO_NOTARIO_P_NGASE_CONTACTO_NOTAR_A_247950165";
+}

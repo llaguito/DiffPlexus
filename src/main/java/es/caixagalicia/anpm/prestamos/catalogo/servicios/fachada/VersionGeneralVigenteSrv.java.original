@@ -1,0 +1,166 @@
+package es.caixagalicia.anpm.prestamos.catalogo.servicios.fachada;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.Time;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionKey;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Constantes;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+
+public class VersionGeneralVigenteSrv extends ServicioNegocio
+{
+	public final static String CTE_ENTRADA_COD_PRODUCTO = "COD_PRODUCTO";
+	public final static String CTE_ENTRADA_COD_SUBPRODUCTO = "COD_SUBPRODUCTO";
+	public final static String CTE_ENTRADA_VERSION_GENERAL = "VERSION_GENERAL";
+	public final static String CTE_ENTRADA_COLECTIVO = "COLECTIVO";
+	
+	public final static String CTE_CTX = 				"ANPMN099";
+	public final static String CTE_CTX_COD_PRODUCTO = 	"ANPMN099010";
+	public final static String CTE_CTX_COD_SUBPRODUCTO = "ANPMN099020";
+	public final static String CTE_CTX_VERSION_GENERAL = "ANPMN099030";
+	public final static String CTE_CTX_COLECTIVO = 			"ANPMN099040";
+	public final static String CTE_CTX_IND_ES_VERSION_VIGENTE = "ANPMN099050";
+	
+	@Override
+	public IContexto[] ejecutar(IContextoEjecucion contextoEjecucion, IDatosEntradaTx datosEntrada)
+	{
+		IContexto[] resultado = null;
+		IContexto contextoSalida = null;
+		
+		List<VersionesC> versionesVigentes = null;
+		
+		BigDecimal bidCodProducto = null;
+		BigDecimal bidCodSubproducto = null;
+		BigDecimal bidVersionGeneral = null;
+		BigDecimal bidColectivo = null;
+		
+		Integer intCodProducto = null;
+		Integer intCodSubproducto = null;
+		Integer intVersionGeneral = null;
+		Integer intColectivo = null;
+		
+		Date fechaHoy = null;
+		String horaActualStr = null;
+		Time horaActual = null;
+		
+		Date fechaInicio = null;
+		Time horaInicio = null;
+		
+		Date fechaFin = null;
+		Time horaFin = null;
+		
+		fechaHoy = new Date(DateHelper.getInstance().askTime().getTime());
+		
+		horaActualStr = DateHelper.dateToString(fechaHoy, DateHelper.FORMATO_DB2_TIME);
+		horaActual = DateHelper.stringASqlTime(horaActualStr, DateHelper.FORMATO_DB2_TIME);
+		
+		fechaInicio = fechaHoy;
+		horaInicio = horaActual;
+		
+		fechaFin = fechaHoy;
+		horaFin = horaActual;
+		
+		
+		boolean esVersionGeneralVigente = false;
+		
+		/*Establecemos diario electrónico*/
+		contextoEjecucion.setDiarioElectronico(
+			new DiarioElectronico(DiarioElectronico.TIPO_CONSULTA));
+		
+		/*Recuperamos las entradas*/
+		
+		bidCodProducto = datosEntrada.getDecimal(CTE_ENTRADA_COD_PRODUCTO);
+		bidCodSubproducto = datosEntrada.getDecimal(CTE_ENTRADA_COD_SUBPRODUCTO);
+		bidVersionGeneral = datosEntrada.getDecimal(CTE_ENTRADA_VERSION_GENERAL);
+		bidColectivo = datosEntrada.getDecimal(CTE_ENTRADA_COLECTIVO);
+		
+		if ((null == bidCodProducto) ||
+			(null == bidCodSubproducto) ||
+			(null == bidVersionGeneral) ||
+			(null == bidColectivo))
+		{
+			ServicioNegocio.rollback(
+				Constantes.CTE_ERROR_CAMPOS_OBLIGATORIOS,
+				new String[] {"Comprobación versión general vigente"},
+				null,
+				null);
+		}
+		
+		intCodProducto = new Integer(bidCodProducto.intValue());
+		intCodSubproducto = new Integer(bidCodSubproducto.intValue());
+		intVersionGeneral = new Integer(bidVersionGeneral.intValue());
+		intColectivo = new Integer(bidColectivo.intValue());
+		
+		versionesVigentes = GestionVersiones.obtenerVersionesEnFechas(
+			intCodProducto,
+			intCodSubproducto,
+			intColectivo,
+			fechaInicio,
+			horaInicio,
+			fechaFin,
+			horaFin);
+		
+		
+		for (VersionesC versionVigenteActual : versionesVigentes)
+		{
+			VersionKey claveVersionVigenteActual = versionVigenteActual.getVersionKey();
+			
+			
+			if ((0 == intCodProducto.compareTo(claveVersionVigenteActual.getIdProducto())) &&
+				(0 == intCodSubproducto.compareTo(claveVersionVigenteActual.getIdSubProducto())) &&
+				(0 == intVersionGeneral.compareTo(claveVersionVigenteActual.getIdVersionGeneral())) &&
+				(0 == intColectivo.compareTo(claveVersionVigenteActual.getIdColectivo())))
+			{
+				esVersionGeneralVigente = true;
+			}
+			break;
+		}
+		
+		contextoSalida = rellenarContextoSalida(bidCodProducto, bidCodSubproducto, bidVersionGeneral, bidColectivo, esVersionGeneralVigente);
+		
+		resultado = new IContexto[1];
+		
+		resultado[0] = contextoSalida;
+		
+		return resultado;
+	}
+
+	
+	private static IContexto rellenarContextoSalida(
+		BigDecimal bidCodProducto, BigDecimal bidCodSubproducto,
+		BigDecimal bidVersionGeneral, BigDecimal bidColectivo,
+		boolean esVersionGeneralVigente)
+	{
+		IContexto contextoSalida = null;
+		
+		contextoSalida = ContextoFactory.getInstance().getContexto(CTE_CTX);
+		
+		contextoSalida.put(CTE_CTX_COD_PRODUCTO, bidCodProducto);
+		contextoSalida.put(CTE_CTX_COD_SUBPRODUCTO, bidCodSubproducto);
+		contextoSalida.put(CTE_CTX_VERSION_GENERAL, bidVersionGeneral);
+		contextoSalida.put(CTE_CTX_COLECTIVO, bidColectivo);
+		if (esVersionGeneralVigente)
+		{
+			contextoSalida.put(CTE_CTX_IND_ES_VERSION_VIGENTE, Constantes.CTE_STRING_S);
+		}
+		else
+		{
+			contextoSalida.put(CTE_CTX_IND_ES_VERSION_VIGENTE, Constantes.CTE_STRING_N);
+		}
+		
+		return contextoSalida;
+		
+	}
+	
+	
+}

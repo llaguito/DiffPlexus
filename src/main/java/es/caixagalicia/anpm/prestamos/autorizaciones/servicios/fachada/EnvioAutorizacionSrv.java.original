@@ -1,0 +1,286 @@
+/**
+ * Aplicacion de Autorización de precios
+ * Caixa Galicia © 2011
+ */
+package es.caixagalicia.anpm.prestamos.autorizaciones.servicios.fachada;
+
+import java.math.BigDecimal;
+
+import es.caixagalicia.anpm.prestamos.autorizaciones.persistencia.DatosAutorizacionC;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.aplicacion.GestionDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.autorizaciones.servicios.fachada.contextos.ContextoDatosAutorizacion;
+import es.caixagalicia.anpm.prestamos.autorizaciones.utilidades.AutorizacionVO;
+import es.caixagalicia.anpm.prestamos.autorizaciones.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.autorizaciones.utilidades.EstadosAutorizacion;
+import es.caixagalicia.anpm.prestamos.catalogo.utilidades.Utilidades;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.ifrt.core.DiarioElectronico;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IContextoEjecucion;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.log.LogHelper;
+
+/**
+ * Servicio para Enviar una autorización.
+ * 
+ * @author F001317 (Mario García)
+ *
+ * AP: ANPM
+ * CO: ANPM_212
+ * CTX: ANPMN070
+ *
+ */
+public class EnvioAutorizacionSrv extends DatosAutorizacionAbstractSrv
+{
+	/*
+	 * NOMBRES MULTICANAL DE LOS PARAMETROS DE ENTRADA AL SERVICIO 
+	 */
+	private static final String CTE_CAMPO_OFICINA_SOLICITUD = "OFICINA_SOLICITUD";
+	private static final String CTE_CAMPO_NUMERO_SOLICITUD = "NUMERO_SOLICITUD";
+	private static final String CTE_CAMPO_VERSION_SOLICITUD = "VERSION_SOLICITUD";
+	private static final String CTE_CAMPO_NUMERO_AUTORIZACION = "NUMERO_AUTORIZACION";
+	private static final String CTE_CAMPO_ID_AGRUPACION = "ID_AGRUPACION";
+	
+	/*20150615 Campos de entrada para el envío de autorización scoring a AGEN*/
+	public static final String CTE_CAMPO_IND_TIPO_AUTORIZ = "IND_TIPO_AUTORIZ";
+	public static final String CTE_CAMPO_NIVEL_MAX_AUTORIZ = "NIVEL_MAX_AUTORIZ";
+	
+	public static final String CTE_CAMPO_IND_DICTAMEN_SCORING = "IND_DICTAMEN_SCORING";
+	
+	/*
+	 * NOMBRE DEL CONTEXTO DE SALIDA DEL SERVICIO
+	 */
+	private static final String CTE_CTX_ERROR = "AG031CON";
+	private static final String CTE_CAMPO_DESC_ERROR = "AG031C080";
+	private static final String CTE_CAMPO_COD_ERROR = "AG031C070";
+
+	// Instancia para log del servicio
+	private static final LogHelper LOGGER = LogHelper.getLog(EnvioAutorizacionSrv.class);
+	
+	/**
+	 * Metodo ejecutar
+	 * @param contexto
+	 * @param datosEntrada
+	 * @return <code>IContexto[]</code>
+	 */
+	@Override
+	public IContexto[] ejecutar(final IContextoEjecucion contexto, final IDatosEntradaTx datosEntrada)
+	{
+		final long lInicio = System.currentTimeMillis();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("INICIO SNANPM212: Envío de una autorización.");
+		}
+
+		contexto.setDiarioElectronico(new DiarioElectronico(
+				DiarioElectronico.TIPO_ACTUALIZA));
+
+		// Recuperamos los campos de entrada al servicio
+		final BigDecimal oficinaSolicitud = datosEntrada.getDecimal(CTE_CAMPO_OFICINA_SOLICITUD);
+		final BigDecimal numeroSolicitud = datosEntrada.getDecimal(CTE_CAMPO_NUMERO_SOLICITUD);
+		final BigDecimal versionSolicitud = datosEntrada.getDecimal(CTE_CAMPO_VERSION_SOLICITUD);
+		final BigDecimal numeroAutorizacion = datosEntrada.getDecimal(CTE_CAMPO_NUMERO_AUTORIZACION);
+		final BigDecimal idAgrupacion = datosEntrada.getDecimal(CTE_CAMPO_ID_AGRUPACION);
+		
+		/*20150515 Se añaden los campos nuevos*/
+		BigDecimal indTipoAutoriz = datosEntrada.getDecimal(CTE_CAMPO_IND_TIPO_AUTORIZ);
+		BigDecimal nivelMaximoAutoriz = datosEntrada.getDecimal(CTE_CAMPO_NIVEL_MAX_AUTORIZ);
+		
+		if (null == nivelMaximoAutoriz)
+		{
+			nivelMaximoAutoriz = Constantes.CTE_NIVEL_TODOS;
+		}
+		
+		BigDecimal indDictamenScoring = datosEntrada.getDecimal(CTE_CAMPO_IND_DICTAMEN_SCORING);
+		
+		if (null == indDictamenScoring)
+		{
+			indDictamenScoring = BigDecimal.ZERO;
+		}
+		
+		boolean esAltaAutorizScoring = false;
+		
+		// Recuperamos los datos de la autorización buscando a partir de la clave
+		final GestionDatosAutorizacion ga = new GestionDatosAutorizacion();
+		DatosAutorizacionC autorizacion = ga.buscarAutorizacion(
+				oficinaSolicitud, 
+				numeroSolicitud, 
+				versionSolicitud, 
+				numeroAutorizacion);
+		
+		esAltaAutorizScoring = (null != indTipoAutoriz) &&
+			(0 == Constantes.CTE_TIPO_AUTORIZ_SCORING.compareTo(indTipoAutoriz));
+		
+		// Si no existe la autorización a enviar, lanzamos un error técnico hacia las capas
+		// superiores de la infaestructura
+		if (autorizacion == null)
+		{
+			throw new RuntimeException("Error enviando la autorización. No se ha podido recuperar los datos de la autorización");
+		}
+		
+		// Comprobamos si se trata de un envío de una autorización o bien de un
+		// reenvío de una autorización anterior. Para ello basta con comprobar
+		// si el estado de la autorización es DENEGADA --> Reenvío
+		
+		// Si es un reenvío
+		if (EstadosAutorizacion.DENEGADA.equals(autorizacion.getEstado()))
+		{
+			// Anulamos la autorización previa
+			if (UtilidadesAutorizacion.anularAutorizacionAGEN(contexto, autorizacion))
+			{
+				UtilidadesAutorizacion.anularAutorizacion(autorizacion, contexto.getUsuario());
+				autorizacion = this.reenvioAutorizacion(contexto, autorizacion, esAltaAutorizScoring, indDictamenScoring, nivelMaximoAutoriz);
+			}
+			else
+			{
+				throw new RuntimeException("Error reenviando la autorización. " +
+						"No se ha podido anular la autorización anterior");	
+			}
+		}
+		// Si es un envío por primera vez
+		else
+		{
+			autorizacion = this.envioAutorizacion(contexto, autorizacion, esAltaAutorizScoring, indDictamenScoring, nivelMaximoAutoriz);
+		}
+		
+		/*
+		 * Corregido el 28-Febrero-2012
+		 * Se añade la posibilidad de adjuntar documentos adjuntos a la autorización
+		 * AGEN generada.
+		 * 
+		 * De momento se ha optado por separar el envio de la autorización de la operación
+		 * adjuntar documentos. Por lo tanto idAgrupacion siempre será NULL.
+		 */
+		if (autorizacion != null && !Utilidades.isBlankOrNull(autorizacion.getIdExternoAutorizacion()) &&
+				!Utilidades.isBlankOrNull(idAgrupacion) && !BigDecimal.ZERO.equals(idAgrupacion))
+		{
+			this.adjuntarDocumentosAutorizacionAGEN(contexto, autorizacion.getIdExternoAutorizacion(), idAgrupacion);
+		}
+		
+		final IContexto[] contextoSalida = 
+			ContextoDatosAutorizacion.rellenarDatosContexto(autorizacion, BigDecimal.ZERO);
+		
+		if (LOGGER.isDebugEnabled())
+		{			
+			LOGGER.debug("La autorización ha sido enviada correctamente.");
+		}
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("FIN SNANPM212: Envío de una autorización" +
+					"Tiempo total: " + (System.currentTimeMillis() - lInicio) + "ms");
+		}
+		
+		return contextoSalida;
+	}
+	
+	/**
+	 * Envía la autorización dando de alta los datos en la aplicación AGEN.
+	 *  
+	 * @param contexto Contexto de ejecución del servicio de negocio
+	 * @param autorizacion Datos de la autorización que se va a enviar.
+	 * @return Datos de la autorización actualizada.
+	 */
+	private DatosAutorizacionC envioAutorizacion(
+			final IContextoEjecucion contexto, 
+			final DatosAutorizacionC autorizacion,
+			boolean esAltaAutorizScoring, BigDecimal indDictamenScoring, BigDecimal nivelMaximoAutoriz)
+	{
+		// Llamamos al servicio de alta de autorización en la aplicación AGEN.
+		final AutorizacionVO autorizacionAGEN = this.altaAutorizacionAGEN(
+				contexto, autorizacion.getNivelMaximo(), autorizacion.getDatosAutorizacionKey());
+
+		if ((autorizacionAGEN != null) && 
+			(!(Utilidades.isBlankOrNull(autorizacionAGEN.getIdExtAutorizacion()))))
+		{
+			// Llamamos al servicio que crea el detalle de una autorizacion
+			/*20150610 En el caso de que sea una autorización de scoring, se indicará en el detalle de la autorización*/
+			IContexto[] salida = altaDetalleAutorizacionAGEN(contexto, autorizacion.getNivelMaximo(), 
+					autorizacionAGEN.getIdExtAutorizacion(),
+					autorizacion.getDatosAutorizacionKey().getOficinaSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getVersionSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getNumeroSolicitud(),
+					esAltaAutorizScoring, indDictamenScoring, nivelMaximoAutoriz);
+			
+			// Comprobamos si ha habido algún error en la invocación al servicio AGEN_100
+			if (null == salida || (CTE_CTX_ERROR.equals(salida[0].getNombre()) && 
+					!BigDecimal.ZERO.equals(salida[0].getBigDecimal(CTE_CAMPO_COD_ERROR))))
+			{
+				throw new RuntimeException(salida[0].getString(CTE_CAMPO_DESC_ERROR));
+			}
+			else 
+			{
+				// Llamamos al servicio de actualización de la autorización de ANPM
+				final GestionDatosAutorizacion ga = new GestionDatosAutorizacion();
+				ga.cambiarEstadoAutorizacionEnviada(autorizacion, 
+						autorizacionAGEN.getIdAplicacionCliente(),
+						autorizacionAGEN.getIdExtAutorizacion(),
+						autorizacionAGEN.getIdExtFaseGenerada(),
+						autorizacionAGEN.getIdExtFaseSiguiente(), 
+						autorizacionAGEN.getEstadoResultante(),
+						Constantes.NO, 
+						contexto.getUsuario());
+			}
+		}
+		
+		return autorizacion;
+	}	
+	
+	/**
+	 * Genera una nueva autorización (solo en caso de reenvios) dando de alta
+	 * los datos en la tabla de autorizaciones AN31TB01 y en la aplicación AGEN. 
+	 * 
+	 * @param contexto Contexto de ejecución del servicio de negocio
+	 * @param autorizacion Datos de la anterior autorización que se va a reenviar.
+	 * @return Datos de la nueva autorización generada.
+	 */
+	private DatosAutorizacionC reenvioAutorizacion(
+			final IContextoEjecucion contexto, 
+			final DatosAutorizacionC autorizacion,
+			boolean esAltaAutorizScoring, BigDecimal indDictamenScoring, BigDecimal nivelMaximoAutoriz)
+	{
+		DatosAutorizacionC nuevaAutoriz = null;
+		
+		// Llamamos al servicio de alta de autorización en la aplicación AGEN.
+		final AutorizacionVO autorizacionAGEN = this.altaAutorizacionAGEN(
+				contexto, 
+				autorizacion.getNivelMaximo(),
+				autorizacion.getDatosAutorizacionKey());
+
+		if ((autorizacionAGEN != null) &&
+			(!(Utilidades.isBlankOrNull(autorizacionAGEN.getIdExtAutorizacion()))))
+		{
+			
+			// Llamamos al servicio que crea el detalle de una autorizacion
+			altaDetalleAutorizacionAGEN(contexto, autorizacion.getNivelMaximo(), 
+					autorizacionAGEN.getIdExtAutorizacion(),
+					autorizacion.getDatosAutorizacionKey().getOficinaSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getVersionSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getNumeroSolicitud(),
+					esAltaAutorizScoring, indDictamenScoring, nivelMaximoAutoriz);
+			
+			// Llamamos al servicio de alta de la autorización de ANPM
+			final GestionDatosAutorizacion ga = new GestionDatosAutorizacion();
+			nuevaAutoriz = ga.altaAutorizacion(
+					autorizacion.getDatosAutorizacionKey().getOficinaSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getNumeroSolicitud(),
+					autorizacion.getDatosAutorizacionKey().getVersionSolicitud(), 
+					autorizacion.getRed(),
+					autorizacion.getNivelMaximo(), 
+					contexto.getUsuario(),
+					autorizacion.getTipoAutorizacion());
+			
+			ga.cambiarEstadoAutorizacionEnviada(
+					nuevaAutoriz,
+					autorizacionAGEN.getIdAplicacionCliente(),
+					autorizacionAGEN.getIdExtAutorizacion(),
+					autorizacionAGEN.getIdExtFaseGenerada(),
+					autorizacionAGEN.getIdExtFaseSiguiente(),
+					autorizacionAGEN.getEstadoResultante(), 
+					Constantes.SI, 
+					contexto.getUsuario());
+		}
+		
+		return nuevaAutoriz;
+	}	
+}

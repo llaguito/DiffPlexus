@@ -1,0 +1,643 @@
+/**
+ * Aplicacion de activo
+ */
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.sql.Time;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.periodosTransitorio.PeriodoTransitorioC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.producto.SubProductoC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.version.VersionesC;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionPeriodoTransitorio;
+import es.caixagalicia.anpm.prestamos.catalogo.servicios.aplicacion.GestionVersiones;
+import es.caixagalicia.anpm.prestamos.comun.utilidades.UtilidadesAutorizacion;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.apoderado.ApoderadoEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.cuentas.DatosCuentasEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CodigosError;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DateUtils;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ResultadoDatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.log.LogHelper;
+import es.caixagalicia.ifrt.persistencia.eccv02.CEcc;
+import es.caixagalicia.ifrt.util.Helper;
+
+/**
+ * 
+ * Define el comportamiento comun entre las pantallas de preformalización y
+ * formalización de PITA
+ *
+ */
+public class GestionPreformalizacionFormalizacionComunes
+{
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	
+//	Tabla de subproductos
+	private static final String CTE_TABLA_DATOS_SUBPRODUCTO = "AN02TB01";
+//	Error en la validacion de la solicitud activa
+	private static final int ERROR_VALIDACION_FECHA_SUBPRODUCTO = 10813;
+	private static final int ERROR_VALIDACION_FECHA_PERIODO_ACTIVO = 10817;
+//	private static final int ERROR_VALIDACION_FECHA_PERIODO_VERSION = 10818;
+//	Datos del servicio que realiza un alta una nueva version de solicitud
+	private static final Integer ID_COOP_NUEVA_VERSION_SOLICITUD = Integer.valueOf(172);
+	private static final Integer ID_CO_COMPROBACION_CUENTAS = Integer.valueOf(292);
+	
+	private static final String CTE_CAMPO_ENTRADA_NUC = "NUC";
+	private static final String CTE_CAMPO_ENTRADA_IBAN_CARGO_EUROS = "IBAN_C_EUR";
+	private static final String CTE_CAMPO_ENTRADA_IBAN_ABONO_EUROS = "IBAN_A_EUR";
+	private static final String CTE_CAMPO_ENTRADA_IBAN_CARGO_ABONO_EUROS = "IBAN_CA_DIV";
+	
+	private static final int CTE_POSICION_TIRA_OFICINA_SOLICITUD = 0; // OBLIGATORIO
+	private static final int CTE_POSICION_TIRA_NUMERO_SOLICITUD = 1; // OBLIGATORIO
+	private static final int CTE_POSICION_TIRA_VERSION_SOLICITUD = 2; // OBLIGATORIO 
+	private static final int CTE_POSICION_TIRA_NUC_EXPEDIENTE = 3; // OBLIGATORIO
+	private static final String CTE_CTXTO_SOLCTUD_VRSION = "ANPMN050030";
+	private static final String CTE_ERROR_ID_CTX = "ANPMN004";
+//	Valores a controlar para el campo de estado tarea
+	private static final String ESTADO_TAREA_FORMALIZADA = "F";
+	private static final String ESTADO_TAREA_INCOMPLETA = "I";
+	private static final int ERROR_GENERAR_VERSION = 10814;
+//	Cuenta contable de la aplicacion .
+	private static final Integer ID_CUENTA_ANPM = Integer.valueOf(507);
+	
+	//Cargo provision codigos de cuenta y operaicon
+	private static final Integer ID_CUENTA_GHIP = Integer.valueOf(702);
+	private static final Integer ID_CODIGO_OPERACION_GHIP = Integer.valueOf(23);
+	
+	//Generacion aviso
+	private static final Integer ID_CUENTA_CGAL = Integer.valueOf(100);
+	private static final Integer ID_CODIGO_OPERACION_AVISOS = Integer.valueOf(304);
+	
+	//Cargar gestion hipotecaria
+	private static final Integer ID_CODIGO_OPERACION_FIRMA_ASISTIDA = Integer.valueOf(41);
+	
+	//Campos de entrada de generar aviso
+	private static final int CTE_CAMPO_POSICION_ID_APLICACION 	= 0;
+	private static final int CTE_CAMPO_POSICION_ID_PROYECTO 	= 1;
+	private static final int CTE_CAMPO_POSICION_ID_PROCESO 	= 2;
+	private static final int CTE_CAMPO_POSICION_ID_TAREA 	= 3;
+	private static final int CTE_CAMPO_POSICION_DELEGABLE = 4;
+	private static final int CTE_CAMPO_POSICION_TIPO_DESTINO = 5;
+	/*20150604 Faltaba el campo EMPLEADO DESTINO, que tambien se usa para meterle el usuario al que se le envia en aviso.*/
+	private static final int CTE_CAMPO_POSICION_EMPLEADO_DESTINO = 6;
+	private static final int CTE_CAMPO_POSICION_CENTRO_DESTINO = 7;
+	/*20150608 Campos que faltaba por informar*/
+	private static final int CTE_CAMPO_POSICION_PUESTO_DESTINO = 8;
+	private static final int CTE_CAMPO_POSICION_TIPO_APLICA_ARRAN = 9;
+	private static final int CTE_CAMPO_POSICION_APLICA_ARRAN = 10;
+	/*Fin campos que faltaban*/
+	
+	private static final int CTE_CAMPO_POSICION_TIPO_AVISO = 11;
+	private static final int CTE_CAMPO_POSICION_TEXTO_AVISO = 12;
+	private static final int CTE_CAMPO_POSICION_ICONO = 13;
+	private static final int CTE_CAMPO_POSICION_USUARIO_ALTA = 14;
+	private static final int CTE_CAMPO_POSICION_TERMINAL_ALTA = 15;
+	
+	private static final int CTE_CAMPO_POSICION_FECHA_INICIO_AVISO = 16;
+	private static final int CTE_CAMPO_POSICION_FECHA_FIN_AVISO = 17;
+	private static final int CTE_CAMPO_POSICION_A_OFICINA_2K = 18;
+	private static final int CTE_CAMPO_POSICION_ALTA_AVISOS_MULTIPLES = 19;
+	private static final int CTE_CAMPO_POSICION_CORREO_S_N = 20;
+	private static final int CTE_CAMPO_POSICION_IR_SUPERIOR = 21;
+	private static final int CTE_CAMPO_POSICION_TIRA_TERMINAL = 22;
+	private static final int CTE_CAMPO_POSICION_TRATA_GLOBAL = 23;
+	private static final int CTE_CAMPO_POSICION_AVISO_ANULA = 24;
+	private static final int CTE_CAMPO_POSICION_CLAVE_APLICA_ANULA = 25;
+	private static final int CTE_CAMPO_POSICION_TIENE_FICHERO_HOST = 26;
+	private static final int CTE_CAMPO_POSICION_FICHERO_HOST = 27;
+	
+	//Campos de entrada de gestion de firma
+	private static final String CAMPO_ENTRADA_NUC_EXPEDIENTE = "NucExpediente";
+	private static final String CAMPO_ENTRADA_TIENE_FIRMA = "TieneFirma";
+	
+	//Campos de entrada del cargo de provision
+	private static final String CAMPO_ENTRADA_NUC = "NUC";
+	private static final String CAMPO_ENTRADA_OPCION = "OPCION";
+	private static final String CAMPO_ENTRADA_USUARIO = "USUARIO";
+	private static final String CAMPO_ENTRADA_TERMINAL = "TERMINAL";
+	
+	private static final String CTE_USUARIO_CHG = "CHG";
+	
+	private static final LogHelper LOGGER = LogHelper.getLog(GestionPreformalizacionFormalizacionComunes.class);
+	
+	/**
+	 * Constructor sin parámetros
+	 */
+	public GestionPreformalizacionFormalizacionComunes()
+	{
+	}
+	
+	/**
+	 * @param bidOficinaSolicitud
+	 * @param bidNumeroSolicitud
+	 * @param bidVersionSolicitud
+	 * @param bidNucExpediente
+	 * @return Devuelve la lista de cuentas asociadas a la oficina, solicitud y version
+	 */
+	public List<DatosCuentasC> consultaDatosCuentasLst(
+			BigDecimal bidOficinaSolicitud, 
+			BigDecimal bidNumeroSolicitud,
+			BigDecimal bidVersionSolicitud,
+			BigDecimal bidNucExpediente) 
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("consultaDatosCuentasLst() - Inicio");
+		}
+		DatosCuentasEng datosCuentaEng = new DatosCuentasEng(CTE_JNDI_DATASOURCE);
+		
+		List<DatosCuentasC> datosCuentasLst = datosCuentaEng.buscarInfoCuentas(
+				bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud,
+				bidNucExpediente);
+
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("consultaDatosCuentasLst() - Fin");
+		}
+		return datosCuentasLst;
+	}
+	
+	/**
+	 * @param bidOficinaSolicitud
+	 * @param bidNumeroSolicitud
+	 * @param bidVersionSolicitud
+	 * @param bidNucExpediente
+	 * @return Devuelve la lista de apoderados a la oficina, solicitud y version
+	 */
+	public List<ApoderadoC> consultaDatosApoderadoLst(
+			BigDecimal bidOficinaSolicitud, 
+			BigDecimal bidNumeroSolicitud,
+			BigDecimal bidVersionSolicitud,
+			BigDecimal bidNucExpediente) 
+	{
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("consultaApoderadosLst() - Inicio");
+		}
+		
+		ApoderadoEng apoderadosEng = new ApoderadoEng();		
+		
+		List<ApoderadoC> apoderadosLst = apoderadosEng.buscarInfoApoderados(bidOficinaSolicitud, bidNumeroSolicitud, bidVersionSolicitud, bidNucExpediente);
+	
+
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("consultaApoderadosLst() - Fin");
+		}
+		return apoderadosLst;
+	}
+	
+	
+	
+	/**
+	 * Comprueba la vigencia del producto asociado a la solicitud
+	 * @param datosSolicitud
+	 * @param strFecha Fecha introducida por el usuario
+	 */
+	public void comprobarVigenciaProducto(DatosSolicitudC datosSolicitud, String strFecha){
+		//final Date dateNow = DateUtils.dateNow();
+		final Date dateComprobacion = DateUtils.parseDate(strFecha, DateUtils.FORMATO_FECHA_CORTO);
+		
+		if (LOGGER.isDebugEnabled()){
+			LOGGER.debug("INICIO - comprobando vigencia producto");
+		}
+		VersionesC version = GestionVersiones.obtenerVersion(
+				datosSolicitud.getProducto().intValue(),
+				datosSolicitud.getSubproducto().intValue(),
+				datosSolicitud.getVersionGeneral().intValue(),
+				datosSolicitud.getLineaColectivo().intValue());
+		
+		// Si la fecha fin es mínima hay que comprobar que date es menor o igual
+		// que la fecha tope de formalizacion del subproducto
+		if (version.getFechaFin().compareTo(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO)) == 0){
+			List<String> nombreTablas = new ArrayList<String>(1);
+			nombreTablas.add(CTE_TABLA_DATOS_SUBPRODUCTO);
+			List<CEcc> lstSubproductos = GestionVersiones.obtenerDatosVersion(
+					datosSolicitud.getProducto().intValue(), 
+					datosSolicitud.getSubproducto().intValue(), 
+					datosSolicitud.getLineaColectivo().intValue(), 
+					datosSolicitud.getVersionGeneral().intValue(), 
+					nombreTablas);
+			SubProductoC subproducto = null;
+			int iLstSubproductos = lstSubproductos.size();
+			for (int i = 0; i < iLstSubproductos && subproducto == null; i++){
+				if (lstSubproductos.get(i) instanceof SubProductoC){
+					SubProductoC subproductoTmp = (SubProductoC) lstSubproductos.get(i);
+					if (subproductoTmp.getActivo().equals(BigDecimal.ONE.intValue())){
+						subproducto = subproductoTmp;
+					}
+				}
+			}
+			final Date dateMinima = DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO);
+			Date dateTopeFormalizacion = null;
+			if (subproducto != null){
+				dateTopeFormalizacion = subproducto.getFechaFormalizacion();
+			}
+			if (subproducto == null || (dateTopeFormalizacion != null && !dateMinima.equals(DateUtils.getSoloFecha(dateTopeFormalizacion)) && 
+				 DateUtils.isDateLessEqual(DateUtils.getSoloFecha(dateTopeFormalizacion), DateUtils.getSoloFecha(dateComprobacion)))){
+				UtilidadesTramitacion.enviarCorreo(
+						ERROR_VALIDACION_FECHA_SUBPRODUCTO, 
+						datosSolicitud);
+				ServicioNegocio.rollback(ERROR_VALIDACION_FECHA_SUBPRODUCTO, null, null, null);
+			}
+		}
+//		si la fecha actual no esta comprendidas entre las fechas de
+//		vigencia de la version general, se comprueban los periodos transitorios
+		else if (!(
+				(DateUtils.isDateGreater(DateUtils.getSoloFecha(dateComprobacion), DateUtils.getSoloFecha(version.getFechaInicio()))  
+						|| (DateUtils.getSoloFecha(dateComprobacion).compareTo(DateUtils.getSoloFecha(version.getFechaInicio())) == 0 &&
+							DateUtils.isDateLessEqual(DateUtils.getSoloHorario(version.getHoraIncio()), DateUtils.getSoloHorario(dateComprobacion)))) &&
+				(DateUtils.isDateGreater(DateUtils.getSoloFecha(version.getFechaFin()), DateUtils.getSoloFecha(dateComprobacion)) 
+						||	(DateUtils.getSoloFecha(version.getFechaFin()).compareTo(DateUtils.getSoloFecha(dateComprobacion)) == 0 &&				
+							DateUtils.isDateGreaterEqual(DateUtils.getSoloHorario(version.getHoraFin()), DateUtils.getSoloHorario(dateComprobacion)))))){
+			
+//			ServicioNegocio.rollback(ERROR_VALIDACION_FECHA_PERIODO_VERSION, null, null, null);
+			// Hay que comprobar si existe un periodo transitorio de tipo formalizacion (1)
+			List<PeriodoTransitorioC> lstPeridosTrans = GestionPeriodoTransitorio.obtenerPeriodoTransitorioFechas(
+					datosSolicitud.getProducto().intValue(),
+					datosSolicitud.getSubproducto().intValue(),
+					BigDecimal.ONE.intValue(),
+					DateUtils.toSQLDate(dateComprobacion),
+					new Time(dateComprobacion.getTime()));
+			if (!lstPeridosTrans.isEmpty()){
+				boolean existeActivo = false;
+				int iLengthLst = lstPeridosTrans.size();
+				for (int i = 0; i < iLengthLst && !existeActivo; i++) {
+					existeActivo = Constantes.CTE_PERIODO_NO_ANULADO.equals(lstPeridosTrans.get(i).getBorrado());
+				}
+				if (!existeActivo){
+					UtilidadesTramitacion.enviarCorreo(
+							ERROR_VALIDACION_FECHA_PERIODO_ACTIVO, 
+							datosSolicitud);
+					ServicioNegocio.rollback(ERROR_VALIDACION_FECHA_PERIODO_ACTIVO, null, null, null);
+				}
+			}
+			else{
+				UtilidadesTramitacion.enviarCorreo(
+							ERROR_VALIDACION_FECHA_PERIODO_ACTIVO, 
+							datosSolicitud);
+				ServicioNegocio.rollback(ERROR_VALIDACION_FECHA_PERIODO_ACTIVO, null, null, null);
+			}
+		}		
+		if (LOGGER.isDebugEnabled()){
+			LOGGER.debug("FIN - comprobando vigencia producto");
+		}
+	}
+	
+	/**
+	 * Comprueba las cuentas que van a intervenir en una operacion de preformalizacion
+	 * @param nuc
+	 * @param ibanCargoEuros
+	 * @param ibanAbonoEuros
+	 * @param ibanCargoAbonoDivisa
+	 */
+	public static void comprobarCuentas(BigDecimal nuc,String ibanCargoEuros,String ibanAbonoEuros,String ibanCargoAbonoDivisa) {
+		
+		IDatosEntradaTx datosEntradaComprobacionCuentas = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_ANPM,
+				ID_CO_COMPROBACION_CUENTAS);
+			datosEntradaComprobacionCuentas.addCampo(CTE_CAMPO_ENTRADA_NUC, nuc);
+			datosEntradaComprobacionCuentas.addCampo(CTE_CAMPO_ENTRADA_IBAN_CARGO_EUROS, ibanCargoEuros);
+			datosEntradaComprobacionCuentas.addCampo(CTE_CAMPO_ENTRADA_IBAN_ABONO_EUROS, ibanAbonoEuros);
+			datosEntradaComprobacionCuentas.addCampo(CTE_CAMPO_ENTRADA_IBAN_CARGO_ABONO_EUROS, ibanCargoAbonoDivisa);
+			
+			ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaComprobacionCuentas);
+	}
+	
+
+	
+	/**
+	 * Si el estado de la tarea de preformalizacion es incompleto o finalizado
+	 * y la fecha de formalización no es nula
+	 * y se hace alguna modificacion es necesario crear una nueva version de la solicitud
+	 * Se genera una nueva version con las fechas de impresion inicializadas, y el estado a vacio
+	 * @param strEstdoTrea
+	 * @param datosSolicitud
+	 * @param gds
+	 * @param codProcedencia Codigo de procedencia de la nueva version de datos solicitud
+	 * @return Nueva version de solicitud si se cumplen los requisitos, la antigua en otro caso
+	 */
+	public DatosSolicitudC comprobarEstadoPreformalizacion(final String strEstdoTrea, 
+			final DatosSolicitudC datosSolicitud,
+			final GestionDatosSolicitud gds
+			)
+	{
+		DatosSolicitudC solicitudResultado = datosSolicitud;
+		if ((ESTADO_TAREA_FORMALIZADA.equalsIgnoreCase(strEstdoTrea) 
+				|| ESTADO_TAREA_INCOMPLETA.equalsIgnoreCase(strEstdoTrea))
+				&& !datosSolicitud.getFechaFormalizacion().equals(DateUtils.getSoloFecha(DateUtils.parseDate(DateUtils.CTE_DATELOWESTONLYDAY, DateUtils.FORMATO_FECHA_AMERICANO))))
+		{
+			if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug("INICIO - creando nueva version de solicitud");
+			}
+			
+			IDatosEntradaTx datosEntradaAltaVersion = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_ANPM, ID_COOP_NUEVA_VERSION_SOLICITUD);
+			datosEntradaAltaVersion.addCampo(CTE_POSICION_TIRA_OFICINA_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud());
+			datosEntradaAltaVersion.addCampo(CTE_POSICION_TIRA_NUMERO_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+			datosEntradaAltaVersion.addCampo(CTE_POSICION_TIRA_VERSION_SOLICITUD, datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+			datosEntradaAltaVersion.addCampo(CTE_POSICION_TIRA_NUC_EXPEDIENTE, datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+			
+			IContexto[] aCntxtoVrsion = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaAltaVersion);
+			if (aCntxtoVrsion != null && aCntxtoVrsion.length != 0)
+			{
+				if (CTE_ERROR_ID_CTX.equals(aCntxtoVrsion[0].getNombre()))
+				{
+					ServicioNegocio.rollback(ERROR_GENERAR_VERSION, null, null, null);
+				}
+				else
+				{
+					solicitudResultado = gds.obtenerDatosSolicitud(
+							datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), 
+							BigDecimal.ZERO, 
+							aCntxtoVrsion[0].getBigDecimal(CTE_CTXTO_SOLCTUD_VRSION),
+							datosSolicitud.getDatosSolicitudKey().getNucExpediente()); 
+					/*20140826 se recupera la fecha de concesión de la versión antigua porque se hizo un cambio
+					 * en el ANPM_172 para que cuando la oficina del contexto de ejecución no es de back office, 7313,
+					 * se ponga la fecha mínima en la fecha de concesión, por lo tanto aquí necesitamos recuperarla de
+					 *  la versión anterior.*/
+					solicitudResultado.setDateFechaConcesion(datosSolicitud.getDateFechaConcesion());
+					//Metodo que comprueba si solo han variado los datos de los apoderados
+					//Si es asi la fecha de impresion de poliza e info previa quedan establecidas a la version anterior
+					compruebaDatosApoderados(datosSolicitud,solicitudResultado);
+					
+					//20161017 siempre se setea la fecha de impresion a partir de la solicitud anterior
+					solicitudResultado.setDateFechaImpresion(datosSolicitud.getDateFechaImpresion());
+					
+					
+					gds.updateSolicitud(solicitudResultado);
+					
+					ResultadoDatosSolicitudVO voSolucitud = gds.altaSolicitud(solicitudResultado, ServicioNegocio.getContexto(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+					
+					if (0 == BigDecimal.ONE.compareTo(voSolucitud.getDatos().getIndicadorAutorizacion()))
+					{
+						UtilidadesAutorizacion.generarAutorizacionVersionNueva(voSolucitud.getDatos(), true);
+						//sólo generamos autorización en ANPM, no llamamos a AGEN.
+					}
+					
+					solicitudResultado = voSolucitud.getDatos();
+					solicitudResultado.setEstadoSolicitud(Constantes.ESTADO_SOL_CONCEDIDA);
+					gds.updateSolicitud(solicitudResultado);
+					//gds.guardarSolicitud(solicitudResultado);
+
+				}
+			}
+			else 
+			{
+				ServicioNegocio.rollback(ERROR_GENERAR_VERSION, null, null, null);
+			}
+			if (LOGGER.isDebugEnabled())
+			{
+				LOGGER.debug("FIN - creando nueva version de solicitud");
+			}
+		}
+		return solicitudResultado;
+	}
+	
+	/**
+	 * Comprueba si solo han variado los datos de la tabla de apoderados 
+	 * @param versionAnterior
+	 * @param versionNueva
+	 * @return
+	 */
+	public DatosSolicitudC compruebaDatosApoderados(DatosSolicitudC versionAnterior, DatosSolicitudC versionNueva) {
+		
+		
+		//Compruebo si los datos de cuentas, fecha, hora y lugar son iguales, de serlo se genero por cambio en apoderados
+		if(compararDatosCuentas(versionAnterior.getCuentas(), versionNueva.getCuentas())
+				&& versionAnterior.getHoraFormalizacion().equals(versionNueva.getHoraFormalizacion())
+				&& versionAnterior.getFechaFormalizacion().equals(versionNueva.getFechaFormalizacion())
+				&& versionAnterior.getLocalidadFirma().equals(versionNueva.getLocalidadFirma())) {
+				
+				//Establecemos las fechas de los documentos a la version anterior
+				versionNueva.setFechaValorFirma(versionAnterior.getFechaValorFirma());
+				return versionNueva;
+			
+		}
+		
+		return versionNueva;
+	}
+	
+	/**
+	 * Compara los datos de las cuentas
+	 * @param datosCuentasVersionAnterior
+	 * @param datosCuentasVersionActual
+	 * @return
+	 */
+	public boolean compararDatosCuentas(List<DatosCuentasC> datosCuentasVersionAnterior, List<DatosCuentasC> datosCuentasVersionActual) {
+		
+		if(datosCuentasVersionAnterior.size() != datosCuentasVersionActual.size()) {
+			return false;
+		}else {
+			//Tenemos que recorrer el array de cuentas para compararlo
+			for(int i=0;i<datosCuentasVersionActual.size();i++) {
+				DatosCuentasC datosCuentasActual = datosCuentasVersionActual.get(i);
+				DatosCuentasC datosCuentasAnterior = datosCuentasVersionAnterior.get(i);
+				
+				if(!datosCuentasActual.getCuenta().equals(datosCuentasAnterior.getCuenta())) {
+					return false;
+				}
+			}
+		}
+		
+		return true;
+	}
+	
+	
+	/**
+	 * Llamada para cargar la provision de gestion hipotecaria GHIP_023
+	 * @param datosSolicitud
+	 */
+	public void cargoProvision(DatosSolicitudC datosSolicitud) {
+		IDatosEntradaTx datosEntradaCargoProvision = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_GHIP,ID_CODIGO_OPERACION_GHIP);
+		datosEntradaCargoProvision.addCampo(CAMPO_ENTRADA_NUC, datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+		datosEntradaCargoProvision.addCampo(CAMPO_ENTRADA_OPCION, new String("C"));
+		if(Helper.isNullOrEmpty(ServicioNegocio.getContexto().getUsuario())){
+			//Si nos viene blanco o nulo metemos un usuario CHG generico
+			datosEntradaCargoProvision.addCampo(CAMPO_ENTRADA_USUARIO, CTE_USUARIO_CHG);
+		}else {
+			datosEntradaCargoProvision.addCampo(CAMPO_ENTRADA_USUARIO, ServicioNegocio.getContexto().getUsuario());
+		}
+		datosEntradaCargoProvision.addCampo(CAMPO_ENTRADA_TERMINAL, ServicioNegocio.getContexto().getTerminal());
+		
+		ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaCargoProvision);
+	}
+	
+	
+	/**
+	 * Servicio que da de alta avisos llamando al CGAL_304
+	 * @param apoderado
+	 * @param tipoAviso
+	 * @param observaciones
+	 * @param nuc
+	 * @param fechaPrevistaFirma en formato DD/MM/AAAA
+	 * @param localidad
+	 * 
+	 * @return
+	 */
+	public static int generarAvisoDelegacionFirmaCorregido(String usuarioApoderado, int tipoAviso, BigDecimal nuc,
+		String fechaPrevistaFirma, String localidad, String horaPrevistaFirma)
+	{
+		
+		Date fechaInicio = null;
+		java.sql.Date fechaInicioSqlDate = null;
+		String fechaInicioStr = null;
+		
+		StringBuilder textoAviso = null;
+		
+		int salidaAltaAviso = Constantes.CTE_SALIDA_ALTA_AVISO_CORRECTA;
+		
+		final String CTE_BLANCO = " ";
+		
+		Date fechaFin = null;
+		java.sql.Date fechaFinSqlDate = null;
+		String fechaFinStr = null;
+		
+		fechaInicio = DateUtils.dateNow();
+		fechaInicioSqlDate = new java.sql.Date(fechaInicio.getTime());
+		fechaInicioStr = DateHelper.sqlDateToString(fechaInicioSqlDate, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+		
+		fechaFin = DateUtils.addDays(fechaInicio, 5);
+		fechaFinSqlDate = new java.sql.Date(fechaFin.getTime());
+		fechaFinStr = DateHelper.sqlDateToString(fechaFinSqlDate, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+		
+		textoAviso = new StringBuilder();
+
+		//*Comprobamos que el usuario apoderado no es el mismo que el que enviamos el aviso
+		//*De lo contrario no se envia
+		if(!ServicioNegocio.getContexto().getUsuario().trim().equals(usuarioApoderado.trim())) {
+			IDatosEntradaTx datosEntradaGeneracionAviso = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_CGAL,ID_CODIGO_OPERACION_AVISOS);
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_APLICACION, "PMOS"); 								//pos  1 nsdk: id aplicación
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_PROYECTO, new BigDecimal(24));						//pos  2 nsdk: id proyecto
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_PROCESO, new BigDecimal(24));						//pos  3 nsdk: id proceso
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ID_TAREA, new BigDecimal(704));							//pos  4 nsdk: id tarea
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_DELEGABLE, Constantes.CTE_STR_S);						//pos  5 nsdk: ind delegable
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_DESTINO, Constantes.CTE_STR_N);	//tipo destino:
+																											//N: Usuario
+																											//T: Empleados de un centro
+																														//pos  6 nsdk: tipo destino
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_EMPLEADO_DESTINO, usuarioApoderado);				//pos  7 nsdk: empleado destino
+			//datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CENTRO_DESTINO, new BigDecimal(-1));				//pos  8 nsdk: centro destino
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CENTRO_DESTINO, BigDecimal.ZERO);					//pos  8 nsdk: centro destino
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_PUESTO_DESTINO, CTE_BLANCO);						//pos  9 nsdk: puesto destino
+			
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_APLICA_ARRAN, "Metropolis");					//pos 10 nsdk: tipo aplicacion arran
+			
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_APLICA_ARRAN, "ANPM_254 -> CGAL_304");				//pos 11 nsdk: aplicacion arranque 
+			
+			//datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_AVISO, Constantes.CTE_STR_NO);
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIPO_AVISO, Constantes.CTE_STR_AT);					//pos 12 nsdk: tipo aviso
+			
+			if (Constantes.CTE_AVISO_ALTA == tipoAviso) {
+				/*20150724 Se cambia el literal de aviso*/
+				//"Expediente electrónico: Delegación de firma. Se le ha delegado la firma del expediente <nuc>, prevista para el <dd/mm/aaaa> en <Localidad>."
+				textoAviso.append("Expediente electrónico: Delegación de firma. Se le ha delegado la firma del expediente ");
+				
+				textoAviso.append(nuc.toString());
+				textoAviso.append(", prevista para el ");
+				
+				textoAviso.append(fechaPrevistaFirma);
+				
+				textoAviso.append(" en ");
+				textoAviso.append(localidad);
+				
+				textoAviso.append(" a las ");
+				textoAviso.append(horaPrevistaFirma);
+			}
+			else 
+			{
+				textoAviso.append(Constantes.CTE_MENSAJE_BAJA_AVISO);
+				textoAviso.append("Expediente electrónico: Delegación de firma. Se le ha delegado la firma del expediente ");
+				
+				textoAviso.append(nuc.toString());
+				textoAviso.append(", prevista para el ");
+				
+				textoAviso.append(fechaPrevistaFirma);
+				
+				textoAviso.append(" en ");
+				textoAviso.append(localidad);
+				
+				textoAviso.append(" a las ");
+				textoAviso.append(horaPrevistaFirma);
+			}
+			
+			datosEntradaGeneracionAviso.addCampo(
+				CTE_CAMPO_POSICION_TEXTO_AVISO,
+				textoAviso.toString());																				// pos 13 nsdk: texto aviso
+			
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ICONO, CTE_BLANCO);								//pos 14 nsdk: icono
+			
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_USUARIO_ALTA, ServicioNegocio.getContexto().getUsuario());	//pos 15 nsdk: usuario alta
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TERMINAL_ALTA, ServicioNegocio.getContexto().getTerminal()); //pos 16 nsdk: terminal alta
+			
+			
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FECHA_INICIO_AVISO, fechaInicioStr);					//pos 17 nsdk: fecha ini aviso
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FECHA_FIN_AVISO, fechaFinStr);							//pos 18 nsdk: fecha fin aviso
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_A_OFICINA_2K, Constantes.CTE_STR_S);					//pos 19 nsdk: ind a of2k
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_ALTA_AVISOS_MULTIPLES, Constantes.CTE_STR_N);			//pos 20 nsdk: ind avisos multiples
+				// EN LA CGALM342 PONE QUE CUANDO ES AVISO SIMPLE SE ENVIA A BLANCO
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CORREO_S_N, Constantes.CTE_STR_N);						//pos 21 nsdk: ind correo S/N
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_IR_SUPERIOR, CTE_BLANCO);						//pos 22 nsdk: ir superior
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIRA_TERMINAL, CTE_BLANCO);						//pos 23 nsdk: tira terminal
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TRATA_GLOBAL, CTE_BLANCO);						//pos 24 nsdk: trata global
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_AVISO_ANULA, CTE_BLANCO);						//pos 25 nsdk: aviso anula
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_CLAVE_APLICA_ANULA, CTE_BLANCO);					//pos 26 nsdk: clave aplica anula
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_TIENE_FICHERO_HOST, Constantes.CTE_STR_N);				//pos 27 nsdk: tiene fichero host
+			datosEntradaGeneracionAviso.addCampo(CTE_CAMPO_POSICION_FICHERO_HOST, CTE_BLANCO);						//pos 28 nsdk: fichero host
+			
+			
+			ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaGeneracionAviso);
+		}
+		else
+		{
+			/*No se envía aviso porque el usuario apoderado es el mismo que el usuario tramitador*/
+			salidaAltaAviso = Constantes.CTE_SALIDA_ALTA_AVISO_NO_AVISO_MISMOS_USUARIOS;
+		}
+		
+		return salidaAltaAviso;
+	}
+
+	
+	//Cargar gestion hipotecaria
+	public static void gestionFirmaAsistida(BigDecimal nucSolicitud,String tieneFirma) {
+		
+		IDatosEntradaTx datosEntradaGestionFirmaAsistida = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), ID_CUENTA_GHIP,ID_CODIGO_OPERACION_FIRMA_ASISTIDA);
+		datosEntradaGestionFirmaAsistida.addCampo(CAMPO_ENTRADA_NUC_EXPEDIENTE, nucSolicitud);
+		datosEntradaGestionFirmaAsistida.addCampo(CAMPO_ENTRADA_TIENE_FIRMA, tieneFirma);
+		
+		IContexto[] gestionFirmaAsistida = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaGestionFirmaAsistida);
+		
+		
+		if (UtilidadesTramitacion.isBlankOrNull(gestionFirmaAsistida))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_GHIP_FIRMA_ASISTIDA_NO_CTX,
+				null,
+				null,
+				null);
+			
+		}
+		else if (0 != BigDecimal.ZERO.compareTo(gestionFirmaAsistida[0].getBigDecimal("GHIPN999010")))
+		{
+			ServicioNegocio.rollback(
+				CodigosError.CTE_ERROR_GHIP_FIRMA_ASISTIDA,
+				null,
+				new String[] {gestionFirmaAsistida[0].getBigDecimal("GHIPN999010").toString(), gestionFirmaAsistida[0].getString("GHIPN999020")},
+				null);
+		}
+		
+		
+	}
+	
+	
+}

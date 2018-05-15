@@ -1,0 +1,1457 @@
+/**/
+package es.caixagalicia.anpm.prestamos.tramitacion.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang.StringUtils;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosEng;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.destinos.DestinosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.destinos.DestinosEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionCapitalEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.producto.CondicionesInteresEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.solicitud.DatosSolicitudKey;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.tratamientoadelantos.TratamientoAdelantosC;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.tratamientoadelantos.TratamientoAdelantosEng;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.ComisionSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.CondicionCapitalSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.DatosSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.IConstantesSolicitud;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.InteresSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.TratAdelSolicitudVO;
+import es.caixagalicia.anpm.prestamos.tramitacion.utilidades.UtilidadesTramitacion;
+import es.caixagalicia.ifrt.core.IContexto;
+import es.caixagalicia.ifrt.core.IDatosEntradaTx;
+import es.caixagalicia.ifrt.core.IRegistro;
+import es.caixagalicia.ifrt.core.ServicioNegocio;
+import es.caixagalicia.ifrt.fechas.DateHelper;
+import es.caixagalicia.ifrt.mensajes.Mensaje;
+
+/**
+ * Clase abstracta intermedia entre ObtencionDatosSolicitudPrestamoDivEnt/ObtencionDatosSolicitudPrestamoDivisa y
+ * AbstractObtencionDatosSolicitud.
+ *
+ * En ella se implementa el método obtenerDatosSolicitudConcreto(), en el que se
+ * recuperan los datos comunes de los préstamos, tanto en divisa entidad
+ * como en divisa.
+ *
+ * De todos modos, este método se reimplementará en las clases hijas para recuperar los
+ * datos concretos de los préstamos en divisa entidad y en divisa, respectivamente,
+ * (básicamente recuperación de importes y cálculo de contravalores), además de llamar
+ * a la implementación de dicho método en la clase padre, que es ésta.
+ *
+ * @author V360144
+ */
+public abstract class AbstractObtencionDatosSolicitudPrestamo extends AbstractObtencionDatosSolicitud {
+
+    private static final String CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS = "ANPMN075140";
+
+    private static final String CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_NUM_PAGO = "ANPMN075141";
+
+    private static final String CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_FECHA_PAGO = "ANPMN075142";
+
+    private static final String CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_CUOTA = "ANPMN075145";
+
+    private static final String CTE_CTX_CUADRO_AMORT_FECHA_PRIMERA_REVISION = "ANPMN075400";
+
+    protected AbstractObtencionDatosSolicitudPrestamo(DatosSolicitudVO datosSolicitudVO) {
+        super(datosSolicitudVO);
+    }
+
+    /**
+     * Método que obtiene los datos solicitud concretos de un préstamo, independientemente de si
+     * es en divisa entidad o divisa.
+     * Los datos solicitud dependientes de si es en divisa entidad o divisa (básicamente importes y contravalores)
+     * se obtienen en la implementación de éste método que hay en las clases hijas,
+     *  ObtencionDatosSolicitudPrestamoDivEnt y ObtencionDatosSolicitudPrestamoDivisa.
+     */
+    public DatosSolicitudVO obtenerDatosSolicitudConcreto(DatosSolicitudVO datosSolicitudVO, boolean seObtieneCuadroAmort) {
+        /* TABLA AN26TB01 (CondicionCapitalC) */
+        datosSolicitudVO = obtenerMatrizCondicionCapital(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*OBTENEMOS IMPORTES*/
+        datosSolicitudVO = obtenerImportes(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*TABLA AN27TB01 (CondicionesInteresC)*/
+        datosSolicitudVO = obtenerMatrizIntereses(datosSolicitudVO, seObtieneCuadroAmort);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*TABLA AN28TB01*/
+        datosSolicitudVO = obtenerComisionesDeprecated(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*TABLA AN28TB01
+		 * 
+		 * EDIT 20140515: Método redundante con la forma de obtener la matriz de comisiones 
+		 * en el programa ANPMX101, lo comentamos
+		datosSolicitudVO = obtenerComisiones_ANPMM008(datosSolicitudVO);
+		if (! IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError()))
+		{
+			return datosSolicitudVO;
+		}*/
+        datosSolicitudVO = obtenerComisiones(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*TABLA AN29TB01*/
+        datosSolicitudVO = obtenerTratamientoAdelantos(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        /*TABLA AN30TB01*/
+        datosSolicitudVO = obtenerDestino(datosSolicitudVO);
+        if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+            return datosSolicitudVO;
+        }
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO obtenerMatrizCondicionCapital(DatosSolicitudVO datosSolicitudVO) {
+        CondicionCapitalEng condicionCapitalDao = new CondicionCapitalEng();
+        List<CondicionCapitalC> listaCondicionCapitalC = null;
+        CondicionCapitalSolicitudVO condicionCapitalSolicVO = null;
+        List<CondicionCapitalSolicitudVO> listaCondicionCapitalSolicVO = new ArrayList<CondicionCapitalSolicitudVO>(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        DatosSolicitudKey datosSolicitudKey = null;
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal tramo = BigDecimal.ONE;
+        ParametrosKey parametrosKey = null;
+        ParametrosC parametros = null;
+        ParametrosEng parametrosDao = new ParametrosEng();
+        String clave = null;
+        String codigoEnTabla = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        datosSolicitudKey = datosSolicitud.getDatosSolicitudKey();
+        listaCondicionCapitalC = condicionCapitalDao.buscarCondicionesCapital(datosSolicitudKey.getOficinaSolicitud(), datosSolicitudKey.getNumSolicitud(), datosSolicitudKey.getVersionSolicitud(), datosSolicitudKey.getNucExpediente());
+        if (UtilidadesTramitacion.isBlankOrNull(listaCondicionCapitalC)) {
+            datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorCondicionCapitalNoExiste(datosSolicitudVO, datosSolicitudKey.getOficinaSolicitud(), datosSolicitudKey.getNumSolicitud(), datosSolicitudKey.getVersionSolicitud(), datosSolicitudKey.getNucExpediente(), tramo);
+            /*La columna AN260040 es BigDecimal pero su equivalente en hibernate (condicionCapitalC.tramo) es un Integer. */
+            return datosSolicitudVO;
+        }
+        for (CondicionCapitalC condicionCapitalC : listaCondicionCapitalC) {
+            condicionCapitalSolicVO = new CondicionCapitalSolicitudVO();
+            condicionCapitalSolicVO.setModalidadAmortizacion(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntModalidadDeAmortizacion())));
+            /*En la CondicionCapitalC los BigDecimal de AN26TB01 están mapeados a Integer*/
+            condicionCapitalSolicVO = obtenerCodPeriodicidadCapital(condicionCapitalC, condicionCapitalSolicVO);
+            /*BEGIN ANPMX101*/
+            // ANPMD1010800 = AN260090; /* PLAN DE ENTREGAS = MODALIDAD */
+            condicionCapitalSolicVO.setPlanEntregas(new BigDecimal(condicionCapitalC.getIntModalidadDeAmortizacion()));
+            /*END ANPMX101*/
+            /*TABLA CG32TB01 POR CLAVE MDA (ParametrosC)*/
+            parametrosKey = new ParametrosKey();
+            clave = IConstantesSolicitud.CTE_CLAVE_PARAMETRO_MDA;
+            parametrosKey.setClave(clave);
+            codigoEnTabla = StringUtils.leftPad(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalSolicVO.getModalidadAmortizacion()).toString(), IConstantesSolicitud.CTE_INT_4, IConstantesSolicitud.CTE_CHAR_0);
+            parametrosKey.setCodTabla(codigoEnTabla);
+            parametros = parametrosDao.findById(parametrosKey);
+            if (null == parametros) {
+                datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(datosSolicitudVO, parametrosKey.getClave(), parametrosKey.getCodTabla());
+                return datosSolicitudVO;
+            }
+            condicionCapitalSolicVO.setDescrModalidadAmortizacion(parametros.getCG320030());
+            condicionCapitalSolicVO.setRazonDeProgresion(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntRazonProgresion()));
+            /*BEGIN ANPMX101*/
+            condicionCapitalSolicVO.setTipoPagoAplazado(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntTipoPagoAplazado()).intValue()));
+            condicionCapitalSolicVO.setIndPagoUnicoVtoFinal(condicionCapitalC.getStrPagoUnicoVencimientoFinal());
+            /*END ANPMX101*/
+            condicionCapitalSolicVO.setImportePagoAplazadoDivisa(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntImportePagoAplazado()));
+            condicionCapitalSolicVO.setDivisaImportePagoAplazado(UtilidadesTramitacion.obtenerMonedaEntidad());
+            condicionCapitalSolicVO.setPorcentajePagoAplazado(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntPorcentajeAplazado()));
+            if (IConstantesSolicitud.CTE_UNIDAD_MESES.equals(condicionCapitalC.getStrPeriodicidadUnidadPeriodo())) {
+                condicionCapitalSolicVO.setPeriodicidadAmortizacion(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntPeriodicidadNumPeriodo())));
+                condicionCapitalSolicVO.setUnidadPeriodicidadAmortizacion(condicionCapitalC.getStrPeriodicidadUnidadPeriodo());
+                condicionCapitalSolicVO.setTipoPeriodicidadAmorizacion(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionCapitalC.getIntPeriodicidadTipoPeriodo())));
+            }
+            if (IConstantesSolicitud.CTE_STR_1.equals(condicionCapitalC.getStrPagoUnicoVencimientoFinal())) {
+                // tam codigoEnTabla: 4
+                codigoEnTabla = IConstantesSolicitud.CTE_STR_00FP;
+            } else {
+                /*Si la periodicidad no es correcta rellena los campos de error de datosSolicitudVO*/
+                datosSolicitudVO = GestionConsultaDatosSolicitud.verificarPeriodicidad(datosSolicitudVO, condicionCapitalC.getStrPeriodicidadUnidadPeriodo(), condicionCapitalC.getIntPeriodicidadNumPeriodo(), condicionCapitalC.getIntPeriodicidadTipoPeriodo());
+                if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+                    return datosSolicitudVO;
+                }
+                codigoEnTabla = GestionConsultaDatosSolicitud.obtenerCodigoEnTabla(condicionCapitalC.getStrPeriodicidadUnidadPeriodo(), condicionCapitalC.getIntPeriodicidadNumPeriodo(), condicionCapitalC.getIntPeriodicidadTipoPeriodo());
+                if (StringUtils.isBlank(codigoEnTabla)) {
+                    datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorPeriodicidadNoEsValida(datosSolicitudVO, condicionCapitalC.getStrPeriodicidadUnidadPeriodo(), condicionCapitalC.getIntPeriodicidadNumPeriodo(), condicionCapitalC.getIntPeriodicidadTipoPeriodo());
+                    return datosSolicitudVO;
+                }
+                clave = IConstantesSolicitud.CTE_CLAVE_PARAMETRO_IPC;
+                parametrosKey = new ParametrosKey();
+                parametrosKey.setClave(clave);
+                parametrosKey.setCodTabla(codigoEnTabla);
+                parametros = parametrosDao.findById(parametrosKey);
+                if (null == parametros) {
+                    condicionCapitalSolicVO.setDescrPeriodicidadAmorticacion(StringUtils.EMPTY);
+                } else {
+                    condicionCapitalSolicVO.setDescrPeriodicidadAmorticacion(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()).concat(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320070())));
+                }
+            }
+            listaCondicionCapitalSolicVO.add(condicionCapitalSolicVO);
+        }
+        datosSolicitudVO.setListaCondicionCapitalSolicitudVO(listaCondicionCapitalSolicVO);
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO obtenerMatrizIntereses(DatosSolicitudVO datosSolicitudVO, boolean seObtieneCuadroAmort) {
+        DatosSolicitudC datosSolicitud = null;
+        // String periodicidad = null;
+        CondicionesInteresEng condicionesInteresDao = new CondicionesInteresEng();
+        List<CondicionesInteresC> listaCondicionesInteres = new ArrayList<CondicionesInteresC>(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        StringBuilder textoErrorStb = null;
+        // int i = IConstantesDatosSolicitud.CTE_INT_0;
+        // int numeroTramos = IConstantesDatosSolicitud.CTE_INT_3;
+        ParametrosKey parametrosKey = null;
+        ParametrosC parametros = null;
+        ParametrosEng parametrosDao = new ParametrosEng();
+        String clave = null;
+        String codigoEnTabla = null;
+        /* EDIT V360144 20140807 
+		 * SE COMENTA TEMPORALMENTE LA LLAMADA A ANPM_266
+		*/
+        IContexto[] resultadoObtCuadroAmort = null;
+        String fechaPrimerCambioInteresStr = null;
+        Date fechaPrimerCambioInteres = null;
+        IDatosEntradaTx datosEntradaObtCuadroAmort = null;
+        IRegistro[] matrizVencimientos = null;
+        String fechaPrimerVctoCapitalStr = null;
+        Date fechaPrimerVctoCapital = null;
+        String fechaUltimoVctoCapitalStr = null;
+        Date fechaUltimoVctoCapital = null;
+        List<InteresSolicitudVO> listaInteresSolicitudVO = new ArrayList<InteresSolicitudVO>(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        InteresSolicitudVO interesSolicitudVO = null;
+        DatosSolicitudKey datosSolicitudKey = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        datosSolicitudKey = datosSolicitud.getDatosSolicitudKey();
+        /*
+	     AN270010 = AN250010;   OFICINA SOLICITUD                               
+	     AN270020 = AN250020;   NUMERO SOLICITUD                                
+	     AN270030 = AN250030;   VERSION SOLICITUD                               
+	     AN270070 = AN250040;   NUC              */
+        listaCondicionesInteres = condicionesInteresDao.buscarCondicionesInteres(datosSolicitudKey.getOficinaSolicitud(), datosSolicitudKey.getNumSolicitud(), datosSolicitudKey.getVersionSolicitud(), datosSolicitudKey.getNucExpediente(), IConstantesSolicitud.CTE_TIPO_CONDICION_INTERES_INTERES);
+        if ((null == listaCondicionesInteres) || IConstantesSolicitud.CTE_INT_0 == listaCondicionesInteres.size()) {
+            datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorCondicionInteresNoExiste(datosSolicitudVO, datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+            return datosSolicitudVO;
+        }
+        if (seObtieneCuadroAmort) {
+            datosEntradaObtCuadroAmort = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), // 507, AP: ANPM
+            IConstantesSolicitud.CTE_CC_OBTENER_CUADRO_AMORT, // 266
+            IConstantesSolicitud.CTE_CO_OBTENER_CUADRO_AMORT);
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_OFICINA_SOLIC, datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud());
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_NUM_SOLIC, datosSolicitud.getDatosSolicitudKey().getNumSolicitud());
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_VERSION_SOLIC, datosSolicitud.getDatosSolicitudKey().getVersionSolicitud());
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_DIGITO_SOLIC, datosSolicitud.getDigitoSolicitud());
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_NUC_EXP, datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+            // Campos opcionales:
+            // datosEntradaObtCuadroAmort.addCampo(IConstantesDatosSolicitud.CTE_ENT_ANPM_266_IND_TAE,
+            // IConstantesDatosSolicitud.CTE_STR_S);
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_PANTALLA_ORIGEN, IConstantesSolicitud.CTE_STR_0);
+            datosEntradaObtCuadroAmort.addCampo(IConstantesSolicitud.CTE_ENT_ANPM_266_SERVICIO_ORIGEN, BigDecimal.ZERO);
+            resultadoObtCuadroAmort = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaObtCuadroAmort);
+            if (UtilidadesTramitacion.isBlankOrNull(resultadoObtCuadroAmort)) {
+                datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+                datosSolicitudVO.setTextoError(new Mensaje(ServicioNegocio.getContexto(), ERROR_LINK_PROGRAMA_AMPMR003_APUNTADO_ANPM_266_707191981).toString());
+                return datosSolicitudVO;
+            }
+            datosSolicitudVO.setInteresInicial(resultadoObtCuadroAmort[0].getBigDecimal(IConstantesSolicitud.CTE_CTX_OBTENER_CUADRO_AMORT_INTERES_INICIAL));
+            if (0 == BigDecimal.ZERO.compareTo(UtilidadesTramitacion.comprobarDatoNull(datosSolicitudVO.getInteresInicial()))) {
+                datosSolicitudVO.setInteresInicial(IConstantesSolicitud.CTE_INTERES_CERCANO_A_CERO);
+            }
+            /*20141203 Se recuperan la primera cuota constante del primer tramo y la primera cuota del segundo tramo*/
+            datosSolicitudVO = obtenerCuotasCuadroAmort(datosSolicitudVO, resultadoObtCuadroAmort, listaCondicionesInteres);
+            // BEGIN ANPMX101
+            // FECHA 1ER VCTO CAPITAL
+            // ANPMD1010450 = CG@CFFEC('AAAA-MM-DD',
+            // 'DD-MM-AAAA',AMPMM005500);
+            // FECHA VENCIMIENTO FINAL
+            // ANPMD1010460 = CG@CFFEC('AAAA-MM-DD',
+            // 'DD-MM-AAAA',AMPMM005530);
+            // FIN LLAMADA MODULO DE RICHI
+            // reg, matriz vctos: ANPMN075140
+            // fecha pago en matriz vctos: ANPMN075142
+            matrizVencimientos = resultadoObtCuadroAmort[0].getRegistro(IConstantesSolicitud.CTE_CTX_OBTENER_CUADRO_AMORT_MATRIZ_VCTOS);
+            if (UtilidadesTramitacion.isBlankOrNull(matrizVencimientos)) {
+                datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+                datosSolicitudVO.setTextoError(new Mensaje(ServicioNegocio.getContexto(), AMPMR003_APUNTADO_ANPM_266_HAY_VENCIMIENTOS_AN_1025790130).toString());
+                return datosSolicitudVO;
+            }
+            fechaPrimerVctoCapitalStr = matrizVencimientos[0].getString(IConstantesSolicitud.CTE_CTX_OBTENER_CUADRO_AMORT_FECHA_PAGO);
+            fechaPrimerVctoCapital = DateHelper.stringASqlDate(fechaPrimerVctoCapitalStr, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+            datosSolicitudVO.setFechaPrimerVtoCapital(fechaPrimerVctoCapital);
+            fechaUltimoVctoCapitalStr = matrizVencimientos[matrizVencimientos.length - 1].getString(IConstantesSolicitud.CTE_CTX_OBTENER_CUADRO_AMORT_FECHA_PAGO);
+            fechaUltimoVctoCapital = DateHelper.stringASqlDate(fechaUltimoVctoCapitalStr, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+            datosSolicitudVO.setFechaVtoFinal(fechaUltimoVctoCapital);
+            // END ANPMX101
+            fechaPrimerCambioInteresStr = resultadoObtCuadroAmort[0].getString(IConstantesSolicitud.CTE_CTX_OBTENER_CUADRO_AMORT_FECHA_PRIMERA_REV_INT);
+            // DD-MM-YYYY
+            fechaPrimerCambioInteres = DateHelper.stringASqlDate(fechaPrimerCambioInteresStr, DateHelper.FORMATO_DD_MM_YYYY_GUION);
+        // fin obtencion datos ANPM_266
+        }
+        for (CondicionesInteresC condicionesInteres : listaCondicionesInteres) {
+            interesSolicitudVO = new InteresSolicitudVO();
+            interesSolicitudVO = obtenerDatosInteres(interesSolicitudVO, condicionesInteres);
+            /*Buscamos en la CG32 el parametro con clave IBN y codigo en tabla = referencial interés para
+			 * setear la descripción del referencial. */
+            parametrosKey = new ParametrosKey();
+            clave = IConstantesSolicitud.CTE_CLAVE_PARAMETRO_IBN;
+            codigoEnTabla = StringUtils.leftPad(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntTipoReferencia()).toString(), IConstantesSolicitud.CTE_INT_4, IConstantesSolicitud.CTE_CHAR_0);
+            parametrosKey.setClave(clave);
+            parametrosKey.setCodTabla(codigoEnTabla);
+            parametros = parametrosDao.findById(parametrosKey);
+            if (null == parametros) {
+                datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(datosSolicitudVO, clave, codigoEnTabla);
+                return datosSolicitudVO;
+            }
+            interesSolicitudVO.setDescrReferencial(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()));
+            /**
+             ***********************************************************
+             *        TABLA CG32TB01 POR MENSUAL, SEMESTRAL, ANUAL        *
+             ************************************************************
+             */
+            if (IConstantesSolicitud.CTE_STR_1.equals(condicionesInteres.getStrPagoUnicoVencimientoFinal())) {
+                codigoEnTabla = IConstantesSolicitud.CTE_STR_00FP;
+            } else {
+                /*Si la periodicidad no es correcta rellena los campos de error de datosSolicitudVO*/
+                datosSolicitudVO = GestionConsultaDatosSolicitud.verificarPeriodicidad(datosSolicitudVO, condicionesInteres.getStrPeriodicidadUnidadPeriodo(), condicionesInteres.getIntPeriodicidadNumPeriodo(), condicionesInteres.getIntPeriodicidadTipoPeriodo());
+                if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+                    return datosSolicitudVO;
+                }
+                codigoEnTabla = GestionConsultaDatosSolicitud.obtenerCodigoEnTabla(condicionesInteres.getStrPeriodicidadUnidadPeriodo(), condicionesInteres.getIntPeriodicidadNumPeriodo(), condicionesInteres.getIntPeriodicidadTipoPeriodo());
+                if (StringUtils.isBlank(codigoEnTabla)) {
+                    datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+                    datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_TIPO_PERIODICIDAD_NO_ES_VALIDO);
+                    textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+                    datosSolicitudVO.setTextoError(textoErrorStb.toString());
+                    return datosSolicitudVO;
+                }
+            }
+            clave = IConstantesSolicitud.CTE_CLAVE_PARAMETRO_IPC;
+            parametrosKey = new ParametrosKey();
+            parametrosKey.setClave(clave);
+            parametrosKey.setCodTabla(codigoEnTabla);
+            parametros = parametrosDao.findById(parametrosKey);
+            if (null == parametros) {
+                interesSolicitudVO.setDescrPeriodicidadIntereses(StringUtils.EMPTY);
+            } else {
+                interesSolicitudVO.setDescrPeriodicidadIntereses(UtilidadesTramitacion.comprobarDatoNull(parametros.getCG320030()));
+            }
+            // Si es el primer tramo de condiciones interés
+            if (IConstantesSolicitud.CTE_INT_1 == condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) {
+                if (!IConstantesSolicitud.CTE_UNIDAD_MESES.equals(condicionesInteres.getStrUnidadPeriodosRevision())) {
+                    datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+                    datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_UNIDAD_PERIODOS_REVISION_NO_VALIDA);
+                    datosSolicitudVO.setTextoError(IConstantesSolicitud.CTE_TEXTO_ERROR_UNIDAD_PERIODOS_REVISION_NO_VALIDA);
+                    return datosSolicitudVO;
+                }
+                interesSolicitudVO = obtenerDatosInteresPrimerTramo(datosSolicitudVO, interesSolicitudVO, condicionesInteres);
+                /* EDIT V360144 20140807 
+		 * SE COMENTA TEMPORALMENTE LA LLAMADA A ANPM_266
+				interesSolicitudVO.setMesesDuracionPeriodoInicial(
+					GestionConsultaDatosSolicitud.obtenerMesesPeriodoInicial(
+						datosSolicitud.getFechaSolicitud(), fechaPrimerCambioInteres));
+		*/
+                /*EDIT 20140529: El interés inicial ya se obtiene antes,
+				 *  de la llamada a ANPM_266
+				datosSolicitudVO.setInteresInicial(
+					condicionesInteres.getIntInteres());
+				*/
+                /*CUOTA SCORING*/
+                datosSolicitudVO = obtenerCuotaScoring(datosSolicitudVO, interesSolicitudVO);
+                if (!IConstantesSolicitud.CTE_IND_ERROR_OK.equals(datosSolicitudVO.getIndicadorError())) {
+                    return datosSolicitudVO;
+                }
+            } else if (IConstantesSolicitud.CTE_INT_2 == condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) {
+                // Si es el segundo tramo de condiciones interés
+                parametrosKey = new ParametrosKey();
+                parametrosKey.setClave(IConstantesSolicitud.CTE_CLAVE_PARAMETRO_IBN);
+                codigoEnTabla = StringUtils.leftPad(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntTipoReferencia()).toString(), IConstantesSolicitud.CTE_INT_4, IConstantesSolicitud.CTE_CHAR_0);
+                parametrosKey.setCodTabla(codigoEnTabla);
+                parametros = parametrosDao.findById(parametrosKey);
+                if (null == parametros) {
+                    datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(datosSolicitudVO, clave, codigoEnTabla);
+                    return datosSolicitudVO;
+                }
+                if (0 != condicionesInteres.getIntTipoReferencia().intValue()) {
+                    /*
+					 * ANPMD1010987 = ANPMD1010560 || '+' ||                              
+	                            TRIM(DIFERENCIAL) || '%';                           
+	*/
+                    datosSolicitudVO.setDescrRestoPeriodos(interesSolicitudVO.getReferencial().toString().concat("+").concat(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntDif()).toString()).concat("%"));
+                } else {
+                    // ELSE ANPMD1010987 = ANPMD1010560;
+                    datosSolicitudVO.setDescrRestoPeriodos(interesSolicitudVO.getReferencial().toString());
+                }
+                // ANPMD1010570 = CG320030;
+                interesSolicitudVO.setDescrReferencial(parametros.getCG320030());
+            }
+            listaInteresSolicitudVO.add(interesSolicitudVO);
+        }
+        datosSolicitudVO.setListaInteresesSolicitudVO(listaInteresSolicitudVO);
+        datosSolicitudVO.setNumeroTramos(new BigDecimal(listaCondicionesInteres.size()));
+        datosSolicitudVO = obtenerIntereses_ANPMX101(datosSolicitudVO);
+        return datosSolicitudVO;
+    }
+
+    public static DatosSolicitudVO obtenerComisionesDeprecated(DatosSolicitudVO datosSolicitudVO) {
+        ComisionEng comisionDao = new ComisionEng();
+        ComisionC comision = null;
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal oficina = null;
+        BigDecimal numeroSolicitud = null;
+        BigDecimal versionSolicitud = null;
+        Integer ordenTramo = null;
+        BigDecimal nuc = null;
+        String tipoComision = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        oficina = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud();
+        numeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+        versionSolicitud = datosSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+        nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        ordenTramo = IConstantesSolicitud.CTE_ORDEN_TRAMO_1;
+        /*AN280040 = '005';      COMISION GASTOS DE ESTUDIO */
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_ESTUDIO;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            /*
+			datosSolicitudVO = rellenarErrorComisionNoExiste(
+				datosSolicitudVO, oficina, numeroSolicitud, versionSolicitud,
+				ordenTramo, nuc, tipoComision);
+			return datosSolicitudVO;
+			*/
+            datosSolicitudVO.setPorcentajeGastosEstudio(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosEstudio(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosEstudio(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosEstudio(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        }
+        /*AN280040 = '003';       COMISION DE APERTURA */
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_APERTURA;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosApertura(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosApertura(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosApertura(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosApertura(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        }
+        /*AN280040 = '007';      /* COMISION POR MOD. CONTRACTUAL/GARANT*/
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_MODIF_CONTRACT_GARANT;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosModificacion(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosModificacion(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosModificacion(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosModificacion(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        }
+        /*AN280040 = '008';      /*COMISION POR RECLAMACION DEUDA VENCIDA*/
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_RECLAM_DEUDA_VENC;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosDeudaVencida(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosDeudaVencidaDivisa(BigDecimal.ZERO);
+        /*ANPMD008511 = 0; GASTOS POS.DEUDORA SIEMPRE SON EN EUROS*/
+        } else {
+            datosSolicitudVO.setPorcentajeGastosDeudaVencida(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosDeudaVencidaDivisa(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        /*
+		 	ANPMD008500 = AN280070; PORCENTAJE DE GASTOS DE POS. DEUDORA        
+			ANPMD008510 = AN280090; IMPORTE MíNIMO DE GASTOS POS.DEUDORA        
+			ANPMD008511 = AN280090; IMP. MIN.GASTOS POS.DEUDORA EN EUROS
+			 * En ANPMD008:
+			    2 ANPMD008500 PIC'(2)Z9V,9999',  /*PORC DE GASTOS DE DEUDA VEN
+			    2 ANPMD008510 PIC'(8)Z9V,99',    /*IMP MINIMO DE GAST DE DEUDA
+			    2 ANPMD008511 PIC'(8)Z9V,99',    /*IMP MIN DE GAST DE DEUDA CONT
+*/
+        }
+        /*AN280040 = '004';       /*COMISION DE CANCELACION */
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_CANCEL;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosCancelacion(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosCancelacion(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosCancelacion(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosCancelacion(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        }
+        /*AN280040 = '001';       /* COMISION SOBRE ADELANTOS */
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_SOBRE_ADELANTOS;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosSobreadelanto(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosSobreadelanto(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosSobreadelanto(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosSobreadelanto(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+        }
+        /*AN280040 = '002';        /* COMISION ADELANTO > TOPE SALDO     */
+        tipoComision = IConstantesSolicitud.CTE_TIPO_COMISION_ADELANTO_GT_TOPE_SALDO;
+        comision = comisionDao.obtenerComision(oficina, numeroSolicitud, versionSolicitud, tipoComision, ordenTramo, nuc);
+        if (null == comision) {
+            datosSolicitudVO.setPorcentajeGastosSobreadelantoMayorTope(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoGastosSobreadelantoMayorTope(BigDecimal.ZERO);
+            datosSolicitudVO.setPorcentajeTopeSaldoAdelantos(BigDecimal.ZERO);
+        } else {
+            datosSolicitudVO.setPorcentajeGastosSobreadelanto(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+            datosSolicitudVO.setImporteMinimoGastosSobreadelanto(UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+            datosSolicitudVO.setPorcentajeTopeSaldoAdelantos(UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeAdelanto()));
+        }
+        return datosSolicitudVO;
+    }
+
+    /**
+     * TABLA AN28TB01
+     *
+     * EDIT 20140515: Método redundante con la forma de obtener la matriz de comisiones
+     *  en ANPMX101, lo comentamos.
+     * @param datosSolicitudVO
+     * @return
+     *	public static DatosSolicitudVO obtenerComisiones_ANPMM008(DatosSolicitudVO datosSolicitudVO)
+     *	{
+     *		ComisionEng comisionDao = new ComisionEng();
+     *		ComisionC comision = null;
+     *		DatosSolicitudC datosSolicitud = null;
+     *		BigDecimal oficina = null;
+     *		BigDecimal numeroSolicitud = null;
+     *		BigDecimal versionSolicitud = null;
+     *		Integer ordenTramo = null;
+     *		BigDecimal nuc = null;
+     *		//String tipoComision = null;
+     *		List<ComisionSolicitudVO> listaComisionSolicitudVO = new ArrayList<ComisionSolicitudVO>(0);
+     *		ComisionSolicitudVO comisionSolicitudVO = null;
+     *		List<String> listaTipoComisiones = new ArrayList<String>(0);
+     *
+     *		datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+     *		oficina = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud();
+     *		numeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+     *		versionSolicitud = datosSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+     *		nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+     *
+     *		ordenTramo = IConstantesSolicitud.CTE_ORDEN_TRAMO_1;
+     *
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_ESTUDIO);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_APERTURA);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_MODIF_CONTRACT_GARANT);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_RECLAM_DEUDA_VENC);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_CANCEL);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_SOBRE_ADELANTOS);
+     *		listaTipoComisiones.add(IConstantesSolicitud.CTE_TIPO_COMISION_ADELANTO_GT_TOPE_SALDO);
+     *
+     *		for (String tipoComision : listaTipoComisiones)
+     *		{
+     *			comisionSolicitudVO = new ComisionSolicitudVO();
+     *
+     *			comisionSolicitudVO.setTipoComision(tipoComision);
+     *			comisionSolicitudVO.setOrdenTramo(new BigDecimal(ordenTramo));
+     *			//comisionSolicitudVO.setDivisaImporteMinimo(UtilidadesTramitacion.obtenerMonedaEntidad());
+     *
+     *			comision =  comisionDao.obtenerComision(oficina, numeroSolicitud,
+     *				versionSolicitud, tipoComision, ordenTramo, nuc);
+     *			if (null == comision)
+     *			{
+     *				comisionSolicitudVO.setPorcentajeComision(BigDecimal.ZERO);
+     *				comisionSolicitudVO.setImporteMinimoDivisaEntidad(BigDecimal.ZERO);
+     *				comisionSolicitudVO.setPorcentajeAdelanto(BigDecimal.ZERO);
+     *			}
+     *			else
+     *			{
+     *				comisionSolicitudVO.setPorcentajeComision(
+     *					UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeComision()));
+     *				comisionSolicitudVO.setImporteMinimoDivisaEntidad(
+     *					UtilidadesTramitacion.comprobarDatoNull(comision.getBidImporteMinimo()));
+     *				comisionSolicitudVO.setPorcentajeAdelanto(
+     *					UtilidadesTramitacion.comprobarDatoNull(comision.getBidPorcentajeAdelanto()));
+     *			}
+     *			listaComisionSolicitudVO.add(comisionSolicitudVO);
+     *		}
+     *		datosSolicitudVO.setListaComisionesSolicitudVO(listaComisionSolicitudVO);
+     *
+     *		return datosSolicitudVO;
+     *	}
+     */
+    public static DatosSolicitudVO obtenerComisiones(DatosSolicitudVO datosSolicitudVO) {
+        List<ComisionSolicitudVO> listaComisionSolicitudVO = null;
+        ComisionSolicitudVO comisionSolicitudVO = null;
+        List<ComisionC> listaComisionC = null;
+        ComisionEng comisionDao = new ComisionEng();
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal importeMinimoGastosApertura = null;
+        BigDecimal importeMinimoGastosEstudio = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        /*BEGIN ANPMX101*/
+        listaComisionSolicitudVO = datosSolicitudVO.getListaComisionesSolicitudVO();
+        listaComisionC = comisionDao.obtenerListaComisiones(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+        if (null != listaComisionC) {
+            for (ComisionC comisionC : listaComisionC) {
+                comisionSolicitudVO = new ComisionSolicitudVO();
+                comisionSolicitudVO.setTipoComision(comisionC.getComisionesKey().getStrTipoComision());
+                comisionSolicitudVO.setOrdenTramo(new BigDecimal(comisionC.getComisionesKey().getIntOrden()));
+                comisionSolicitudVO.setPorcentajeComision(comisionC.getBidPorcentajeComision());
+                comisionSolicitudVO.setImporteMinimoDivisaEntidad(comisionC.getBidImporteMinimo());
+                comisionSolicitudVO.setPorcentajeAdelanto(comisionC.getBidPorcentajeAdelanto());
+                listaComisionSolicitudVO.add(comisionSolicitudVO);
+                if (IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_APERTURA.equals(comisionSolicitudVO.getTipoComision())) {
+                    importeMinimoGastosApertura = obtenerGastosACobrarDivisaEntidad(comisionC, datosSolicitud, datosSolicitudVO.getDivisaEntidad());
+                    datosSolicitudVO.setImporteMinimoGastosApertura(importeMinimoGastosApertura);
+                    /*Se añade también el importe mínimo en el registro correspondiente*/
+                    comisionSolicitudVO.setImporteMinimoDivisaEntidad(importeMinimoGastosApertura);
+                } else if (IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_ESTUDIO.equals(comisionSolicitudVO.getTipoComision())) {
+                    importeMinimoGastosEstudio = obtenerGastosACobrarDivisaEntidad(comisionC, datosSolicitud, datosSolicitudVO.getDivisaEntidad());
+                    datosSolicitudVO.setImporteGastosACobrarDivisaEntidad(importeMinimoGastosEstudio);
+                    comisionSolicitudVO.setImporteMinimoDivisaEntidad(importeMinimoGastosEstudio);
+                }
+            }
+            datosSolicitudVO.setListaComisionesSolicitudVO(listaComisionSolicitudVO);
+        }
+        return datosSolicitudVO;
+    }
+
+    /**
+     * Obtenemos los datos de los tratamientos de adelantos (TABLA AN29TB01)
+     * @param datosSolicitudVO
+     * @return
+     */
+    public static DatosSolicitudVO obtenerTratamientoAdelantos(DatosSolicitudVO datosSolicitudVO) {
+        TratamientoAdelantosC tratamientoAdelantos = null;
+        List<TratamientoAdelantosC> listaTratAdel = null;
+        TratamientoAdelantosEng tratamientoAdelantosDao = new TratamientoAdelantosEng();
+        TratAdelSolicitudVO tratAdelSolicitudVO = null;
+        List<TratAdelSolicitudVO> listaTratAdelSolicitudVO = new ArrayList<TratAdelSolicitudVO>(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal oficina = null;
+        BigDecimal numeroSolicitud = null;
+        BigDecimal versionSolicitud = null;
+        BigDecimal nuc = null;
+        BigDecimal contravalor = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        oficina = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud();
+        numeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+        versionSolicitud = datosSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+        nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        tratamientoAdelantos = tratamientoAdelantosDao.buscarTratamientoAdelantosPriodidadMinima(oficina, numeroSolicitud, versionSolicitud, nuc);
+        if (null == tratamientoAdelantos) {
+            datosSolicitudVO.setTipoAdelanto(BigDecimal.ZERO);
+            datosSolicitudVO.setImporteMinimoAdelantoDivisa(BigDecimal.ZERO);
+            datosSolicitudVO.setDivisaImporteMinimoAdelanto(UtilidadesTramitacion.obtenerMonedaEntidad());
+        } else {
+            datosSolicitudVO.setTipoAdelanto(UtilidadesTramitacion.comprobarDatoNull(tratamientoAdelantos.getTipoAdelanto()));
+            datosSolicitudVO.setImporteMinimoAdelantoDivisa(UtilidadesTramitacion.comprobarDatoNull(tratamientoAdelantos.getImporteMinAdelanto()));
+            if (StringUtils.isBlank(tratamientoAdelantos.getMonedaImpMinAdelanto())) {
+                datosSolicitudVO.setDivisaImporteMinimoAdelanto(UtilidadesTramitacion.comprobarDatoNull(UtilidadesTramitacion.obtenerMonedaEntidad()));
+            } else {
+                datosSolicitudVO.setDivisaImporteMinimoAdelanto(UtilidadesTramitacion.comprobarDatoNull(tratamientoAdelantos.getMonedaImpMinAdelanto()));
+            }
+            datosSolicitudVO.setControlCuotasCompletas(UtilidadesTramitacion.comprobarDatoNull(tratamientoAdelantos.getControlCuotasCompletas()));
+        }
+        /*BEGIN ANPMX101*/
+        listaTratAdel = tratamientoAdelantosDao.buscarTratamientoAdelantos(oficina, numeroSolicitud, versionSolicitud, nuc);
+        if (UtilidadesTramitacion.isBlankOrNull(listaTratAdel)) {
+            if (IConstantesSolicitud.CTE_PERMITE_ADELANTAR_NO == datosSolicitud.getPermiteAdelantar().intValue()) {
+                if (IConstantesSolicitud.CTE_PERMITE_CANCELAR_NO == datosSolicitud.getPermiteCancelar().intValue()) {
+                    datosSolicitudVO.setTipoAdelantoBis(IConstantesSolicitud.CTE_TIPO_ADELANTO_NO_ADELANTO_NI_CANCEL);
+                } else {
+                    datosSolicitudVO.setTipoAdelantoBis(IConstantesSolicitud.CTE_TIPO_ADELANTO_NO_ADELANTO);
+                }
+            } else {
+                /* ERROR:DEBERIA HABER DATOS EN LA AN29TB01 */
+                datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorAdelantosNoExisten(datosSolicitudVO, oficina, numeroSolicitud, versionSolicitud, nuc);
+                return datosSolicitudVO;
+            }
+        } else {
+            switch(listaTratAdel.get(0).getId().getImputacionAdelanto().intValue()) {
+                case IConstantesSolicitud.CTE_TIPO_IMPUTACION_ADELANTO_RECALCULO:
+                    {
+                        if (IConstantesSolicitud.CTE_FECHAS_ADELANTO_LIBRES == listaTratAdel.get(0).getFechasAdelanto().intValue()) {
+                            // ANPMD1010810 = 3;
+                            datosSolicitudVO.setTipoAdelantoBis(new BigDecimal(3));
+                        } else {
+                            // ANPMD1010810 = 4;
+                            datosSolicitudVO.setTipoAdelantoBis(new BigDecimal(4));
+                        }
+                        break;
+                    }
+                case IConstantesSolicitud.CTE_TIPO_IMPUTACION_ADELANTO_ULT_CUOTAS:
+                    {
+                        if (IConstantesSolicitud.CTE_FECHAS_ADELANTO_LIBRES == listaTratAdel.get(0).getFechasAdelanto().intValue()) {
+                            // ANPMD1010810 = 4;
+                            datosSolicitudVO.setTipoAdelantoBis(new BigDecimal(4));
+                        } else {
+                            // ANPMD1010810 = 6;
+                            datosSolicitudVO.setTipoAdelantoBis(new BigDecimal(6));
+                        }
+                        break;
+                    }
+                default:
+                    {
+                        datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorAdelantosIncorrectos(datosSolicitudVO, oficina, numeroSolicitud, versionSolicitud, nuc);
+                        return datosSolicitudVO;
+                    }
+            }
+        }
+        listaTratAdelSolicitudVO = datosSolicitudVO.getListaTratAdelSolicitudVO();
+        /* ASIGNAMOS LOS VALORES A LA MATRIZ DE TTO DE ADELANTOS */
+        for (TratamientoAdelantosC tratAdelC : listaTratAdel) {
+            tratAdelSolicitudVO = new TratAdelSolicitudVO();
+            // ANPMD1010975(IND).ANPMD1010976 = AN290040; /*IMPUTAC. ADEL.*/
+            tratAdelSolicitudVO.setTipoImputacionAdelanto(tratAdelC.getId().getImputacionAdelanto());
+            // ANPMD1010975(IND).ANPMD1010977 = AN290060; /*PRIORIDAD*/
+            tratAdelSolicitudVO.setPrioridad(tratAdelC.getPrioridad());
+            // ANPMD1010975(IND).ANPMD1010978 = AN290070; /*TIPO*/
+            tratAdelSolicitudVO.setTipoAdelanto(tratAdelC.getTipoAdelanto());
+            // ANPMD1010975(IND).ANPMD1010979 = AN290080; /*FECHAS ADELANT*/
+            tratAdelSolicitudVO.setIndFechasAdelanto(tratAdelC.getFechasAdelanto());
+            // ANPMD1010975(IND).ANPMD1010980 = AN290090; /*IMPORTE MINIMO*/
+            tratAdelSolicitudVO.setImporteMinimoAdelantoDivisa(tratAdelC.getImporteMinAdelanto());
+            tratAdelSolicitudVO.setDivisaImporteMinimoAdelanto(tratAdelC.getMonedaImpMinAdelanto());
+            contravalor = UtilidadesTramitacion.calcularContravalor(tratAdelSolicitudVO.getDivisaImporteMinimoAdelanto(), tratAdelSolicitudVO.getImporteMinimoAdelantoDivisa(), datosSolicitudVO.getDivisaEntidad());
+            if (null != contravalor) {
+                tratAdelSolicitudVO.setImporteMinimoAdelantoContravalor(contravalor);
+            }
+            // ANPMD1010975(IND).ANPMD1010981 = AN290120; /*CUOTA COMPLETA*/
+            tratAdelSolicitudVO.setIndCuotasCompletas(tratAdelC.getControlCuotasCompletas());
+            // ANPMD1010975(IND).ANPMD1010982 = AN290130; /*RECALC. CUOTA*/
+            tratAdelSolicitudVO.setIndRecalculaCuota(tratAdelC.getRecalcularCuota());
+            // ANPMD1010975(IND).ANPMD1010983 = AN290160; /*OBLIGATORIEDAD*/
+            tratAdelSolicitudVO.setIndObligatoriedad(tratAdelC.getObligatoriooptativo());
+            listaTratAdelSolicitudVO.add(tratAdelSolicitudVO);
+        }
+        datosSolicitudVO.setListaTratAdelSolicitudVO(listaTratAdelSolicitudVO);
+        return datosSolicitudVO;
+    }
+
+    /*
+	private  BigDecimal convertirAdivisaPrestamo(BigDecimal importe,
+			String divisaDestino, String fechaConcesion)
+	{
+		
+		BigDecimal resultado = importe;
+		
+		IDatosEntradaTx datosEntradaCambioDivisa = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(),
+				100, 300);
+		
+		
+		
+		IContexto [] aDivisaConv = ServicioNegocio.invocarServicio(new ContextoEjecucionImpl(), datosEntradaCambioDivisa);
+		
+		
+		return resultado;
+	}
+*/
+    /**
+     * Tabla AN30TB01
+     *
+     * @param datosSolicitudVO
+     * @return
+     */
+    public static DatosSolicitudVO obtenerDestino(DatosSolicitudVO datosSolicitudVO) {
+        DestinosC destino = null;
+        DestinosEng destinoDao = new DestinosEng();
+        ParametrosEng parametroDao = new ParametrosEng();
+        ParametrosC parametro = null;
+        ParametrosKey parametroKey = null;
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal oficina = null;
+        BigDecimal numeroSolicitud = null;
+        BigDecimal versionSolicitud = null;
+        BigDecimal nuc = null;
+        StringBuilder textoErrorStb = null;
+        StringBuilder descrDestinoStb = new StringBuilder(1);
+        StringBuilder descrSubdestinoStb = new StringBuilder(1);
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        oficina = datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud();
+        numeroSolicitud = datosSolicitud.getDatosSolicitudKey().getNumSolicitud();
+        versionSolicitud = datosSolicitud.getDatosSolicitudKey().getVersionSolicitud();
+        nuc = datosSolicitud.getDatosSolicitudKey().getNucExpediente();
+        destino = destinoDao.obtenerDestinoPrincipal(oficina, numeroSolicitud, versionSolicitud, nuc);
+        if (null == destino) {
+            textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+            datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+            datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_DESTINO_NO_EXISTE);
+            textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), DESTINO_PRINCIPAL_OFICINA_1265136895).toString());
+            textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(oficina).toString());
+            textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _N_MERO_SOLICITUD_86517977).toString());
+            textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(numeroSolicitud).toString());
+            textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), _VERSI_N_SOLICITUD_422041756).toString());
+            textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(versionSolicitud).toString());
+            textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), NUC_EXPEDIENTE_2005243413).toString());
+            textoErrorStb = textoErrorStb.append(UtilidadesTramitacion.comprobarDatoNull(nuc).toString());
+            textoErrorStb = textoErrorStb.append(new Mensaje(ServicioNegocio.getContexto(), EXISTE_1315400288).toString());
+            datosSolicitudVO.setTextoError(textoErrorStb.toString());
+            return datosSolicitudVO;
+        }
+        datosSolicitudVO.setCodigoDestino(UtilidadesTramitacion.comprobarDatoNull(destino.getDestino()));
+        /*TABLA CG32TB01*/
+        parametroKey = new ParametrosKey();
+        parametroKey.setClave(IConstantesSolicitud.CTE_CLAVE_PARAMETRO_DET);
+        parametroKey.setCodTabla(datosSolicitudVO.getCodigoDestino());
+        parametro = parametroDao.findById(parametroKey);
+        if (null == parametro) {
+            datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorParametroNoExiste(datosSolicitudVO, parametroKey.getClave(), parametroKey.getCodTabla());
+            return datosSolicitudVO;
+        }
+        descrDestinoStb = descrDestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320030()));
+        descrDestinoStb = descrDestinoStb.append(" ");
+        descrDestinoStb = descrDestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320040()));
+        descrDestinoStb = descrDestinoStb.append(" ");
+        descrDestinoStb = descrDestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320050()));
+        datosSolicitudVO.setDescrDestino(descrDestinoStb.toString());
+        if (!StringUtils.isBlank(destino.getSubdestino())) {
+            parametroKey = new ParametrosKey();
+            parametroKey.setClave(IConstantesSolicitud.CTE_CLAVE_PARAMETRO_CDT);
+            parametroKey.setCodTabla(StringUtils.leftPad(destino.getSubdestino(), IConstantesSolicitud.CTE_INT_4, IConstantesSolicitud.CTE_CHAR_0));
+            parametro = parametroDao.findById(parametroKey);
+            if (null == parametro) {
+                datosSolicitudVO.setDescrSubdestino(StringUtils.EMPTY);
+                datosSolicitudVO.setCodigoSubdestino(StringUtils.EMPTY);
+            } else {
+                descrSubdestinoStb = descrSubdestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320030()));
+                descrSubdestinoStb = descrSubdestinoStb.append(" ");
+                descrSubdestinoStb = descrSubdestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320040()));
+                descrSubdestinoStb = descrSubdestinoStb.append(" ");
+                descrSubdestinoStb = descrSubdestinoStb.append(UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320050()));
+                datosSolicitudVO.setDescrSubdestino(descrSubdestinoStb.toString());
+                /*
+				datosSolicitudVO.setDescrSubdestino(
+					UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320030()).concat(
+						UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320040()).concat(
+							UtilidadesTramitacion.comprobarDatoNull(parametro.getCG320050()))));
+*/
+                datosSolicitudVO.setDestinoScoring(parametro.getCG320070());
+                datosSolicitudVO.setCodigoSubdestino(destino.getSubdestino());
+            }
+        } else {
+            datosSolicitudVO.setDescrSubdestino(StringUtils.EMPTY);
+            datosSolicitudVO.setCodigoSubdestino(StringUtils.EMPTY);
+        }
+        datosSolicitudVO.setDestinoFinalidad(destino.getComentario());
+        return datosSolicitudVO;
+    }
+
+    private static BigDecimal obtenerGastosACobrarDivisaEntidad(ComisionC comisionC, DatosSolicitudC datosSolicitud, String divisaEntidad) {
+        // BigDecimal importeMinimoComisionDivisaEntidad = BigDecimal.ZERO;
+        BigDecimal gastosACobrarDivisaEntidad = BigDecimal.ZERO;
+        // AN250580
+        BigDecimal importeSolicitadoContravalor = null;
+        // AN250610
+        BigDecimal importeProductosFinanciarContravalor = null;
+        MathContext mathContext = new MathContext(17, RoundingMode.HALF_UP);
+        BigDecimal contravalor = null;
+        /*Contravaloramos el importe solicitado. */
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitud.getMonedaImporteSolicitado(), datosSolicitud.getImporteSolicitado(), divisaEntidad);
+        importeSolicitadoContravalor = UtilidadesTramitacion.comprobarDatoNull(contravalor);
+        /*Contravaloramos el importe financiar. */
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitud.getMonedaProductosFinanciar(), datosSolicitud.getImporteProductosFinanciar(), divisaEntidad);
+        importeProductosFinanciarContravalor = UtilidadesTramitacion.comprobarDatoNull(contravalor);
+        if (IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_APERTURA.equals(comisionC.getComisionesKey().getStrTipoComision())) {
+            if (0 > BigDecimal.ZERO.compareTo(comisionC.getBidPorcentajeComision())) {
+                /*
+               /* LE SUMAMOS EL IMPORTE DE PRODUCTOS A FINANCIAR
+                 CALCU_BIN = MULTIPLY(ANPMD1010110 + AN250610,                  
+                                      AN280070,15,4) / 100;                     
+                 CALCU_15_4 = CALCU_BIN;                                        
+                 CALCU_15_3 = CALCU_15_4;                                       
+                                                                                
+                 /* IF AN250590 = 'EUR'                                         
+                 THEN COMCON = ROUND(CALCU_15_3,2);                             
+                 ELSE COMCON = ROUND(CALCU_15_3,0);
+                 COMCON = ROUND(CALCU_15_3,2);                                  
+                                                                                
+               END;                                                             
+ */
+                gastosACobrarDivisaEntidad = importeSolicitadoContravalor.add(importeProductosFinanciarContravalor, mathContext);
+                gastosACobrarDivisaEntidad = gastosACobrarDivisaEntidad.multiply(comisionC.getBidPorcentajeComision(), mathContext).divide(new BigDecimal(100), mathContext);
+            }
+        } else if (IConstantesSolicitud.CTE_TIPO_COMISION_GASTOS_ESTUDIO.equals(comisionC.getComisionesKey().getStrTipoComision())) {
+            if (0 > BigDecimal.ZERO.compareTo(comisionC.getBidPorcentajeComision())) {
+                gastosACobrarDivisaEntidad = importeSolicitadoContravalor.add(importeProductosFinanciarContravalor, mathContext);
+                gastosACobrarDivisaEntidad = gastosACobrarDivisaEntidad.multiply(comisionC.getBidPorcentajeComision(), mathContext).divide(new BigDecimal(100), mathContext);
+            }
+        }
+        if (0 < comisionC.getBidImporteMinimo().compareTo(gastosACobrarDivisaEntidad)) {
+            gastosACobrarDivisaEntidad = comisionC.getBidImporteMinimo();
+        }
+        return gastosACobrarDivisaEntidad;
+    }
+
+    private DatosSolicitudVO obtenerImportes(DatosSolicitudVO datosSolicitudVO) {
+        DatosSolicitudC datosSolicitud = null;
+        BigDecimal contravalor = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        /*
+			datosSolicitudVO.setPrecioTotalBienInversDivisaEntidad(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitudVO.getImporteBienInversionDivisa()).add(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitudVO.getImporteImpuestosInversDivisa()).add(
+				UtilidadesTramitacion.comprobarDatoNull(datosSolicitudVO.getImporteGastosInversDivisa()))));
+*/
+        datosSolicitudVO.setImporteEstimadoTasacionDivisa(datosSolicitud.getImporteTasacionEstimado());
+        /*TODO aunque haya moneda/divisa de importe estimado tasacion, aqui me viene en divisa entidad*/
+        datosSolicitudVO.setDiferimientoCuotaPactada(datosSolicitud.getDiferCuotaPactada());
+        // ANPMD008110 = AN250810;      /* CUOTA PACTADA               */
+        // ANPMD1010974 = AN250810; /* DIFERIMIENTO CUOTA PACTADA */
+        /*Importe producto a financiar*/
+        datosSolicitudVO.setDivisaImporteProductoAFinanciar(datosSolicitud.getMonedaProductosFinanciar());
+        datosSolicitudVO.setImporteProductoAFinanciarDivisa(datosSolicitud.getImporteProductosFinanciar());
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitudVO.getDivisaImporteProductoAFinanciar(), datosSolicitudVO.getImporteProductoAFinanciarDivisa(), datosSolicitudVO.getDivisaEntidad());
+        if (null != contravalor) {
+            datosSolicitudVO.setImporteProductoAFinanciarContravalor(contravalor);
+        }
+        /*Importe solicitado*/
+        /*ANPMD008070 = AN250580;      IMPORTE SOLICITADO          */
+        datosSolicitudVO.setDivisaImporteSolicitado(datosSolicitud.getMonedaImporteSolicitado());
+        datosSolicitudVO.setImporteSolicitadoDivisa(datosSolicitud.getImporteSolicitado());
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitud.getMonedaImporteSolicitado(), datosSolicitud.getImporteSolicitado(), datosSolicitudVO.getDivisaEntidad());
+        if (null != contravalor) {
+            datosSolicitudVO.setImporteSolicitadoContravalor(contravalor);
+        }
+        /*Importe bien/inversión*/
+        /*BEGIN ANPMX101*/
+        /*Calculamos el contravalor del importe de inversión.*/
+        /*           ANPMD1010850 = CALCULO_CAMBIO(AN250930,AN250570,                     
+                                         AN250560,'EUR');*/
+        datosSolicitudVO.setDivisaImporteBienInversion(datosSolicitud.getMonedaInversion());
+        datosSolicitudVO.setImporteBienInversionDivisa(datosSolicitud.getImporteInversion());
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitud.getMonedaInversion(), datosSolicitud.getImporteInversion(), datosSolicitudVO.getDivisaEntidad());
+        if (null != contravalor) {
+            datosSolicitudVO.setImporteBienInversionContravalor(contravalor);
+        }
+        /*END ANPMX101*/
+        /*Importe impuestos inversión*/
+        datosSolicitudVO.setDivisaImporteBienInversion(datosSolicitud.getMonedaImpuestosInversion());
+        datosSolicitudVO.setImporteImpuestosInversDivisa(datosSolicitud.getImporteImpuestosInversion());
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitudVO.getDivisaImporteBienInversion(), datosSolicitudVO.getImporteImpuestosInversDivisa(), datosSolicitudVO.getDivisaEntidad());
+        if (null != contravalor) {
+            datosSolicitudVO.setImporteImpuestosInversContravalor(contravalor);
+        }
+        /*Importe gastos inversión*/
+        datosSolicitudVO.setDivisaImporteGastosInvers(datosSolicitud.getMonedaGastosInversion());
+        datosSolicitudVO.setImporteGastosInversDivisa(datosSolicitud.getImporteGastosInversion());
+        contravalor = UtilidadesTramitacion.calcularContravalor(datosSolicitudVO.getDivisaImporteGastosInvers(), datosSolicitudVO.getImporteGastosInversDivisa(), datosSolicitudVO.getDivisaEntidad());
+        if (null != contravalor) {
+            datosSolicitudVO.setImporteGastosInversContravalor(contravalor);
+        }
+        // ANPMD1010710 = 'EUR'; /*MONEDA PRECIO TOTAL VALOR INVERSION */
+        datosSolicitudVO.setDivisaPrecioTotalBienInvers(datosSolicitudVO.getDivisaEntidad());
+        if (datosSolicitudVO.getDivisaEntidad().equals(datosSolicitudVO.getDivisaImporteBienInversion())) {
+            // ANPMD1010700 = AN250560 + AN250565 + AN250545;
+            datosSolicitudVO.setPrecioTotalBienInversDivisaEntidad(datosSolicitud.getImporteInversion().add(datosSolicitud.getImporteGastosInversion().add(datosSolicitud.getImporteImpuestosInversion())));
+        } else {
+            /* Calculamos el contravalor en euros del importe inversion
+	           ANPMD1010850 = CALCULO_CAMBIO(AN250930,AN250570,                     
+	                                         AN250560,'EUR'); */
+            datosSolicitudVO.setImporteBienInversionContravalor(UtilidadesTramitacion.calcularContravalor(datosSolicitudVO.getDivisaImporteBienInversion(), datosSolicitudVO.getImporteBienInversionContravalor(), datosSolicitudVO.getDivisaEntidad()));
+            // ANPMD1010700 = ANPMD1010850 + AN250565 + AN250545;
+            datosSolicitudVO.setPrecioTotalBienInversDivisaEntidad(datosSolicitudVO.getImporteBienInversionContravalor().add(datosSolicitud.getImporteGastosInversion().add(datosSolicitud.getImporteImpuestosInversion())));
+        }
+        /*END IMPORTES*/
+        return datosSolicitudVO;
+    }
+
+    private static CondicionCapitalSolicitudVO obtenerCodPeriodicidadCapital(CondicionCapitalC condicionCapital, CondicionCapitalSolicitudVO condicionCapitalSolicVO) {
+        /*BEGIN ANPMX101*/
+        switch(condicionCapital.getIntPeriodicidadTipoPeriodo().intValue()) {
+            case IConstantesSolicitud.CTE_INT_1:
+                {
+                    switch(condicionCapital.getIntPeriodicidadNumPeriodo().intValue()) {
+                        case IConstantesSolicitud.CTE_INT_0:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_FP);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_1:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_MV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_3:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_TV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_6:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_SV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_12:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_1V);
+                                break;
+                            }
+                        default:
+                            {
+                                break;
+                            }
+                    }
+                    break;
+                }
+            case IConstantesSolicitud.CTE_INT_2:
+                {
+                    switch(condicionCapital.getIntPeriodicidadNumPeriodo().intValue()) {
+                        case IConstantesSolicitud.CTE_INT_1:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_MN);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_3:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_TN);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_6:
+                            {
+                                condicionCapitalSolicVO.setCodPeriodicidadCapital(IConstantesSolicitud.CTE_COD_PERIODICIDAD_SN);
+                                break;
+                            }
+                        default:
+                            {
+                                break;
+                            }
+                    }
+                    break;
+                }
+            default:
+                {
+                    break;
+                }
+        }
+        return condicionCapitalSolicVO;
+    }
+
+    private static InteresSolicitudVO obtenerDatosInteresPrimerTramo(DatosSolicitudVO datosSolicitudVO, InteresSolicitudVO interesSolicitudVO, CondicionesInteresC condicionesInteres) {
+        CondicionesInteresEng condicionesInteresDao = new CondicionesInteresEng();
+        List<CondicionesInteresC> listaCondicionesInteresTodas = null;
+        BigDecimal tamanoListaCondicionesInteresTodas = null;
+        DatosSolicitudC datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        String tipoInteres = null;
+        if (IConstantesSolicitud.CTE_TIPO_INTERES_FIJO.equals(condicionesInteres.getStrTipoDeInteres())) {
+        // interesSolicitudVO.setTipo(condicionesInteresPrimerTramo.getStrTipoDeInteres());
+        /*FEITO EN obtenerIntereses(..)*/
+        // interesSolicitudVO.setInteres(condicionesInteresPrimerTramo.getIntInteres());
+        /*FEITO EN obtenerIntereses(..)*/
+        } else {
+        /*
+		           IF BUSCAR_INDICE_PITA = 0 THEN                                       
+		               /*IF ANPMD1010997 = 0 THEN * /
+		               ANPMD1010320 = PI040070 + AN270270;                              
+		           ELSE                                                                 
+		             RETURN(1);                                                         
+		 		
+		 		TODO: Falta por saber de dónde sacamos el resultado del método BUSCAR_INDICE_PITA, opciones:
+		 		 - Buscar un programa host en la aplicación PITA que haga lo mismo e invocarlo desde java.
+		 		 - ...
+*/
+        }
+        // ANPMD1010620 = AN270100; /* VALORACION DEL PTMO
+        datosSolicitudVO.setIndValoracionPrestamoIvi(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getStrValoracionIVI()));
+        datosSolicitudVO = obtenerCodigoPeriodicidadInteres(datosSolicitudVO, condicionesInteres);
+        /*BEGIN Obtención descripción resto periodos*/
+        listaCondicionesInteresTodas = condicionesInteresDao.buscarCondicionesInteres(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente(), null);
+        if (null == listaCondicionesInteresTodas) {
+            tamanoListaCondicionesInteresTodas = BigDecimal.ZERO;
+        } else {
+            tamanoListaCondicionesInteresTodas = new BigDecimal(listaCondicionesInteresTodas.size());
+        }
+        if (0 == BigDecimal.ONE.compareTo(tamanoListaCondicionesInteresTodas)) {
+            if (0 != UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntTipoReferencia()).intValue()) {
+                datosSolicitudVO.setDescrRestoPeriodos(UtilidadesTramitacion.comprobarDatoNull(interesSolicitudVO.getDescrReferencial()).concat("+").concat(interesSolicitudVO.getDiferencial().toString().concat("%")));
+            } else {
+                datosSolicitudVO.setDescrRestoPeriodos(UtilidadesTramitacion.comprobarDatoNull(interesSolicitudVO.getDescrReferencial()));
+            }
+        }
+        /*END Obtención descripción resto periodos*/
+        /* MESES VIGENCIA INTERES INICIAL */
+        tipoInteres = condicionesInteres.getStrTipoDeInteres();
+        if ((IConstantesSolicitud.CTE_TIPO_INTERES_FIJO.equals(tipoInteres)) || (IConstantesSolicitud.CTE_TIPO_INTERES_FIJO_PENALIZABLE.equals(tipoInteres)) || (IConstantesSolicitud.CTE_TIPO_INTERES_FIJO_REFERENCIADO.equals(tipoInteres))) {
+            /* SI EL TRAMO ES FIJO ES EL PLAZO */
+            // ANPMD1010740 =  AN270110;
+            interesSolicitudVO.setMesesDuracionPeriodoInicial(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntPlazo())));
+        /*
+ * 		//ESTO YA SE HACE EN obtenerIntereses(..):
+				interesSolicitudVO.setPlazo(new BigDecimal(
+					UtilidadesTramitacion.comprobarDatoNull(condicionesInteresPrimerTramo.getIntPlazo())));
+*/
+        } else {
+            // ANPMD1010740 = AN270380;
+            interesSolicitudVO.setMesesDuracionPeriodoInicial(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntNumPeriodosRevision())));
+            // ANPMD1010750 = AN270380;     /* MESES REVISION INTERES    */
+            interesSolicitudVO.setPeriodicidadRevisionIntereses(new BigDecimal(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getIntNumPeriodosRevision())));
+        }
+        return interesSolicitudVO;
+    }
+
+    /**
+     * Obtener cuota scoring
+     *
+     * @param datosSolicitudVO
+     * @param interesSolicitudVO value object del primer tramo de interés.
+     * @return datosSolicitudVO
+     */
+    public static DatosSolicitudVO obtenerCuotaScoring(DatosSolicitudVO datosSolicitudVO, InteresSolicitudVO interesSolicitudVO) {
+        DatosSolicitudC datosSolicitud = null;
+        StringBuilder textoErrorStb = null;
+        BigDecimal plazoMesesCuotaScoring = BigDecimal.ZERO;
+        BigDecimal plazoTotalAnos = null;
+        BigDecimal plazoCarenciaAnos = null;
+        BigDecimal plazoTotalDias = null;
+        BigDecimal plazoCarenciaDias = null;
+        BigDecimal cuotaScoring = null;
+        // List<InteresSolicitudVO> listaInteresesSolicitudVO = null;
+        IDatosEntradaTx datosEntradaSNCalculoCuotaScoring = null;
+        IContexto[] resultadoSNCalculoCuotaScoring = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        // ANPMD008670 = AN250580;  CUOTA
+        datosSolicitudVO.setCuotaContravalor(// ¿? TODO MIRAR ISTO
+        UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getImporteSolicitado()));
+        if (IConstantesSolicitud.CTE_UNIDAD_MESES.equals(datosSolicitud.getUnidadPlazo())) {
+            plazoMesesCuotaScoring = UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getPlazoTotal()).subtract(UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getPlazoCarencia()));
+        } else if (IConstantesSolicitud.CTE_UNIDAD_ANOS.equals(datosSolicitud.getUnidadPlazo())) {
+            plazoTotalAnos = UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getPlazoTotal()).divideToIntegralValue(IConstantesSolicitud.CTE_BID_12);
+            plazoCarenciaAnos = UtilidadesTramitacion.comprobarDatoNull(datosSolicitud.getPlazoCarencia()).divideToIntegralValue(IConstantesSolicitud.CTE_BID_12);
+            plazoMesesCuotaScoring = UtilidadesTramitacion.comprobarDatoNull(plazoTotalAnos).subtract(UtilidadesTramitacion.comprobarDatoNull(plazoCarenciaAnos));
+        } else if (IConstantesSolicitud.CTE_UNIDAD_DIAS.equals(datosSolicitud.getUnidadPlazo())) {
+            plazoTotalDias = datosSolicitud.getPlazoTotal().multiply(IConstantesSolicitud.CTE_BID_30);
+            plazoCarenciaDias = datosSolicitud.getPlazoCarencia().multiply(IConstantesSolicitud.CTE_BID_30);
+            plazoMesesCuotaScoring = plazoTotalDias.subtract(plazoCarenciaDias);
+        }
+        datosSolicitudVO.setPlazoMesesCuotaScoring(plazoMesesCuotaScoring);
+        /*V360144 20140807 COMENTADO PROVISIONALMENTE MIENTRAS NO SE CAMBIE
+		 * EL ANPM_403 de calculo cuota scoring.
+		 * 20140808: El problema no es el cálculo de la cuota scoring, el problema es la 
+		 * llamada a ANPM_266 que es de donde se recibe el interes inicial.
+		 * De todos modos este interes inicial ya no se le envia al ANPM_403.
+		 * 
+		if (0 == BigDecimal.ZERO.compareTo(datosSolicitudVO.getInteresInicial()))
+		{
+			textoErrorStb = new StringBuilder(IConstantesSolicitud.CTE_TAM_INICIAL_ARRAYS);
+			datosSolicitudVO.setIndicadorError(IConstantesSolicitud.CTE_IND_ERROR_NK);
+			datosSolicitudVO.setCodigoError(IConstantesSolicitud.CTE_CODIGO_ERROR_INTERES_INICIAL_CERO);
+			textoErrorStb = textoErrorStb.append(IConstantesSolicitud.CTE_TEXTO_ERROR_INTERES_INICIAL_CERO);
+			datosSolicitudVO.setTextoError(textoErrorStb.toString());
+			
+			return datosSolicitudVO;
+		}
+		 */
+        /*
+
+EEXP007_TIRA_SCORING= CUOTA_SCORING(ANPMD008085,ANPMD008660,               
+ANPMD008680,ANPMD008281(1),ANPMD008350(1));                      
+
+IF EEXP007_ERR_SCOR ¬= ''                                                  
+THEN DO;                                                                   
+	ANPMD008996 = '1';         /* INDICADOR DE ERROR 
+	ANPMD008997 = 0;           /* SQLCODE                                 
+	ANPMD008998 = "";          /* SQLERRM                                 
+	ANPMD008999 = EEXP007_ERR_SCOR;                                          
+	RETURN (ANPMD008TIR);                                                    
+END;                                                                       
+ANPMD008690 = EEXP007_CUOTA_SCOR;                                          
+*/
+        // Obtenemos la cuota de scoring invocando el servicio de negocio ANPM_403
+        datosEntradaSNCalculoCuotaScoring = ServicioNegocio.getPrograma(ServicioNegocio.getContexto(), IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_CC, IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_CO);
+        /*
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_IMPORTE,
+			datosSolicitudVO.getImporteSolicitadoContravalor());
+*/
+        /*20150415 Al servicio de cálculo de cuota scoring le estabamos enviando el
+		 * importe solicitado, AN250630, pero hay que enviarle el importe total, AN250630.
+		 *  */
+        datosEntradaSNCalculoCuotaScoring.addCampo(IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_IMPORTE, datosSolicitudVO.getImporteTotalContravalor());
+        /*
+ * 	20140808 campo deprecated.
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_INTERES_INICIAL,
+			datosSolicitudVO.getInteresInicial());
+*/
+        datosEntradaSNCalculoCuotaScoring.addCampo(IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_PLAZO, datosSolicitudVO.getPlazoMesesCuotaScoring());
+        /* 	20140808 campo deprecated.
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_REFERENCIAL,
+			interesSolicitudVO.getReferencial());
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_ENT_DIFERENCIAL,
+			interesSolicitudVO.getDiferencial());
+*/
+        /*20140808 se añaden codigo producto y codigo subproducto*/
+        /*20141121 los campos COD_PRODUCTO y COD_SUBPRODUCTO son obsoletos*/
+        /*		
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_COD_PROD,
+			datosSolicitudVO.getModalidad());
+		datosEntradaSNCalculoCuotaScoring.addCampo(
+			IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_COD_SUBPROD,
+			datosSolicitudVO.getCodigoSubProducto());
+*/
+        /*20141121 Se añade el nuc expediente como campo de entrada del ANPM_403*/
+        datosEntradaSNCalculoCuotaScoring.addCampo(IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_NUC_EXPEDIENTE, datosSolicitudVO.getNuc());
+        resultadoSNCalculoCuotaScoring = ServicioNegocio.invocarServicio(ServicioNegocio.getContexto(), datosEntradaSNCalculoCuotaScoring);
+        if (!UtilidadesTramitacion.isBlankOrNull(resultadoSNCalculoCuotaScoring)) {
+            cuotaScoring = resultadoSNCalculoCuotaScoring[0].getBigDecimal(IConstantesSolicitud.CTE_SN_CALC_CUOTA_SCO_SAL_CUOTA_SCO);
+        }
+        // cogiendo el referencial y diferencial del primer interesScoringVO
+        // que hay en la lista hace que se obtenga el de referencial = 0 cuando el primer tramo es fijo.
+        datosSolicitudVO.setCuotaScoring(cuotaScoring);
+        return datosSolicitudVO;
+    }
+
+    private static DatosSolicitudVO obtenerCodigoPeriodicidadInteres(DatosSolicitudVO datosSolicitudVO, CondicionesInteresC condicionesInteresPrimerTramo) {
+        switch(condicionesInteresPrimerTramo.getIntPeriodicidadTipoPeriodo().intValue()) {
+            case IConstantesSolicitud.CTE_INT_1:
+                {
+                    switch(condicionesInteresPrimerTramo.getIntPeriodicidadNumPeriodo().intValue()) {
+                        case IConstantesSolicitud.CTE_INT_0:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_FP);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_1:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_MV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_3:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_TV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_6:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_SV);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_12:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_1V);
+                                break;
+                            }
+                        default:
+                            {
+                                break;
+                            }
+                    }
+                    break;
+                }
+            case IConstantesSolicitud.CTE_INT_2:
+                {
+                    switch(condicionesInteresPrimerTramo.getIntPeriodicidadNumPeriodo().intValue()) {
+                        case IConstantesSolicitud.CTE_INT_1:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_MN);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_3:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_TN);
+                                break;
+                            }
+                        case IConstantesSolicitud.CTE_INT_6:
+                            {
+                                datosSolicitudVO.setCodPeriodicidadInteres(IConstantesSolicitud.CTE_COD_PERIODICIDAD_SN);
+                                break;
+                            }
+                        default:
+                            {
+                                break;
+                            }
+                    }
+                    break;
+                }
+            default:
+                {
+                    break;
+                }
+        }
+        return datosSolicitudVO;
+    }
+
+    private static DatosSolicitudVO obtenerIntereses_ANPMX101(DatosSolicitudVO datosSolicitudVO) {
+        List<CondicionesInteresC> listaInteresSolicitudFijo = null;
+        List<CondicionesInteresC> listaInteresSolicitudVariable = null;
+        List<CondicionesInteresC> listaInteresSolicitudSustitutivo = null;
+        CondicionesInteresEng condicionesInteresDao = new CondicionesInteresEng();
+        DatosSolicitudC datosSolicitud = null;
+        datosSolicitud = datosSolicitudVO.getDatosSolicitud();
+        listaInteresSolicitudVariable = condicionesInteresDao.buscarCondicionesInteresVariable(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+        if (UtilidadesTramitacion.isBlankOrNull(listaInteresSolicitudVariable)) {
+            // ANPMD1010490 = 'F';
+            datosSolicitudVO.setIndResponsabHipotGarantia(IConstantesSolicitud.CTE_STR_F);
+            listaInteresSolicitudFijo = condicionesInteresDao.buscarCondicionesInteresFijo(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+            if (!UtilidadesTramitacion.isBlankOrNull(listaInteresSolicitudFijo)) {
+                // ANPMD1010500 = AN270130;
+                datosSolicitudVO.setInteresResponsabHipotecaria(listaInteresSolicitudFijo.get(0).getIntInteres());
+            /*
+					datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorCondicionInteresFijoNoExiste(
+						datosSolicitudVO,
+						datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+						datosSolicitud.getDatosSolicitudKey().getNumSolicitud(),
+						datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(),
+						datosSolicitud.getDatosSolicitudKey().getNucExpediente(),
+						IConstantesSolicitud.CTE_TIPO_CONDICION_INTERES_INTERES);
+					return datosSolicitudVO;
+*/
+            }
+        } else {
+            // ANPMD1010490 = 'V';
+            datosSolicitudVO.setIndResponsabHipotGarantia(IConstantesSolicitud.CTE_STR_V);
+            // aqui ya sabemos que listaInteresSolicitudVariable tiene valores.
+            // ANPMD1010500 = AN270570;
+            datosSolicitudVO.setInteresResponsabHipotecaria(listaInteresSolicitudVariable.get(0).getIntTecho());
+        }
+        // ANPMD1010610 = AN250270;  /* TIPO DE EXPEDIENTE */
+        // ya se hizo en obtenerDatosSolicitudVOComun(..)
+        // ANPMD1010650 = AN250670;  /* CARENCIA DE INTERESES */
+        datosSolicitudVO.setCarenciaIntereses(datosSolicitud.getPlazoDiferimiento());
+        /* DIFERENCIAL SUSTITUTIVO */
+        listaInteresSolicitudSustitutivo = condicionesInteresDao.buscarCondicionesInteresSustitutivo(datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(), datosSolicitud.getDatosSolicitudKey().getNumSolicitud(), datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(), datosSolicitud.getDatosSolicitudKey().getNucExpediente());
+        if (!UtilidadesTramitacion.isBlankOrNull(listaInteresSolicitudSustitutivo)) {
+            /*
+				datosSolicitudVO = GestionErrorConsultaDatosSolicitud.rellenarErrorCondicionInteresSustitutivoNoExiste(
+					datosSolicitudVO,
+					datosSolicitud.getDatosSolicitudKey().getOficinaSolicitud(),
+					datosSolicitud.getDatosSolicitudKey().getNumSolicitud(),
+					datosSolicitud.getDatosSolicitudKey().getVersionSolicitud(),
+					datosSolicitud.getDatosSolicitudKey().getNucExpediente(),
+					IConstantesSolicitud.CTE_TIPO_CONDICION_INTERES_SUSTITUTIVO);
+				return datosSolicitudVO;
+*/
+            // ANPMD1010720 = AN270270; /* DIFERENCIAL SUSTITUTIVO */
+            datosSolicitudVO.setDiferencialSustitutivo(listaInteresSolicitudSustitutivo.get(0).getIntDif());
+            // ANPMD1010730 = AN270160; /* REFERENCIAL SUSTITUTIVO */
+            datosSolicitudVO.setReferencialSustitutivo(new BigDecimal(listaInteresSolicitudSustitutivo.get(0).getIntTipoReferencia()));
+        }
+        for (CondicionesInteresC condicionesInteresC : listaInteresSolicitudVariable) {
+            if (!BigDecimal.ZERO.equals(condicionesInteresC.getIntSuelo())) {
+                if (IConstantesSolicitud.CTE_SOBRE_QUE_APLICA_SUELO_SOBRE_TIPO_REF == condicionesInteresC.getIntSobreQueAplicaElSuelo().intValue()) {
+                    // ANPMD1010780 = AN270550 + AN270270;
+                    datosSolicitudVO.setInteresVariacionMinimo(condicionesInteresC.getIntSuelo().add(condicionesInteresC.getIntDif()));
+                } else {
+                    // ANPMD1010780 = AN270550;
+                    datosSolicitudVO.setInteresVariacionMinimo(condicionesInteresC.getIntSuelo());
+                }
+            }
+            if (!BigDecimal.ZERO.equals(condicionesInteresC.getIntTecho())) {
+                if (IConstantesSolicitud.CTE_SOBRE_QUE_APLICA_SUELO_SOBRE_TIPO_REF == condicionesInteresC.getIntSobreQueAplicaElSuelo().intValue()) {
+                    // ANPMD1010790 = AN270570 + AN270270;
+                    datosSolicitudVO.setInteresVariacionMaximo(condicionesInteresC.getIntTecho().add(condicionesInteresC.getIntDif()));
+                } else {
+                    // ANPMD1010790 = AN270570;
+                    datosSolicitudVO.setInteresVariacionMaximo(condicionesInteresC.getIntTecho());
+                }
+            }
+        }
+        return datosSolicitudVO;
+    }
+
+    private static InteresSolicitudVO obtenerDatosInteres(InteresSolicitudVO interesSolicitudVO, CondicionesInteresC condicionesInteres) {
+        interesSolicitudVO.setTramo(new BigDecimal(condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo()));
+        interesSolicitudVO.setTipo(condicionesInteres.getStrTipoDeInteres());
+        interesSolicitudVO.setPlazo(new BigDecimal(condicionesInteres.getIntPlazo()));
+        interesSolicitudVO.setInteres(condicionesInteres.getIntInteres());
+        // ANPMD1010760 = AN270340; /* INTERESES DEMORA INCR S/CAPITAL */
+        /*Viene tambien de la ANPMX101*/
+        interesSolicitudVO.setInteresMoraSinCapital(condicionesInteres.getIntPorDemoraSobreCapital());
+        // ANPMD1010770 = AN270360; /* INTERESES DEMORA INCR S/INTERES */
+        /*Viene tambien de la ANPMX101*/
+        interesSolicitudVO.setInteresMoraSinIntereses(condicionesInteres.getIntPorDemoraSobreInteres());
+        // ANPMD1010380 = AN270440; /* UNIDAD PERIODO PERIODICIDAD
+        /*Esta asignación viene de la ANPMX101
+		 * en principio era para la condicion interés de primer tramo. */
+        interesSolicitudVO.setUnidadPeriodicidadIntereses(condicionesInteres.getStrPeriodicidadUnidadPeriodo());
+        interesSolicitudVO.setPeriodicidadRevisionIntereses(new BigDecimal(condicionesInteres.getIntNumPeriodosRevision()));
+        interesSolicitudVO.setUnidadPeriodicidadRevisionIntereses(UtilidadesTramitacion.comprobarDatoNull(condicionesInteres.getStrUnidadPeriodosRevision()));
+        interesSolicitudVO.setInteresesMinimo(BigDecimal.ZERO);
+        interesSolicitudVO.setInteresesMaximo(condicionesInteres.getIntTecho());
+        interesSolicitudVO.setDiferencialBonificado(condicionesInteres.getIntDifBonificado());
+        /*Esta asignación viene de la ANPMX101
+		 * en principio era para la condicion interés de primer tramo. */
+        // ANPMD1010370 = AN270430; /* NUM. PERIODO PERIODICIDAD
+        interesSolicitudVO.setPeriodicidadIntereses(new BigDecimal(condicionesInteres.getIntPeriodicidadNumPeriodo()));
+        // ANPMD1010390 = AN270450; /* TIPO PERIODO PERIODICIDAD
+        /*Esta asignación viene de la ANPMX101
+		 * en principio era para la condicion interés de primer tramo. */
+        interesSolicitudVO.setTipoPeriodoPeriodicidadIntereses(new BigDecimal(condicionesInteres.getIntPeriodicidadTipoPeriodo()));
+        // ANPMD1010540 = AN270160; /* TIPO DE REFERENCIA PRIMER TRAMO
+        /*Esta asignación viene de la ANPMX101
+		 * en principio era para la condicion interés de primer tramo. */
+        interesSolicitudVO.setReferencial(new BigDecimal(condicionesInteres.getIntTipoReferencia()));
+        // ANPMD1010640 = AN270270; /* % DIFERENCIAL PRIMER TRAMO
+        interesSolicitudVO.setDiferencial(condicionesInteres.getIntDif());
+        return interesSolicitudVO;
+    }
+
+    private static DatosSolicitudVO obtenerCuotasCuadroAmort(DatosSolicitudVO datosSolicitudVO, IContexto[] resultadoObtCuadroAmort, List<CondicionesInteresC> listaCondicionesInteres) {
+        IContexto ctxCuadroAmort = null;
+        IRegistro[] matrizPagos = null;
+        // String fechaPrimeraRevision = null;
+        BigDecimal plazoPrimerTramo = null;
+        BigDecimal numeroEntregaPrimCuotaSegTramo = null;
+        boolean haySegundoTramo = false;
+        if (null != resultadoObtCuadroAmort) {
+            ctxCuadroAmort = resultadoObtCuadroAmort[0];
+        }
+        matrizPagos = ctxCuadroAmort.getRegistro(CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS);
+        /*Para informar la primera cuota constante del primer tramo recuperamos el segundo pago*/
+        for (IRegistro pago : matrizPagos) {
+            if (0 == Constantes.CTE_BID_2.compareTo(pago.getBigDecimal(CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_NUM_PAGO))) {
+                datosSolicitudVO.setPrimeraCuotaPrimerTramo(pago.getBigDecimal(CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_CUOTA));
+                break;
+            }
+        }
+        /*Recuperamos el plazo del primer tramo interés, en listaCondicionesInteres nos
+		 * vienen los intereses principales de la solicitud*/
+        for (CondicionesInteresC condicionesInteres : listaCondicionesInteres) {
+            if (Constantes.CTE_INT_UNO == condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) {
+                plazoPrimerTramo = new BigDecimal(condicionesInteres.getIntPlazo());
+                break;
+            }
+        }
+        /*Comprobamos si hay segundo tramo*/
+        for (CondicionesInteresC condicionesInteres : listaCondicionesInteres) {
+            if (Constantes.CTE_INT_DOS == condicionesInteres.getCondicionesInteresKey().getIntOrdenDelTramo().intValue()) {
+                haySegundoTramo = true;
+                break;
+            }
+        }
+        if (haySegundoTramo) {
+            /*Recuperamos la primera cuota del segundo tramo*/
+            numeroEntregaPrimCuotaSegTramo = BigDecimal.ONE.add(plazoPrimerTramo);
+            for (IRegistro pago : matrizPagos) {
+                if (0 == numeroEntregaPrimCuotaSegTramo.compareTo(pago.getBigDecimal(CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_NUM_PAGO))) {
+                    datosSolicitudVO.setPrimeraCuotaSegundoTramo(pago.getBigDecimal(CTE_CTX_CUADRO_AMORT_MATRIZ_PAGOS_CUOTA));
+                    break;
+                }
+            }
+        }
+        return datosSolicitudVO;
+    }
+
+    private static final String _VERSI_N_SOLICITUD_422041756 = "_VERSI_N_SOLICITUD_422041756";
+
+    private static final String _N_MERO_SOLICITUD_86517977 = "_N_MERO_SOLICITUD_86517977";
+
+    private static final String DESTINO_PRINCIPAL_OFICINA_1265136895 = "DESTINO_PRINCIPAL_OFICINA_1265136895";
+
+    private static final String EXISTE_1315400288 = "EXISTE_1315400288";
+
+    private static final String ERROR_LINK_PROGRAMA_AMPMR003_APUNTADO_ANPM_266_707191981 = "ERROR_LINK_PROGRAMA_AMPMR003_APUNTADO_ANPM_266_707191981";
+
+    private static final String NUC_EXPEDIENTE_2005243413 = "NUC_EXPEDIENTE_2005243413";
+
+    private static final String AMPMR003_APUNTADO_ANPM_266_HAY_VENCIMIENTOS_AN_1025790130 = "AMPMR003_APUNTADO_ANPM_266_HAY_VENCIMIENTOS_AN_1025790130";
+}

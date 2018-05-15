@@ -1,0 +1,348 @@
+package es.caixagalicia.anpm.prestamos.enotario.servicios.aplicacion;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosC;
+import es.caixagalicia.anpm.prestamos.catalogo.persistencia.clausulas.ParametrosEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosC;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosEng;
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.comisionesgastos.ComisionesgastosKey;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.ComisionesEnotarioVO;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.Constantes;
+import es.caixagalicia.anpm.prestamos.enotario.utilidades.UtilidadesEnotario;
+import es.caixagalicia.anpm.prestamos.tramitacion.persistencia.comisiones.ComisionC;
+import es.caixagalicia.ifrt.log.LogHelper;
+
+public class GestionComisionesEnotario
+{
+	/**
+	 * Log de la clase
+	 */
+	private static final LogHelper LOGGER = LogHelper.getLog(GestionDatosGeneralesEnotario.class);
+	
+	
+		/**
+	 * Alta de las comisiones de e-notario
+	 */
+	public void altaComisionesGastos(List<ComisionC> listaComisions,BigDecimal numSol, BigDecimal version) {
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Alta comisiones e-notario,altaComisionesGastos():INICIO");
+		}
+		
+		List<ParametrosC> listaParametros = obtenerComisiones();
+		
+		for (ComisionC comision : listaComisions) {			
+			//Creamos una nueva instanacia para setear los datos de comision
+			final ComisionesgastosC comisionesgastosC = this.crearComisionesGastos(comision, numSol, version, listaParametros);
+			//Guardar
+			comisionesgastosC.persist();
+			comisionesgastosC.refresh();
+		}
+		
+		if(LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Alta comisiones e-notario,altaComisionesGastos():FIN");
+		}
+	}
+	
+		
+	/**
+	 * Crea una nueva instancia del objeto persistente ComisionesgastosC
+	 * y lo rellena con los datos basicos.
+	 * NOTA: Este metodo no lleva a cabo la inserccionen BD
+	 * (no persiste el contenido)
+	 * @return
+	 */
+	private ComisionesgastosC crearComisionesGastos(ComisionC comision, BigDecimal numSol,BigDecimal version, List<ParametrosC> listaParametros) {
+		
+		final ComisionesgastosEng dao = new ComisionesgastosEng();
+		
+		
+		ComisionesgastosC comisionesGastos = dao.createNewObject();
+		//Obtener la clave
+		final ComisionesgastosKey comisionesgastosKey = comisionesGastos.getId();
+		//Colocar los datos de la clave
+		comisionesgastosKey.setCodigoComision(comision.getComisionesKey().getStrTipoComision());
+		
+		if(version  == null) {
+			comisionesgastosKey.setVersionSolicitud(new BigDecimal(comision.getComisionesKey().getIntVersionSolicitud()));
+		}else {
+			comisionesgastosKey.setVersionSolicitud(version);
+		}
+		
+		comisionesgastosKey.setNumeroSolicitud(new BigDecimal(comision.getComisionesKey().getIntNumeroSolicitud()));
+		comisionesgastosKey.setOficinaSolicitud(new BigDecimal(comision.getComisionesKey().getIntOficinaSolicitud()));
+		comisionesgastosKey.setNucExpediente(new BigDecimal(comision.getComisionesKey().getIntNucExpediente()));
+		comisionesgastosKey.setCodigoComision(comision.getComisionesKey().getStrTipoComision());
+		
+		//Colocar los demás datos
+		comisionesGastos.setApplication(comision.getApplication());
+		comisionesGastos.setConnection(comision.getConnection());
+		comisionesGastos.setDescripcion(nombreComision(comision.getComisionesKey().getStrTipoComision(),listaParametros));
+		comisionesGastos.setDigito(comision.getSolicitud().getDigitoSolicitud());
+		comisionesGastos.setId(comisionesgastosKey);
+		comisionesGastos.setImporte(comision.getBidImporteMinimo());
+		comisionesGastos.setTipo(comision.getBidPorcentajeComision());
+		
+		return comisionesGastos;
+	}
+	
+	
+	/**
+	 * Constante para la persistencia
+	 */
+	private static final String CTE_JNDI_DATASOURCE = "conf/CXGDB2XA";
+	
+	/**
+	 * Rellena una lista de objetos virtuales de comisiones para pasar al contexto
+	 * @param comisiones
+	 * @param codError
+	 * @return
+	 */
+	public List<ComisionesEnotarioVO> rellenarDatosComisionesEnotario(final List<ComisionC> comisiones) {
+		
+		List<ComisionesEnotarioVO> comisionesVO =  new ArrayList<ComisionesEnotarioVO>();
+	
+		List<ParametrosC> datosComisiones = this.obtenerComisiones(); 
+		
+		for(ComisionC comision:comisiones) {
+			ComisionesEnotarioVO comisionAux = new ComisionesEnotarioVO();
+			//rellenar los campos
+			comisionAux.setTipoComision(comision.getComisionesKey().getStrTipoComision());
+			comisionAux.setNombreComision(nombreComision(comision.getComisionesKey().getStrTipoComision(), datosComisiones));
+			comisionAux.setImporteMinimoComision(comision.getBidImporteMinimo());
+			comisionAux.setPorcentajeComision(comision.getBidPorcentajeComision());
+			//Añadir el elemento a la lista
+			comisionesVO.add(comisionAux);
+		}
+		
+		return comisionesVO;
+	}
+	
+	/**
+	 * Obtiene la descripcion del tipo de referencia
+	 * @param tipoReferencia
+	 * @return
+	 */
+	public String obtenerDescripcionTipoReferencia(int tipoReferencia) {
+		
+		String descripcionTipoReferencia = new String();
+		
+		
+		
+		return descripcionTipoReferencia;
+	}
+	
+	
+	/**
+	 * Obtiene el tipo de redondeo aplicado
+	 * @param tipoRedondeo
+	 * @return
+	 */
+	public String obtenerTipoRedondeo(int tipoRedondeo) {
+		
+		String descripcionRedondeo = new String();
+		
+		switch(tipoRedondeo) {
+			case Constantes.CTE_CERO_INT:
+				descripcionRedondeo = new String("SIN REDONDEO");
+			break;	
+			case Constantes.CTE_UNO_INT:
+				descripcionRedondeo = new String("AL ALZA");
+			break;	
+			case Constantes.CTE_DOS_INT:
+				descripcionRedondeo = new String("A LA BAJA");
+			break;	
+			case Constantes.CTE_TRES_INT:
+				descripcionRedondeo = new String("AL MAS PRÓXIMO");
+			break;	
+			case Constantes.CTE_CUATRO_INT:
+				descripcionRedondeo = new String();
+			break;
+			
+		default:
+			break;
+		}
+		
+		
+		return descripcionRedondeo;
+	}
+	
+	/**
+	 * Obtiene la descripcion de las comisiones de la CG32TB01
+	 * @return
+	 */
+	public List<ParametrosC> obtenerComisiones(){
+		
+		ParametrosEng parametrosDao = new ParametrosEng(CTE_JNDI_DATASOURCE);
+		return parametrosDao.obtenerComisiones();
+		
+	}
+	
+	/**
+	 * Elige el nombre de la comisino dependiendo del tipo de comision procesado
+	 * @param tipoComision
+	 * @return
+	 */
+	public String nombreComision(String tipoComision,List<ParametrosC> datosComisiones) {
+		
+		String nombreComision = new String();
+		
+		for(ParametrosC datoComision: datosComisiones) {
+			if(tipoComision.trim().equalsIgnoreCase(datoComision.getParametrosKey().getCodTabla().trim())) {
+				return nombreComision = datoComision.getCG320030();
+			}
+		}	
+		return nombreComision;		
+	}
+
+	/**
+	 * 
+	 * @param nuc
+	 * @return
+	 */
+	public List<ComisionesgastosC> obterCominionesByNuc(BigDecimal nuc){
+		
+		ComisionesgastosEng dao = new ComisionesgastosEng();
+						
+		List<ComisionesgastosC> listaComisiones = dao.obterComisionesByNuc(nuc);
+		
+		return listaComisiones;
+		
+	}
+	
+	/**
+	 * 
+	 * @param nuc
+	 * @param version
+	 */
+	public void borrarComisionesGastos(BigDecimal nuc, BigDecimal version)
+	{
+		ComisionesgastosEng comisionesGastosEng = new ComisionesgastosEng();
+		comisionesGastosEng.borrarComisionesGastos(nuc, version);
+	}
+
+
+	/**
+	 * 
+	 * @param bidNuc
+	 * @param numSolicitud
+	 */
+	public void finalizarComisiones(BigDecimal bidNuc, BigDecimal numSolicitud ){
+		
+		ComisionesgastosC comisionesNew = null;
+		ComisionesgastosEng dao = new ComisionesgastosEng();
+		List<ComisionesgastosC> listaComisiones = dao.obterComisionesByNuc(bidNuc);
+		
+		for (ComisionesgastosC comision : listaComisiones) {
+			
+			comisionesNew = dao.createNewObject();
+			comisionesNew.copiar(comision);			
+			
+			comision.markForDelete();
+			comision.persist();
+			
+			comisionesNew.getId().setNumeroSolicitud(numSolicitud);			
+			dao.persist(comisionesNew);			
+		}
+		
+	}
+
+	/**
+	 * 
+	 * @param nucSolicitud
+	 */
+	public void eliminarComisionesEnotarioIncompletas(BigDecimal nucSolicitud)
+	{
+		final ComisionesgastosEng dao = new ComisionesgastosEng();
+		
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("eliminarComisionesEnotarioIncompletas() - Inicio.");
+		}
+		
+		if (!UtilidadesEnotario.isBlankOrNull(nucSolicitud))
+		{
+			// Buscamos las solicitudes incompletas para el usuario
+			final List<ComisionesgastosC> listaComisionesGastos = dao.buscarComisionesGastosIncompletos(nucSolicitud);
+			if(listaComisionesGastos.size()>0){
+				// Marcamos para borrado todas las solicitudes incompletas encontradas
+				for (ComisionesgastosC comision : listaComisionesGastos)
+				{
+					comision.markForDelete();
+					comision.persist();
+				}
+				dao.flush();
+			}
+			
+			
+			
+		}
+	
+		if (LOGGER.isDebugEnabled())
+		{
+			LOGGER.debug("eliminarComisionesEnotarioIncompletas() - Fin.");
+		}
+		
+	}
+	
+	/**
+	 * 
+	 * @param codigoOficina
+	 * @param numeroSolicitud
+	 */
+	public void borrarComisionesGastosPorOficinaSolicitudVersion(BigDecimal codigoOficina,
+			BigDecimal numeroSolicitud, BigDecimal version)
+	{
+		ComisionesgastosEng comisionesGastosDao = new ComisionesgastosEng();
+		List<ComisionesgastosC> listaComisionesGastos = 
+			comisionesGastosDao.obtenerComisionesGastosPorOficinaNumSolVersion(
+			codigoOficina, numeroSolicitud, version);
+		for (ComisionesgastosC comisionesGastos : listaComisionesGastos)
+		{
+			comisionesGastos.markForDelete();
+			comisionesGastos.persist();
+		}
+
+	}	
+	
+	/**
+	 * 
+	 * @param codigoOficina
+	 * @param numeroSolicitud
+	 */
+	public void borrarComisionesGastosPorNuc(BigDecimal nucSolicitud)
+	{
+		ComisionesgastosEng comisionesGastosDao = new ComisionesgastosEng();
+		List<ComisionesgastosC> listaComisionesGastos = 
+			comisionesGastosDao.obtenerComisionesGastosPorNuc(nucSolicitud);
+		if (null != listaComisionesGastos)
+		{
+			for (ComisionesgastosC comisionesGastos : listaComisionesGastos)
+			{
+				comisionesGastos.markForDelete();
+				comisionesGastos.persist();
+			}
+		}
+
+	}	
+	
+	
+	/**
+	 * Metodo para guardar una lista de comisiones
+	 * 
+	 * @param comisionesGastosLista
+	 */
+	public void guardarListaComisionesGastos(List<ComisionesgastosC> comisionesGastosLista)
+	{
+		ComisionesgastosEng dao = new ComisionesgastosEng();
+		
+		for(ComisionesgastosC comisionGasto: comisionesGastosLista)
+		{
+			dao.persist(comisionGasto);
+		}
+	}
+	
+}

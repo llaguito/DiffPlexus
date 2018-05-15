@@ -1,0 +1,171 @@
+package es.caixagalicia.anpm.prestamos.enotario.servicios.fachada.contextos;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import es.caixagalicia.anpm.prestamos.enotario.persistencia.notariosolicitud.NotarioSolicitudC;
+import es.caixagalicia.ifrt.contextos.ContextoFactory;
+import es.caixagalicia.ifrt.core.IContexto;
+
+public class ContextoAsignacionDesasignacionNotario {
+
+	private static final String CTE_ASIGNACION_DESASIGNACION_CTX 	= "ANPMN478";
+	private static final String CTE_OFICINA							= "ANPMN478010";
+	private static final String CTE_NUMERO_SOLICITUD 			    = "ANPMN478020";
+	private static final String CTE_VERSION_SOLICITUD	 			= "ANPMN478030";
+	private static final String CTE_NUC								= "ANPMN478040";
+	private static final String CTE_NUMERO_COLEGIADO 				= "ANPMN478050";
+	private static final String CTE_NIF_NOTARIO	 					= "ANPMN478060";
+	private static final String CTE_FORMALIZACION 					= "ANPMN478070";
+	private static final String CTE_FECHA_ALTA 						= "ANPMN478080";
+	private static final String CTE_FECHA_BAJA						= "ANPMN478090";
+	private static final String CTE_USUARIO							= "ANPMN478100";
+	private static final String CTE_TIMESTAMP						= "ANPMN478110";
+	private static final String CTE_NUMERO_REGISTRO 				= "ANPMN478120";
+	private static final String CTE_CODIGO_RETORNO					= "ANPMN478130";
+	private static final String CTE_CODIGO_ERROR 					= "ANPMN478140";
+	private static final String CTE_DESCRIPCION_ERROR      			= "ANPMN478150";
+	private static final String CTE_CODIGO_BIC     					= "ANPMN478160";
+	private static final String CTE_CODIGO_IBAN      				= "ANPMN478170";
+	private static final String CTE_CODIGO_CONTRATO      			= "ANPMN478180";
+	
+	
+	/**
+	 * Rellenar los datos de vuelta
+	 * @param notarioSolicitud
+	 * @return
+	 */
+	public static IContexto[] rellenarContexto(NotarioSolicitudC notarioSolicitud){
+		IContexto [] resultado = new IContexto[0];
+		List<IContexto> listaContextos = new ArrayList<IContexto>(0);
+
+		if(null != notarioSolicitud){
+			IContexto contexto = ContextoFactory.getInstance()
+					.getContexto(CTE_ASIGNACION_DESASIGNACION_CTX);
+			contexto.put(CTE_OFICINA, notarioSolicitud.getId().getOficinaSolicitud());
+			contexto.put(CTE_NUMERO_SOLICITUD, notarioSolicitud.getId().getNumeroSolicitud());
+			contexto.put(CTE_VERSION_SOLICITUD, notarioSolicitud.getId().getVersionSolicitud());
+			contexto.put(CTE_NUC, notarioSolicitud.getId().getNuc());
+			contexto.put(CTE_NUMERO_COLEGIADO, notarioSolicitud.getId().getNumColegiadoNotario());
+			contexto.put(CTE_NIF_NOTARIO, notarioSolicitud.getNifNotario());
+			contexto.put(CTE_FORMALIZACION, notarioSolicitud.getFormalizacion());
+			contexto.put(CTE_FECHA_ALTA, notarioSolicitud.getFechaAlta().toString());
+			contexto.put(CTE_FECHA_BAJA, notarioSolicitud.getFechaBaja().toString());
+			contexto.put(CTE_USUARIO, notarioSolicitud.getUsuario());
+			contexto.put(CTE_TIMESTAMP, notarioSolicitud.getTimestamp().toString());
+			contexto.put(CTE_NUMERO_REGISTRO, notarioSolicitud.getId().getNumRegistro());
+			contexto.put(CTE_CODIGO_RETORNO, "0");
+			contexto.put(CTE_CODIGO_ERROR, "00");
+			contexto.put(CTE_DESCRIPCION_ERROR, "Ok.");
+
+			listaContextos.add(contexto);
+			resultado = listaContextos.toArray(new IContexto[listaContextos.size()]);
+		}else{
+			IContexto contexto = ContextoFactory.getInstance()
+					.getContexto(CTE_ASIGNACION_DESASIGNACION_CTX);
+			contexto.put(CTE_CODIGO_RETORNO, "9");
+			contexto.put(CTE_CODIGO_ERROR, "99");
+			contexto.put(CTE_DESCRIPCION_ERROR, "El notario ya esta asignado a esta solicitud, no se asignará.");
+			
+			listaContextos.add(contexto);
+			resultado = listaContextos.toArray(new IContexto[listaContextos.size()]);
+		}
+		
+		return resultado;
+	}
+	
+	
+	/**
+	 * Rellena el contexto de salida con los campos correspondientes, no afectan a la logica del servicio
+	 * pero se necesitan a la salida.
+	 * @param contexto
+	 * @param codigoBic
+	 * @param codigoIban
+	 * @param codigoContrato
+	 * @return Contexto con los campos modificados.
+	 */
+	public static IContexto[] rellenarContextoDatosCodigoIbanBicContrato(IContexto[] contexto,String codigoBic,
+			String codigoIban,String codigoContrato){
+		
+		for(IContexto contextoActual:contexto){
+			if(null != codigoBic){
+				contextoActual.put(CTE_CODIGO_BIC, codigoBic);
+			}
+			if(null != codigoIban){
+				contextoActual.put(CTE_CODIGO_IBAN, codigoIban);
+			}
+			if(null != codigoContrato){
+				contextoActual.put(CTE_CODIGO_CONTRATO, codigoContrato);
+			}
+		}
+		
+		
+		return contexto;
+	}
+	
+	/**
+	 * Devuelve un error cuando el notario que se intenta desasignar no ha sido asignado
+	 * @return
+	 */
+	public static IContexto[] rellenarContextoErrorNoAsignado(){
+		
+		IContexto [] resultado = new IContexto[0];
+		List<IContexto> listaContextos = new ArrayList<IContexto>(0);
+
+		IContexto contexto = ContextoFactory.getInstance()
+				.getContexto(CTE_ASIGNACION_DESASIGNACION_CTX);
+		contexto.put(CTE_CODIGO_RETORNO, "8");
+		contexto.put(CTE_CODIGO_ERROR, "98");
+		contexto.put(CTE_DESCRIPCION_ERROR, "El notario no ha sido asignado, no puede desasignarse.");
+
+		listaContextos.add(contexto);
+		resultado = listaContextos.toArray(new IContexto[listaContextos.size()]);
+
+		return resultado;
+	}
+	
+	/**
+	 * Devuelve un error cuando el notario que se intenta desasignar no ha sido asignado
+	 * @return
+	 */
+	public static IContexto[] rellenarContextoErrorDesasignado(){
+		
+		IContexto [] resultado = new IContexto[0];
+		List<IContexto> listaContextos = new ArrayList<IContexto>(0);
+
+		IContexto contexto = ContextoFactory.getInstance()
+				.getContexto(CTE_ASIGNACION_DESASIGNACION_CTX);
+		contexto.put(CTE_CODIGO_RETORNO, "7");
+		contexto.put(CTE_CODIGO_ERROR, "97");
+		contexto.put(CTE_DESCRIPCION_ERROR, "El notario ya habia sido desasignado, no puede desasignarse.");
+
+		listaContextos.add(contexto);
+		resultado = listaContextos.toArray(new IContexto[listaContextos.size()]);
+
+		return resultado;
+	}
+	
+	
+	/**
+	 * Devuelve un error cuando el notario que se intenta desasignar no ha sido asignado
+	 * @return
+	 */
+	public static IContexto[] rellenarContextoErrorAsignado(){
+		
+		IContexto [] resultado = new IContexto[0];
+		List<IContexto> listaContextos = new ArrayList<IContexto>(0);
+
+		IContexto contexto = ContextoFactory.getInstance()
+				.getContexto(CTE_ASIGNACION_DESASIGNACION_CTX);
+		contexto.put(CTE_CODIGO_RETORNO, "6");
+		contexto.put(CTE_CODIGO_ERROR, "96");
+		contexto.put(CTE_DESCRIPCION_ERROR, "El notario ya habia sido asignado, no puede asignarse.");
+
+		listaContextos.add(contexto);
+		resultado = listaContextos.toArray(new IContexto[listaContextos.size()]);
+
+		return resultado;
+	}
+	
+	
+}
