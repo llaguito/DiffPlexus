@@ -29,7 +29,7 @@ function Inicio() {
 //Ejecuta el codigo Diff y lo imprime en pantalla
 function renderDiff(diffDiv, contentsBefore, contentsAfter) {
     diffDiv.appendChild(codediff.buildView(
-        contentsBefore, contentsAfter, { language: 'js' }));
+        contentsBefore, contentsAfter, { language: 'java' }));
 }
 
 function lee(fichero, observador) {
@@ -38,7 +38,7 @@ function lee(fichero, observador) {
     var destino = null;
     var destino_loaded = false;
 
-    console.log(fichero.getPath()+fichero.getNombre())
+    console.log(fichero.getPath() + fichero.getNombre())
 
     leeFichero(fichero.getPath() + fichero.getNombre() + ".java.original", 'page1', function(content) {
         original = content;
