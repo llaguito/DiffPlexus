@@ -3,11 +3,17 @@
 <head>
     <meta charset="utf-8">
     <title>Comparador</title>
-    <link rel="stylesheet" href="./css/style.css" />
-    <script type="text/javascript" src="./mapa_resources/diff.js"></script>
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/codediff.css">
+    <link rel="stylesheet" href="./css/googlecode.css">
+
+    <script type="text/javascript" src="./mapa_resources/diffLib.js"></script>
     <script type="text/javascript" src="./mapa_resources/archivo.js"></script>
     <script type="text/javascript" src="./mapa_resources/general.js"></script>
-    <script type="text/javascript" src="./mapa_resources/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript" src="./mapa_resources/codediff.js"></script>
+    <script src="http://yandex.st/highlightjs/8.0/highlight.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
 </head>
 
 <body>
@@ -23,15 +29,9 @@
             </nav>
         </div>
         <main class="mdl-layout__content">
-            <table id="tablaVisualizar">
-                <thead>
-                    <tr>
-                        <th>Original</th>
-                        <th>Nuevo</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div id="borrar">
+                <div id="diffview"></div>
+            </div>
         </main>
     </div>
 </body>
