@@ -1,49 +1,58 @@
+<!DOCTYPE html>
 <html>
-
 <head>
     <title>Diff</title>
     <meta charset="utf-8">
     <title>Comparador</title>
     <link rel="stylesheet" href="./css/style.css" />
-    <script type="text/javascript" src="./mapa_resources/diff.js"></script>
-    <script type="text/javascript" src="./mapa_resources/archivo.js"></script>
-    <script type="text/javascript" src="./mapa_resources/general.js"></script>
     <script type="text/javascript" src="./mapa_resources/jquery-3.3.1.min.js"></script>
+    <!-- <script type="text/javascript" src="./mapa_resources/diff.js"></script> -->
+    <!-- <script type="text/javascript" src="./mapa_resources/archivo.js"></script> -->
+    <!-- <script type="text/javascript" src="./mapa_resources/general.js"></script> -->
+    <!-- <script src="mapa_resources/idb.filesystem.js" async></script> -->
+    <!-- <script src="mapa_resources/app.js"></script> -->
 </head>
 
 <body>
 
     <iframe id="page1" frameborder="0" src="" style="width:700px; height:1000px; border:0p;"></iframe>
     <iframe id="page2" frameborder="0" src="" style="width:700px; height:1000px; border:0p;"></iframe>
-
-    <script src="mapa_resources/jquery-3.3.1.min.js"></script>
+    
     <script>
 
-        window.requestFileSystem  = window.requestFileSystem || window.webkitRequestFileSystem;
-        window.requestFileSystem(type, size, successCallback, opt_errorCallback);
+        var defaultRoute = "./src/main/java/"; // Cambiar en cadenas metidas a mano
 
-        function onInitFs(fs) {
-            console.log('Opened file system: ' + fs.name);
-        }
+        var ficheros = [
+            { "ruta": "./archivos_java/", "nombre": "prueba.java" },
+        ];
 
         function getAllFiles() {
-
-            
+            for(var i = 0; i < ficheros.length; i++) {
+                var file = document.createElement("li");
+                var fileAttr = document.createAttribute("value");
+                var fileAttrTxt = document.createTextNode(ficheros[i].ruta + "/" + ficheros[i].nombre)
+                fileAttr.appendChild(fileAttrTxt);
+                var fileTxt = document.createTextNode(ficheros[i].nombre);
+                file.appendChild(fileAttr);
+                file.appendChild(fileTxt);
+                document.getElementById("listaArchivos").appendChild(file);
+            }
         }
+
         function lee(fichero, observador) {
             var original = null;
             var original_loaded = false;
             var destino = null;
             var destino_loaded = false;
 
-            leeFichero("./src/main/java/"+fichero+".original", 'page1', function(content){
+            leeFichero("./archivos_java/"+fichero+".original", 'page1', function(content){
                 original = content;
                 original_loaded = true;
                 if( destino_loaded ) {
                     observador( original, destino );
                 }
             });
-            leeFichero("./src/main/java/"+fichero+".new", 'page2', function(content){
+            leeFichero("./archivos_java/"+fichero+".new", 'page2', function(content){
                 destino = content;
                 destino_loaded = true;
                 if( original_loaded ) {
@@ -65,7 +74,7 @@
             }, 250);
         }
         setTimeout(function() {
-            lee("es/caixagalicia/anpm/prestamos/catalogo/servicios/fachada/BusquedaProductoSrv.java", function(original, modificado){
+            lee("prueba.java", function(original, modificado){
                 // alert("Fichero cargado.");
                 // alert( original );
                 // alert( modificado );
