@@ -1,42 +1,39 @@
-
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Comparador</title>
-	<link rel="stylesheet" href="./css/style.css" />
-	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-	<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
-	<link rel="stylesheet" href="googlecode.css">
-	<!-- codediff -->
-	<script src="difflib.js"></script>
-	<script src="codediff.js"></script>
-	<link rel="stylesheet" href="codediff.css">
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/codediff.css">
+    <link rel="stylesheet" href="./css/googlecode.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 
-    <script type="text/javascript" src="./mapa_resources/diff.js"></script>
+    <script type="text/javascript" src="./mapa_resources/diffLib.js"></script>
     <script type="text/javascript" src="./mapa_resources/archivo.js"></script>
     <script type="text/javascript" src="./mapa_resources/general.js"></script>
-	<script type="text/javascript" src="./mapa_resources/jquery-3.3.1.min.js"></script>
-</head>
-<body>
-		
-		
+    <script type="text/javascript" src="./mapa_resources/codediff.js"></script>
+    <script src="http://yandex.st/highlightjs/8.0/highlight.min.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 
-    <iframe id="page1" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
-    <iframe id="page2" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
+    <body>
+        <iframe id="page1" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
+        <iframe id="page2" frameborder="0" src="" style="width:0px; height:0px; border:0p;"></iframe>
 
-    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
-        <div class="mdl-layout__drawer">
-            <span class="mdl-layout-title">Ficheros</span>
-            <nav class="mdl-navigation">
-                <ul id="listaArchivos" class="demo-list-icon"></ul>
-            </nav>
+        <div class="mdl-layout mdl-js-layout mdl-layout--fixed-drawer">
+            <div class="mdl-layout__drawer">
+                <span class="mdl-layout-title">Ficheros</span>
+                <nav class="mdl-navigation">
+                    <ul id="listaArchivos" class="demo-list-icon"></ul>
+                </nav>
+            </div>
+            <main class="mdl-layout__content">
+                <div id="borrar">
+                    <div id="diffview"></div>
+                </div>
+            </main>
         </div>
-        <main class="mdl-layout__content">
-				<p>Here's the diff!</p>    
-				<div id="diffview"></div>
-        </main>
-	</div>
-	
-</body>
+
+    </body>
 
 </html>
