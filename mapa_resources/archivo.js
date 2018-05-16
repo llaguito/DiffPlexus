@@ -13,11 +13,11 @@ function Archivos(nombre, path, charset) {
     }
 
     this.setPath = function(cambio) {
-        this.Path = cambio;
+        this.path = cambio;
     }
 
     this.getPath = function() {
-        return this.Path;
+        return this.path;
     }
 
     this.setCharset = function(cambio) {

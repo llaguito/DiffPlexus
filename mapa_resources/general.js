@@ -14,9 +14,9 @@ var Evento = function() {
 }();
 
 //Array de objetos "Archivos"
-var arrayArchivos = [
-    { "name": "prueba", "path": "./archivos_java/", "charset": "" }
-];
+var prueba = new Archivos("prueba", "./archivos_java/", "utf8");
+var arrayArchivos = [];
+arrayArchivos.push(prueba);
 
 //Evento de espera de carga de página
 Evento(window, 'load', Inicio);
@@ -38,7 +38,9 @@ function lee(fichero, observador) {
     var destino = null;
     var destino_loaded = false;
 
-    leeFichero(fichero.path + fichero.name + ".java.original", 'page1', function(content) {
+    console.log(fichero.getPath()+fichero.getNombre())
+
+    leeFichero(fichero.getPath() + fichero.getNombre() + ".java.original", 'page1', function(content) {
         original = content;
         original_loaded = true;
         if (destino_loaded) {
@@ -46,7 +48,7 @@ function lee(fichero, observador) {
         }
     });
 
-    leeFichero(fichero.path + fichero.name + ".java.new", 'page2', function(content) {
+    leeFichero(fichero.getPath() + fichero.getNombre() + ".java.new", 'page2', function(content) {
         destino = content;
         destino_loaded = true;
         if (original_loaded) {
@@ -58,8 +60,6 @@ function lee(fichero, observador) {
 function leeFichero(fichero, inname, callback) {
     var iframe = document.getElementById(inname);
     iframe.src = fichero;
-
-    alert(iframe.contentWindow.document.body.innerText);
     setTimeout(function() {
         try {
             callback(iframe.contentWindow.document.body.innerText);
@@ -74,9 +74,9 @@ function leeFichero(fichero, inname, callback) {
 function ListarArchivos() {
     for (contador = 0; contador < arrayArchivos.length; contador++) {
         var li = document.createElement("li");
-        li.setAttribute("class", "mdl-list__item");
+        li.setAttribute("class", "mdl-navigation__link mdl-list__item");
         li.setAttribute("onclick", "cargarDatos('" + contador + "')");
-        var texto = document.createTextNode(arrayArchivos[contador].name);
+        var texto = document.createTextNode(arrayArchivos[contador].getNombre());
         li.appendChild(texto);
         document.getElementById("listaArchivos").appendChild(li);
     }
