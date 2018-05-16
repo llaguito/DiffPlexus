@@ -104,10 +104,6 @@ th {
 	height: 20%;
 }
 
-.mdl-navigation__link {
-	font-size: 18px;
-}
-
 .mdl-navigation__link.active {
 	background-color: #e0e0e0;
 	font-weight: bold;
@@ -123,6 +119,11 @@ th {
 .mdl-layout__drawer > .mdl-layout__title, .mdl-layout__drawer > .mdl-layout-title {
 	padding: 0;
 	text-align: center;
+}
+
+.mdl-layout__drawer .mdl-navigation .mdl-navigation__link {
+	padding: 16px;
+	font-size: 14px;
 }
 
 .line-no {

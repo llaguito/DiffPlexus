@@ -16,7 +16,7 @@ var Evento = function() {
 //Array de objetos "Archivos"
 var arrayArchivos = [
     new Archivos("prueba", "./archivos_java/", "utf8"),
-    new Archivos("prueba", "./archivos_java/", "utf8")
+    new Archivos("ArchivoMuyLargoPorquePuedoNecesitoProbarEsteTipoDeCosas", "./archivos_java/", "utf8")
 ];
 var archivos = [];
 
