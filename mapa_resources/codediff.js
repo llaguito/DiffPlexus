@@ -5,8 +5,8 @@ var codediff = (function() {
             contextSize: 3,
             minJumpSize: 10,
             language: null,
-            beforeName: "Before",
-            afterName: "After"
+            beforeName: "Antes",
+            afterName: "Después"
         };
 
         this.params = $.extend({}, defaultParams, userParams);
