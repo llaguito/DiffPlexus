@@ -7,7 +7,7 @@ html, body {
 	font: 12px sans-serif;
 }
 body {
-	padding-top: 1.8em;
+	/*padding-top: 1.8em;*/
 	-webkit-box-sizing: border-box;
 	-moz-box-sizing: border-box;
 	box-sizing: border-box;
@@ -16,16 +16,14 @@ html, body, table, tbody, tr, td {
 	height: 100%;
 }
 table {
-	table-layout: fixed;
 	width: 100%;
 	height:auto;
-
 }
 ul{
 	padding: 3px 4px;
 }
 td {
-	width:40%;
+	/* width:40%; */
 	padding: 3px 4px;
 	border: 1px solid transparent;
 	vertical-align: top;
@@ -102,4 +100,33 @@ ins {
 th {
 	font-size: 2em;
 	height: 20%;
+}
+
+.mdl-navigation__link {
+	font-size: 18px;
+}
+
+.mdl-navigation__link.active {
+	background-color: #e0e0e0;
+	font-weight: bold;
+}
+
+.mdl-navigation__link:hover {
+	cursor: pointer;
+}
+
+.mdl-layout__content {
+	padding-top: 1.8em;
+}
+.diff-header {
+	text-align: center;
+}
+
+.mdl-layout__drawer > .mdl-layout__title, .mdl-layout__drawer > .mdl-layout-title {
+	padding: 0;
+	text-align: center;
+}
+
+.line-no {
+	width: 10%;
 }
