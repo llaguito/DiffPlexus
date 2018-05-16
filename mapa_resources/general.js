@@ -15,11 +15,10 @@ var Evento = function() {
 
 //Array de objetos "Archivos"
 var arrayArchivos = [
+    new Archivos("prueba", "./archivos_java/", "utf8"),
     new Archivos("prueba", "./archivos_java/", "utf8")
 ];
 var archivos = [];
-
-arrayArchivos.push(prueba);
 
 //Evento de espera de carga de página
 Evento(window, 'load', Inicio);
@@ -40,8 +39,6 @@ function lee(fichero, observador) {
     var original_loaded = false;
     var destino = null;
     var destino_loaded = false;
-
-    console.log(fichero.getPath() + fichero.getNombre())
 
     leeFichero(fichero.getPath() + fichero.getNombre() + ".java.original", 'page1', function(content) {
         original = content;
@@ -78,7 +75,7 @@ function ListarArchivos() {
     for (contador = 0; contador < arrayArchivos.length; contador++) {
         var li = document.createElement("li");
         li.setAttribute("class", "mdl-navigation__link mdl-list__item");
-        li.setAttribute("onclick", "cargarDatos('" + contador + "')");
+        li.setAttribute("onclick", "cargarDatos('" + contador + "', this)");
         var texto = document.createTextNode(arrayArchivos[contador].getNombre());
         li.appendChild(texto);
         document.getElementById("listaArchivos").appendChild(li);
@@ -87,7 +84,15 @@ function ListarArchivos() {
 
 
 //Carga el codigo de ambos archivos usando el Diff
-function cargarDatos(numero) {
+function cargarDatos(numero, elemento) {
+    var active = document.getElementsByClassName("active");
+    if(active.length!=0){
+        active[0].className = active[0].className.replace("active", "");
+        elemento.className += " active";
+    } else {
+        elemento.className += " active";
+    }
+    document.getElementById("title-file").innerHTML = arrayArchivos[0].getNombre().toUpperCase();
     document.getElementById("borrar").removeChild(document.getElementById("diffview"));
     var divDiff = document.createElement("div");
     divDiff.setAttribute("id", "diffview");
@@ -96,15 +101,4 @@ function cargarDatos(numero) {
         var diffDiv = document.getElementById("diffview");
         renderDiff(diffDiv, beforeText, afterText);
     });
-}
-
-
-var header = document.getElementById("listaArchivos");
-var links = header.getElementsByClassName("mdl-navigation__link");
-for (var i = 0; i < links.length; i++) {
-    links[i].addEventListener("click", function() {
-    var current = document.getElementsByClassName("active");
-    current[0].className = current[0].className.replace(" active", "");
-    this.className += " active";
-  });
 }
