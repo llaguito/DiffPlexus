@@ -13,13 +13,10 @@ var Evento = function() {
     else if (typeof window.attachEvent !== 'undefined') return ie_crearEvento;
 }();
 
-var primeros = new Archivos("prueba1.java.new", "prueba1.java.original", "Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.Esto es una prueba.", "Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.Es una prueba ahora.");
-var segundos = new Archivos("prueba.java.new", "prueba.java.original", "Esta es la segunda prueba.", "Es la segunda prueba ahora.");
-
 //Array de objetos "Archivos"
-var arrayArchivos = [];
-arrayArchivos.push(primeros);
-arrayArchivos.push(segundos);
+var arrayArchivos = [
+    { "name": "prueba", "path": "./archivos_java/", "charset": "" }
+];
 
 //Evento de espera de carga de página
 Evento(window, 'load', Inicio);
@@ -29,13 +26,11 @@ function Inicio() {
     ListarArchivos();
 }
 
-
+//Ejecuta el codigo Diff y lo imprime en pantalla
 function renderDiff(diffDiv, contentsBefore, contentsAfter) {
     diffDiv.appendChild(codediff.buildView(
         contentsBefore, contentsAfter, { language: 'js' }));
 }
-
-function getAllFiles() {}
 
 function lee(fichero, observador) {
     var original = null;
@@ -43,14 +38,15 @@ function lee(fichero, observador) {
     var destino = null;
     var destino_loaded = false;
 
-    leeFichero("../archivos_java" + fichero + ".original", 'page1', function(content) {
+    leeFichero(fichero.path + fichero.name + ".java.original", 'page1', function(content) {
         original = content;
         original_loaded = true;
         if (destino_loaded) {
             observador(original, destino);
         }
     });
-    leeFichero("../archivos_java" + fichero + ".new", 'page2', function(content) {
+
+    leeFichero(fichero.path + fichero.name + ".java.new", 'page2', function(content) {
         destino = content;
         destino_loaded = true;
         if (original_loaded) {
@@ -62,6 +58,8 @@ function lee(fichero, observador) {
 function leeFichero(fichero, inname, callback) {
     var iframe = document.getElementById(inname);
     iframe.src = fichero;
+
+    alert(iframe.contentWindow.document.body.innerText);
     setTimeout(function() {
         try {
             callback(iframe.contentWindow.document.body.innerText);
@@ -78,7 +76,7 @@ function ListarArchivos() {
         var li = document.createElement("li");
         li.setAttribute("class", "mdl-list__item");
         li.setAttribute("onclick", "cargarDatos('" + contador + "')");
-        var texto = document.createTextNode(arrayArchivos[contador].getFicheroOriginal() + "-" + arrayArchivos[contador].getFicheroNew());
+        var texto = document.createTextNode(arrayArchivos[contador].name);
         li.appendChild(texto);
         document.getElementById("listaArchivos").appendChild(li);
     }
@@ -91,8 +89,8 @@ function cargarDatos(numero) {
     var divDiff = document.createElement("div");
     divDiff.setAttribute("id", "diffview");
     document.getElementById("borrar").appendChild(divDiff);
-    var beforeText = arrayArchivos[numero].getCodigoOriginal();
-    var afterText = arrayArchivos[numero].getCodigoNew();
-    var diffDiv = document.getElementById("diffview");
-    renderDiff(diffDiv, beforeText, afterText);
+    lee(arrayArchivos[numero], function(beforeText, afterText) {
+        var diffDiv = document.getElementById("diffview");
+        renderDiff(diffDiv, beforeText, afterText);
+    });
 }
