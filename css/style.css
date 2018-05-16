@@ -123,6 +123,7 @@ th {
 
 .mdl-layout__drawer .mdl-navigation .mdl-navigation__link {
 	overflow: visible;
+	min-width: 100%;
 	width: fit-content;
 	width: -moz-fit-content;
 	width: -webkit-fit-content;
