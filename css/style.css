@@ -116,10 +116,6 @@ th {
 .mdl-navigation__link:hover {
 	cursor: pointer;
 }
-
-.mdl-layout__content {
-	padding-top: 1.8em;
-}
 .diff-header {
 	text-align: center;
 }
